@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function myGarden() { return me().data.gardenId; }
+    function memberOf(gardenId) { return signedIn() && myGarden() == gardenId; }
+    function adminOf(gardenId) {
+      return memberOf(gardenId) && me().data.role in ['owner', 'admin'];
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (uid == request.auth.uid ||
+        (resource.data.gardenId == myGarden() && me().data.role in ['owner','admin']));
+      allow create: if signedIn() && uid == request.auth.uid;
+      allow update: if signedIn() && (
+        // One-time migration from the pre-SaaS profile that had no gardenId.
+        (uid == request.auth.uid &&
+         !('gardenId' in resource.data) &&
+         request.resource.data.role == 'owner') ||
+        (uid == request.auth.uid &&
+         request.resource.data.gardenId == resource.data.gardenId &&
+         request.resource.data.role == resource.data.role)
+      ) || (
+        me().data.role == 'owner' &&
+        resource.data.gardenId == myGarden() &&
+        request.resource.data.gardenId == resource.data.gardenId
+      );
+    }
+
+    match /gardens/{gardenId} {
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow read: if memberOf(gardenId);
+      allow update: if adminOf(gardenId);
+
+      match /staff/{docId} {
+        allow read: if memberOf(gardenId);
+        allow write: if adminOf(gardenId);
+      }
+      match /shifts/{docId} {
+        allow read: if memberOf(gardenId);
+        allow write: if adminOf(gardenId);
+      }
+      match /events/{docId} {
+        allow read: if memberOf(gardenId);
+        allow write: if adminOf(gardenId);
+      }
+      match /requests/{docId} {
+        allow read: if memberOf(gardenId);
+        allow create: if memberOf(gardenId);
+        allow update, delete: if adminOf(gardenId);
+      }
+      match /invites/{code} {
+        allow read: if signedIn();
+        allow write: if adminOf(gardenId);
+      }
+    }
+  }
+}
