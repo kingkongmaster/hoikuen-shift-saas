@@ -28,6 +28,12 @@ service cloud.firestore {
       );
     }
 
+    match /inviteLookup/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && adminOf(request.resource.data.gardenId);
+      allow update, delete: if false;
+    }
+
     match /gardens/{gardenId} {
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
       allow read: if memberOf(gardenId);
