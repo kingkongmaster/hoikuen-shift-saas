@@ -72,11 +72,12 @@
 <script>
 firebase.initializeApp(APP_CONFIG.firebase);
 const auth=firebase.auth(), db=firebase.firestore(), fns=firebase.app().functions('asia-northeast1'), FV=firebase.firestore.FieldValue;
-let user=null, profile=null, garden=null, gardenId=null, staff=[], events=[], requests=[], shifts={}, holidays=[];
+let user=null, profile=null, garden=null, gardenId=null, staff=[], members=[], events=[], requests=[], shifts={}, holidays=[];
 let holidaySource='未取得';
 let year=new Date().getFullYear(), month=new Date().getMonth(), mode='my';
 const DOW=['日','月','火','水','木','金','土'];
 const shiftNames={E:'早出',N:'通常',L:'遅出',O:'希望休',P:'有給',H:'休日'};
+const JOB_ROLE_OPTIONS=['園長','副園長','主任','担任','副担任','フリー','補助'];
 
 const JP_HOLIDAY_FALLBACK=[
 {date:'2026-01-01',title:'元日'},{date:'2026-01-12',title:'成人の日'},{date:'2026-02-11',title:'建国記念の日'},{date:'2026-02-23',title:'天皇誕生日'},{date:'2026-03-20',title:'春分の日'},{date:'2026-04-29',title:'昭和の日'},{date:'2026-05-03',title:'憲法記念日'},{date:'2026-05-04',title:'みどりの日'},{date:'2026-05-05',title:'こどもの日'},{date:'2026-05-06',title:'休日'},{date:'2026-07-20',title:'海の日'},{date:'2026-08-11',title:'山の日'},{date:'2026-09-21',title:'敬老の日'},{date:'2026-09-22',title:'休日'},{date:'2026-09-23',title:'秋分の日'},{date:'2026-10-12',title:'スポーツの日'},{date:'2026-11-03',title:'文化の日'},{date:'2026-11-23',title:'勤労感謝の日'},
@@ -97,6 +98,7 @@ async function loadJapaneseHolidays(){
 }
 
 const isAdmin=()=>profile&&['owner','admin'].includes(profile.role);
+const isOwner=()=>profile?.role==='owner';
 const col=(name)=>db.collection('gardens').doc(gardenId).collection(name);
 const ymd=(y,m,d)=>`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -161,8 +163,10 @@ async function boot(){
 }
 async function loadAll(){
  const requestQuery=isAdmin()?col('requests'):col('requests').where('uid','==',user.uid);
- const [ss,es,rs]=await Promise.all([col('staff').get(),col('events').get(),requestQuery.get()]);
+ const memberQuery=isAdmin()?col('members').get():Promise.resolve(null);
+ const [ss,es,rs,ms]=await Promise.all([col('staff').get(),col('events').get(),requestQuery.get(),memberQuery]);
  staff=ss.docs.map(d=>({id:d.id,...d.data()}));events=es.docs.map(d=>({id:d.id,...d.data()}));requests=rs.docs.map(d=>({id:d.id,...d.data()}));
+ members=ms?ms.docs.map(d=>({id:d.id,...d.data()})):[];
  await Promise.all([loadShifts(),loadJapaneseHolidays()]);renderAll();
 }
 async function loadShifts(){
@@ -194,9 +198,36 @@ function openDay(date){
  h+='<h3>園の予定</h3>'+(ev.length?ev.map(e=>`<div class="notice">📌 ${esc(e.title)}</div>`).join(''):'<p>登録行事なし</p>');
  h+=`<h3>勤務職員 ${ws.length}名</h3>`+ws.map(s=>`<div class="listrow"><span><b>${esc(s.name)}</b><br><small>${esc(s.className||'補助')}</small></span><span class="pill ${getShift(date,s.id)}">${shiftNames[getShift(date,s.id)]}</span></div>`).join('');openModal(h)
 }
-function renderStaff(){staffList.innerHTML=staff.length?staff.map(s=>`<div class="listrow"><span><b>${esc(s.name)}</b><br><small>${esc(s.employment)}・${esc(s.className)}・${esc(s.shiftType||'全シフト')}</small></span><span class="badge">${s.saturday==='no'?'土曜勤務不可':`土曜 月${s.saturdayMax||2}回まで`}</span></div>`).join(''):'<p>職員未登録</p>'}
-function openStaffForm(){openModal(`<h2>職員登録</h2><div class="grid"><div><label>氏名</label><input id="fName"></div><div><label>メール</label><input id="fEmail" type="email"></div><div><label>雇用</label><select id="fEmp"><option>正職員</option><option>再雇用</option><option>パート</option></select></div><div><label>クラス</label><select id="fClass"><option>0歳児</option><option>1歳児</option><option>2歳児</option><option>3歳児</option><option>4歳児</option><option>5歳児</option><option>補助</option></select></div><div><label>勤務条件</label><select id="fShift"><option value="all">全シフト</option><option value="early">早出専門</option><option value="late">遅出専門</option><option value="normal">通常のみ</option></select></div><div><label>土曜</label><select id="fSat"><option value="yes">勤務可</option><option value="no">勤務不可</option></select></div><button class="btn primary" onclick="saveStaff()">登録</button></div>`)}
-async function saveStaff(){const ref=col('staff').doc();await ref.set({name:fName.value,email:fEmail.value,employment:fEmp.value,className:fClass.value,shiftType:fShift.value,saturday:fSat.value,saturdayMax:fSat.value==='no'?0:2,createdAt:FV.serverTimestamp()});closeModal();await loadAll()}
+const staffJobRoles=s=>Array.isArray(s?.jobRoles)?s.jobRoles.filter(role=>JOB_ROLE_OPTIONS.includes(role)):[];
+const memberForStaff=s=>members.find(member=>member.staffId===s.id)||null;
+function renderStaff(){
+ staffList.innerHTML=staff.length?staff.map(s=>{
+  const jobs=staffJobRoles(s),summary=[s.employment,s.className,...jobs].filter(Boolean).join('・')||'情報未設定';
+  const member=memberForStaff(s),systemRole=member?.role==='admin'?'システム権限: 管理者':'';
+  const edit=isAdmin()?`<button class="btn" onclick="openStaffForm('${s.id}')">編集</button>`:'';
+  const roleControl=isOwner()&&member&&member.id!==user.uid&&member.role!=='owner'?`<button class="btn" onclick="changeMemberRole('${member.id}','${member.role==='admin'?'staff':'admin'}')">${member.role==='admin'?'管理者を解除':'管理者にする'}</button>`:'';
+  return `<div class="listrow"><span><b>${esc(s.name)}</b><br><small>${esc(summary)}${systemRole?` ／ ${esc(systemRole)}`:''}</small></span><span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end"><span class="badge">${s.saturday==='no'?'土曜勤務不可':`土曜 月${s.saturdayMax||2}回まで`}</span>${edit}${roleControl}</span></div>`;
+ }).join(''):'<p>職員未登録</p>';
+}
+function openStaffForm(staffId=null){
+ if(!isAdmin())return;
+ const editing=staffId?staff.find(s=>s.id===staffId):null;if(staffId&&!editing)return;
+ const current=editing||{},jobs=staffJobRoles(current);
+ const options=(values,key)=>values.map(item=>{const value=typeof item==='string'?item:item.value,label=typeof item==='string'?item:item.label;return `<option value="${esc(value)}"${value===(current[key]||'')?' selected':''}>${esc(label)}</option>`}).join('');
+ const jobOptions=JOB_ROLE_OPTIONS.map(role=>`<option value="${esc(role)}"${jobs.includes(role)?' selected':''}>${esc(role)}</option>`).join('');
+ openModal(`<h2>${editing?'職員情報を編集':'職員登録'}</h2><div class="grid"><div><label>氏名</label><input id="fName" value="${esc(current.name||'')}"></div><div><label>メール</label><input id="fEmail" type="email" value="${esc(current.email||'')}"></div><div><label>雇用</label><select id="fEmp">${options(['正職員','再雇用','パート'],'employment')}</select></div><div><label>クラス</label><select id="fClass">${options(['0歳児','1歳児','2歳児','3歳児','4歳児','5歳児','補助'],'className')}</select></div><div><label>勤務条件</label><select id="fShift">${options([['all','全シフト'],['early','早出専門'],['late','遅出専門'],['normal','通常のみ']].map(([value,label])=>({value,label})),'shiftType')}</select></div><div><label>土曜</label><select id="fSat">${options([['yes','勤務可'],['no','勤務不可']].map(([value,label])=>({value,label})),'saturday')}</select></div><div><label>職務（複数選択可）</label><select id="fJobRoles" multiple size="7">${jobOptions}</select><small style="color:var(--muted)">⌘/Ctrlキーで複数選択できます。職務はシステム権限とは別です。</small></div><button class="btn primary" onclick="saveStaff('${editing?.id||''}')">${editing?'保存':'登録'}</button></div>`);
+}
+async function saveStaff(staffId=''){
+ if(!isAdmin())return;
+ const jobRoles=Array.from(fJobRoles.selectedOptions).map(option=>option.value);
+ const data={name:fName.value.trim(),email:fEmail.value.trim(),employment:fEmp.value,className:fClass.value,shiftType:fShift.value,saturday:fSat.value,saturdayMax:fSat.value==='no'?0:2,jobRoles,updatedAt:FV.serverTimestamp()};
+ const ref=staffId?col('staff').doc(staffId):col('staff').doc();if(!staffId)data.createdAt=FV.serverTimestamp();
+ await ref.set(data,{merge:!!staffId});closeModal();await loadAll();
+}
+async function changeMemberRole(uid,role){
+ if(!isOwner())return;
+ try{await fns.httpsCallable('setMemberRole')({gardenId,uid,role});msg('adminMsg',role==='admin'?'管理者権限を付与しました。':'管理者権限を解除しました。');await loadAll();renderStaff();}catch(e){msg('adminMsg',e.message||'権限の変更に失敗しました。',true)}
+}
 function renderEvents(){eventList.innerHTML=events.length?events.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<div class="listrow"><span><b>${esc(e.title)}</b><br><small>${esc(e.date)} / ${esc(e.type||'行事')}</small></span></div>`).join(''):'<p>行事未登録</p>'}
 function openEventForm(){openModal(`<h2>園行事登録</h2><div class="grid"><div><label>日付</label><input id="eDate" type="date"></div><div><label>行事名</label><input id="eTitle"></div><div><label>種別</label><select id="eType"><option>行事</option><option>休園</option><option>職員研修</option><option>会議</option></select></div><button class="btn primary" onclick="saveEvent()">登録</button></div>`)}
 async function saveEvent(){await col('events').add({date:eDate.value,title:eTitle.value,type:eType.value,createdAt:FV.serverTimestamp()});closeModal();await loadAll()}
