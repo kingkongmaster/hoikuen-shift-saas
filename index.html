@@ -52,7 +52,7 @@
 
  <section id="tab-staff" class="hidden"><div class="card"><div class="toolbar"><h2>職員</h2><button class="btn primary admin-only" onclick="openStaffForm()">＋ 職員登録</button></div><div id="staffList"></div></div></section>
  <section id="tab-events" class="hidden"><div class="card"><div class="toolbar"><h2>園行事</h2><button class="btn primary admin-only" onclick="openEventForm()">＋ 行事登録</button></div><div id="eventList"></div></div></section>
- <section id="tab-requests" class="hidden"><div class="card"><div class="toolbar"><h2>希望休申請</h2><button class="btn primary" onclick="openRequestForm()">＋ 申請</button></div><div id="requestList"></div></div></section>
+ <section id="tab-requests" class="hidden"><div class="card"><div class="toolbar"><h2>希望休申請</h2><button class="btn primary" onclick="openRequestForm()">＋ 申請</button></div><div style="display:flex;gap:6px;margin:12px 0"><button id="currentRequestsTab" class="btn primary" onclick="setRequestView('current')">現在の申請</button><button id="historyRequestsTab" class="btn" onclick="setRequestView('history')">申請履歴</button></div><div id="requestHistoryFilter" class="hidden" style="margin-bottom:12px"><label>年月で絞り込み</label><input id="requestHistoryMonth" type="month" onchange="renderRequests()"></div><div id="requestList"></div></div></section>
  <section id="tab-admin" class="hidden"><div class="card"><h2>園管理</h2>
    <div class="grid g2"><button class="btn blue" onclick="generateShifts()">🔁 表示月のシフト自動生成</button><button class="btn" onclick="createInvite()">📨 職員招待コードを発行</button></div>
    <div id="adminMsg"></div>
@@ -74,7 +74,7 @@
 <script>
 firebase.initializeApp(APP_CONFIG.firebase);
 const auth=firebase.auth(), db=firebase.firestore(), fns=firebase.app().functions('asia-northeast1'), FV=firebase.firestore.FieldValue;
-let user=null, profile=null, garden=null, gardenId=null, staff=[], members=[], events=[], requests=[], shifts={}, holidays=[];
+let user=null, profile=null, garden=null, gardenId=null, staff=[], members=[], events=[], requests=[], shifts={}, holidays=[], requestView='current';
 let holidaySource='未取得';
 let year=new Date().getFullYear(), month=new Date().getMonth(), mode='my';
 const DOW=['日','月','火','水','木','金','土'];
@@ -289,11 +289,44 @@ async function changeMemberRole(uid,role){
 function renderEvents(){eventList.innerHTML=events.length?events.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<div class="listrow"><span><b>${esc(e.title)}</b><br><small>${esc(e.date)} / ${esc(e.type||'行事')}</small></span></div>`).join(''):'<p>行事未登録</p>'}
 function openEventForm(){openModal(`<h2>園行事登録</h2><div class="grid"><div><label>日付</label><input id="eDate" type="date"></div><div><label>行事名</label><input id="eTitle"></div><div><label>種別</label><select id="eType"><option>行事</option><option>休園</option><option>職員研修</option><option>会議</option></select></div><button class="btn primary" onclick="saveEvent()">登録</button></div>`)}
 async function saveEvent(){await col('events').add({date:eDate.value,title:eTitle.value,type:eType.value,createdAt:FV.serverTimestamp()});closeModal();await loadAll()}
-const requestStatusName={pending:'申請中',approved:'承認',rejected:'却下','申請中':'申請中','承認':'承認'};
-function renderRequests(){const list=isAdmin()?requests:requests.filter(r=>r.uid===user.uid);requestList.innerHTML=list.length?list.map(r=>`<div class="listrow"><span><b>${esc(r.date)}</b><br><small>${esc(r.reason||'希望休')} / ${esc(requestStatusName[r.status]||r.status||'申請中')}</small></span>${isAdmin()&&!['approved','承認'].includes(r.status)?`<button class="btn" onclick="approveRequest('${r.id}')">承認</button>`:''}</div>`).join(''):'<p>申請なし</p>'}
+const requestStatusName={pending:'申請中',approved:'承認',rejected:'却下','申請中':'申請中','承認':'承認','却下':'却下'};
+function requestHistoryStart(date){
+ const match=String(date||'').match(/^(\d{4})-(\d{2})-\d{2}$/);if(!match)return null;
+ return new Date(Number(match[1]),Number(match[2])+1,1);
+}
+function isRequestHistory(r,now=new Date()){
+ const start=requestHistoryStart(r.date);if(!start)return false;
+ const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());return today>=start;
+}
+function requestTimestamp(value){
+ if(!value)return '';
+ const date=typeof value.toDate==='function'?value.toDate():value instanceof Date?value:null;
+ return date&&!Number.isNaN(date.getTime())?date.toLocaleString('ja-JP'):'';
+}
+function requestStaffName(r){return staff.find(s=>s.id===r.staffId)?.name||''}
+function setRequestView(view){requestView=view==='history'?'history':'current';renderRequests()}
+function renderRequests(){
+ const all=isAdmin()?requests:requests.filter(r=>r.uid===user.uid);
+ const current=all.filter(r=>!isRequestHistory(r)),history=all.filter(r=>isRequestHistory(r));
+ const list=(requestView==='history'?history:current).filter(r=>requestView!=='history'||!requestHistoryMonth?.value||String(r.date||'').startsWith(requestHistoryMonth.value)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+ currentRequestsTab?.classList.toggle('primary',requestView==='current');historyRequestsTab?.classList.toggle('primary',requestView==='history');
+ requestHistoryFilter?.classList.toggle('hidden',requestView!=='history');
+ requestList.innerHTML=list.length?list.map(r=>{
+  const status=requestStatusName[r.status]||r.status||'申請中',staffName=requestStaffName(r);
+  const created=requestTimestamp(r.createdAt),reviewed=requestTimestamp(r.approvedAt||r.rejectedAt||r.reviewedAt||r.updatedAt);
+  const canReview=isAdmin()&&requestView==='current'&&['pending','申請中'].includes(r.status);
+  return `<div class="listrow"><span><b>${esc(r.date)}</b>${staffName?` <small>／ ${esc(staffName)}</small>`:''}<br><small>${esc(r.reason||'希望休')} ／ ${esc(status)}${created?`<br>申請: ${esc(created)}`:''}${reviewed?`<br>承認・却下: ${esc(reviewed)}`:''}</small></span><span style="display:flex;gap:6px">${canReview?`<button class="btn" onclick="approveRequest('${r.id}')">承認</button><button class="btn danger" onclick="rejectRequest('${r.id}')">却下</button>`:''}</span></div>`;
+ }).join(''):`<p>${requestView==='history'?'該当する申請履歴はありません':'現在の申請はありません'}</p>`;
+}
 function openRequestForm(){openModal(`<h2>希望休申請</h2><div class="grid"><div><label>希望日</label><input id="rDate" type="date"></div><div><label>理由・メモ</label><input id="rReason"></div><button class="btn primary" onclick="saveRequest()">申請</button></div>`)}
 async function saveRequest(){await col('requests').add({uid:user.uid,staffId:myStaff()?.id||null,date:rDate.value,reason:rReason.value,status:'pending',createdAt:FV.serverTimestamp()});closeModal();await loadAll()}
-async function approveRequest(id){await col('requests').doc(id).update({status:'approved'});await loadAll()}
+async function reviewRequest(id,status){
+ if(!isAdmin())return;
+ const request=requests.find(r=>r.id===id);if(!request||isRequestHistory(request)||!['pending','申請中'].includes(request.status))return;
+ await col('requests').doc(id).update({status});await loadAll();
+}
+async function approveRequest(id){return reviewRequest(id,'approved')}
+async function rejectRequest(id){return reviewRequest(id,'rejected')}
 function allowedShift(s,prev){if(s.shiftType==='early')return 'E';if(s.shiftType==='late')return 'L';if(s.shiftType==='normal')return 'N';const seq=['E','N','L'];let pick=seq[Math.floor(Math.random()*3)];if((pick==='E'||pick==='L')&&pick===prev)pick='N';return pick}
 async function generateShifts(){
  if(!isAdmin())return; if(!staff.length)return msg('adminMsg','職員を登録してください。',true);
