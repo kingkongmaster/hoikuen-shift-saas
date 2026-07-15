@@ -67,10 +67,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-functions-compat.js"></script>
 <script src="./config.js"></script>
 <script>
 firebase.initializeApp(APP_CONFIG.firebase);
-const auth=firebase.auth(), db=firebase.firestore(), FV=firebase.firestore.FieldValue;
+const auth=firebase.auth(), db=firebase.firestore(), fns=firebase.app().functions('asia-northeast1'), FV=firebase.firestore.FieldValue;
 let user=null, profile=null, garden=null, gardenId=null, staff=[], events=[], requests=[], shifts={}, holidays=[];
 let holidaySource='未取得';
 let year=new Date().getFullYear(), month=new Date().getMonth(), mode='my';
@@ -140,23 +141,15 @@ auth.onAuthStateChanged(async u=>{
 async function createGarden(){
  const name=newGardenName.value.trim();if(!name)return msg('onboardmsg','園名を入力してください。',true);
  try{
-  const ref=db.collection('gardens').doc(); const batch=db.batch();
-  batch.set(ref,{name,ownerUid:user.uid,createdAt:FV.serverTimestamp()});
-  batch.set(db.collection('users').doc(user.uid),{email:user.email,gardenId:ref.id,role:'owner',staffId:null,createdAt:FV.serverTimestamp()});
-  await batch.commit(); profile={email:user.email,gardenId:ref.id,role:'owner',staffId:null};gardenId=ref.id;await boot();
+  const result=await fns.httpsCallable('createGarden')({name});
+  profile={email:user.email,gardenId:result.data.gardenId,role:result.data.role,staffId:result.data.staffId};gardenId=result.data.gardenId;await boot();
  }catch(e){msg('onboardmsg',e.message,true)}
 }
 async function joinGarden(){
- const code=inviteCode.value.trim().toUpperCase();if(!code)return msg('onboardmsg','招待コードを入力してください。',true);
+ const code=inviteCode.value.trim();if(!code)return msg('onboardmsg','招待コードを入力してください。',true);
  try{
-  const lookup=await db.collection('inviteLookup').doc(code).get();
-  if(!lookup.exists)throw new Error('招待コードが見つかりません。');
-  const gid=lookup.data().gardenId;
-  const inv=await db.collection('gardens').doc(gid).collection('invites').doc(code).get();
-  if(!inv.exists)throw new Error('招待コードが無効です。');
-  const data=inv.data();
-  await db.collection('users').doc(user.uid).set({email:user.email,gardenId:gid,role:'staff',staffId:data.staffId||null,createdAt:FV.serverTimestamp()});
-  profile={email:user.email,gardenId:gid,role:'staff',staffId:data.staffId||null};gardenId=gid;await boot();
+  const result=await fns.httpsCallable('acceptInvite')({code});
+  const snap=await db.collection('users').doc(user.uid).get();profile=snap.data();gardenId=result.data.gardenId;await boot();
  }catch(e){msg('onboardmsg',e.message,true)}
 }
 async function boot(){
@@ -167,7 +160,8 @@ async function boot(){
  await loadAll();showTab('calendar');
 }
 async function loadAll(){
- const [ss,es,rs]=await Promise.all([col('staff').get(),col('events').get(),col('requests').get()]);
+ const requestQuery=isAdmin()?col('requests'):col('requests').where('uid','==',user.uid);
+ const [ss,es,rs]=await Promise.all([col('staff').get(),col('events').get(),requestQuery.get()]);
  staff=ss.docs.map(d=>({id:d.id,...d.data()}));events=es.docs.map(d=>({id:d.id,...d.data()}));requests=rs.docs.map(d=>({id:d.id,...d.data()}));
  await Promise.all([loadShifts(),loadJapaneseHolidays()]);renderAll();
 }
@@ -206,10 +200,11 @@ async function saveStaff(){const ref=col('staff').doc();await ref.set({name:fNam
 function renderEvents(){eventList.innerHTML=events.length?events.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<div class="listrow"><span><b>${esc(e.title)}</b><br><small>${esc(e.date)} / ${esc(e.type||'行事')}</small></span></div>`).join(''):'<p>行事未登録</p>'}
 function openEventForm(){openModal(`<h2>園行事登録</h2><div class="grid"><div><label>日付</label><input id="eDate" type="date"></div><div><label>行事名</label><input id="eTitle"></div><div><label>種別</label><select id="eType"><option>行事</option><option>休園</option><option>職員研修</option><option>会議</option></select></div><button class="btn primary" onclick="saveEvent()">登録</button></div>`)}
 async function saveEvent(){await col('events').add({date:eDate.value,title:eTitle.value,type:eType.value,createdAt:FV.serverTimestamp()});closeModal();await loadAll()}
-function renderRequests(){const list=isAdmin()?requests:requests.filter(r=>r.uid===user.uid);requestList.innerHTML=list.length?list.map(r=>`<div class="listrow"><span><b>${esc(r.date)}</b><br><small>${esc(r.reason||'希望休')} / ${esc(r.status||'申請中')}</small></span>${isAdmin()&&r.status!=='承認'?`<button class="btn" onclick="approveRequest('${r.id}')">承認</button>`:''}</div>`).join(''):'<p>申請なし</p>'}
+const requestStatusName={pending:'申請中',approved:'承認',rejected:'却下','申請中':'申請中','承認':'承認'};
+function renderRequests(){const list=isAdmin()?requests:requests.filter(r=>r.uid===user.uid);requestList.innerHTML=list.length?list.map(r=>`<div class="listrow"><span><b>${esc(r.date)}</b><br><small>${esc(r.reason||'希望休')} / ${esc(requestStatusName[r.status]||r.status||'申請中')}</small></span>${isAdmin()&&!['approved','承認'].includes(r.status)?`<button class="btn" onclick="approveRequest('${r.id}')">承認</button>`:''}</div>`).join(''):'<p>申請なし</p>'}
 function openRequestForm(){openModal(`<h2>希望休申請</h2><div class="grid"><div><label>希望日</label><input id="rDate" type="date"></div><div><label>理由・メモ</label><input id="rReason"></div><button class="btn primary" onclick="saveRequest()">申請</button></div>`)}
-async function saveRequest(){await col('requests').add({uid:user.uid,staffId:myStaff()?.id||null,date:rDate.value,reason:rReason.value,status:'申請中',createdAt:FV.serverTimestamp()});closeModal();await loadAll()}
-async function approveRequest(id){await col('requests').doc(id).update({status:'承認'});await loadAll()}
+async function saveRequest(){await col('requests').add({uid:user.uid,staffId:myStaff()?.id||null,date:rDate.value,reason:rReason.value,status:'pending',createdAt:FV.serverTimestamp()});closeModal();await loadAll()}
+async function approveRequest(id){await col('requests').doc(id).update({status:'approved'});await loadAll()}
 function allowedShift(s,prev){if(s.shiftType==='early')return 'E';if(s.shiftType==='late')return 'L';if(s.shiftType==='normal')return 'N';const seq=['E','N','L'];let pick=seq[Math.floor(Math.random()*3)];if((pick==='E'||pick==='L')&&pick===prev)pick='N';return pick}
 async function generateShifts(){
  if(!isAdmin())return; if(!staff.length)return msg('adminMsg','職員を登録してください。',true);
@@ -223,8 +218,8 @@ async function generateShifts(){
 }
 async function createInvite(){
  if(!isAdmin())return;const unlinked=staff.filter(s=>s.email&&!s.invited);if(!unlinked.length)return msg('adminMsg','メール登録済みで未招待の職員がいません。',true);
- const s=unlinked[0],code=Math.random().toString(36).slice(2,10).toUpperCase();const b=db.batch();b.set(col('invites').doc(code),{staffId:s.id,email:s.email,createdAt:FV.serverTimestamp()});b.set(db.collection('inviteLookup').doc(code),{gardenId,staffId:s.id,createdAt:FV.serverTimestamp()});b.update(col('staff').doc(s.id),{invited:true});await b.commit();
- msg('adminMsg',`${s.name}先生 招待コード: ${code}`);
+ const s=unlinked[0],result=await fns.httpsCallable('createInvite')({gardenId,staffId:s.id});
+ msg('adminMsg',`${s.name}先生 招待コード: ${result.data.code}（有効期限: ${new Date(result.data.expiresAt).toLocaleString('ja-JP')}）`);
 }
 function connectGoogleCalendar(){
  if(!APP_CONFIG.googleCalendarClientId)return msg('googleMsg','Google OAuth クライアントIDが未設定です。READMEの手順で config.js に設定してください。',true);
