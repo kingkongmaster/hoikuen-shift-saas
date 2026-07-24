@@ -1,0 +1,35 @@
+{
+  "name": "@enshift/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "tsc -b --pretty false",
+    "test:month": "node test/month-utils.test.mjs",
+    "test:sprint9b2": "node test/setup-wizard.test.mjs",
+    "test:sprint9c": "node test/sprint9c.test.mjs",
+    "test:sprint10a": "node test/sprint10a.test.mjs",
+    "test:sprint10b": "node test/sprint10b.test.mjs",
+    "test:sprint10c": "node test/sprint10c.test.mjs",
+    "test:sprint11a": "node test/sprint11a.test.mjs",
+    "test:shift-display": "node test/shift-assignment-display.test.mjs",
+    "test:regression": "npm run test:month && npm run test:sprint9b2 && npm run test:sprint9c && npm run test:sprint10a && npm run test:sprint10b && npm run test:sprint10c && npm run test:sprint11a && npm run test:shift-display"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^8.1.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}

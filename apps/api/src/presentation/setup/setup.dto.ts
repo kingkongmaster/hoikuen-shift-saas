@@ -1,0 +1,4 @@
+import { IsBoolean, IsEmail, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+export class UpdateTenantDto { @IsString() @MaxLength(120) name!: string; @IsOptional() @IsString() @MaxLength(40) phone?: string; @IsOptional() @IsString() @MaxLength(16) postalCode?: string; @IsOptional() @IsString() @MaxLength(60) prefecture?: string; @IsOptional() @IsString() @MaxLength(80) city?: string; @IsOptional() @IsString() @MaxLength(160) addressLine?: string; @IsOptional() @IsString() @MaxLength(120) contactName?: string; @IsOptional() @IsEmail() @MaxLength(254) contactEmail?: string; @IsOptional() @IsString() @MaxLength(64) timezone?: string; }
+export class UpdateProgressDto { @IsInt() @Min(1) @Max(7) currentStep!: number; }
+export class UpdateConsentsDto { @IsOptional() @IsBoolean() acceptTerms?: boolean; @IsOptional() @IsBoolean() acceptPrivacy?: boolean; }

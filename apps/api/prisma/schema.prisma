@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  ADMIN
+  DIRECTOR
+  CHIEF
+  STAFF
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  REEMPLOYED
+}
+
+enum AssignedClass {
+  AGE_0
+  AGE_1
+  AGE_2
+  AGE_3
+  AGE_4
+  AGE_5
+  FREE
+  SUPPORT
+}
+
+enum ShiftRequestType {
+  DAY_OFF
+  PAID_LEAVE
+  SUMMER_LEAVE
+  BEREAVEMENT
+  HALF_DAY_AM
+  HALF_DAY_PM
+  OTHER
+}
+
+enum ShiftRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum MonthlyShiftStatus {
+  DRAFT
+  CONFIRMED
+}
+
+enum ShiftType {
+  EARLY
+  NORMAL
+  LATE
+  OFF
+  PAID_LEAVE
+  SUMMER_LEAVE
+  AM_HALF
+  PM_HALF
+  OTHER
+}
+
+enum NotificationType {
+  SHIFT_CONFIRMED
+  SHIFT_UPDATED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
+  SHIFT_SWAP_REQUEST
+  SHIFT_SWAP_APPROVED
+  SHIFT_SWAP_REJECTED
+  SYSTEM
+}
+
+enum ShiftSwapStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+enum SubscriptionPlan {
+  TRIAL
+  STANDARD
+  PROFESSIONAL
+}
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+enum SetupStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+model Tenant {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String
+  code        String?      @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+  staff       Staff[]
+  requests    ShiftRequest[]
+  monthlyShifts MonthlyShift[]
+  assignments ShiftAssignment[]
+  shiftSetting TenantShiftSetting?
+  classRequirements ClassStaffingRequirement[]
+  closedDates TenantClosedDate[]
+  notifications Notification[]
+  shiftSwapRequests ShiftSwapRequest[]
+  auditLogs AuditLog[]
+  subscription TenantSubscription?
+  invitations Invitation[]
+  displayName String?
+  phone String?
+  postalCode String?
+  prefecture String?
+  city String?
+  addressLine String?
+  contactName String?
+  contactEmail String?
+  timezone String @default("Asia/Tokyo")
+  setupStatus SetupStatus @default(COMPLETED)
+  setupCurrentStep Int @default(7)
+  setupCompletedAt DateTime?
+  termsAcceptedAt DateTime?
+  privacyAcceptedAt DateTime?
+  termsVersion String?
+  privacyVersion String?
+}
+
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String       @unique
+  passwordHash String
+  displayName  String
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  staff        Staff[]
+  notifications Notification[]
+  requestedSwaps ShiftSwapRequest[] @relation("SwapRequester")
+  targetSwaps ShiftSwapRequest[] @relation("SwapTarget")
+  auditLogs AuditLog[]
+  isPlatformAdmin Boolean @default(false)
+}
+
+model TenantSubscription {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @db.Uuid
+  plan SubscriptionPlan @default(TRIAL)
+  status SubscriptionStatus @default(TRIAL)
+  trialStartedAt DateTime?
+  trialEndsAt DateTime?
+  currentPeriodStartedAt DateTime?
+  currentPeriodEndsAt DateTime?
+  suspendedAt DateTime?
+  cancelledAt DateTime?
+  cancellationReason String?
+  suspensionReason String?
+  staffLimit Int @default(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:Cascade)
+  @@index([status, trialEndsAt])
+}
+
+model Invitation {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  staffId String? @db.Uuid
+  email String?
+  role MembershipRole @default(STAFF)
+  tokenHash String @unique
+  status InvitationStatus @default(PENDING)
+  expiresAt DateTime
+  acceptedAt DateTime?
+  revokedAt DateTime?
+  createdByUserId String @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:Cascade)
+  @@index([tenantId,status,expiresAt])
+}
+
+model Membership {
+  tenantId  String         @db.Uuid
+  userId    String         @db.Uuid
+  role      MembershipRole
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, userId])
+  @@index([userId, isActive])
+}
+
+model Staff {
+  id                   String         @id @default(uuid()) @db.Uuid
+  tenantId             String         @db.Uuid
+  userId               String?        @db.Uuid
+  employeeNumber       String
+  displayName          String
+  email                String?
+  jobTitle             String?
+  employmentType       EmploymentType @default(FULL_TIME)
+  assignedClass        AssignedClass  @default(FREE)
+  canWorkEarly         Boolean        @default(true)
+  canWorkRegular       Boolean        @default(true)
+  canWorkLate          Boolean        @default(true)
+  earlyShiftOnly       Boolean        @default(false)
+  lateShiftOnly        Boolean        @default(false)
+  canWorkSaturdays     Boolean        @default(true)
+  monthlyWorkHourLimit Int?
+  weeklyAvailableDays  Int?
+  isActive             Boolean        @default(true)
+  notes                String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  tenant               Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user                 User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  requests             ShiftRequest[]
+  assignments          ShiftAssignment[]
+
+  @@unique([tenantId, employeeNumber])
+  @@unique([tenantId, userId])
+  @@index([tenantId, isActive])
+}
+
+model ShiftRequest {
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @db.Uuid
+  staffId      String             @db.Uuid
+  requestDate  DateTime           @db.Date
+  requestType  ShiftRequestType
+  status       ShiftRequestStatus @default(PENDING)
+  reason       String?
+  adminComment String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff        Staff              @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, requestDate, requestType])
+  @@index([tenantId, requestDate, status])
+  @@index([tenantId, staffId, requestDate])
+}
+
+model MonthlyShift {
+  id                String             @id @default(uuid()) @db.Uuid
+  tenantId          String             @db.Uuid
+  targetMonth       DateTime           @db.Date
+  status            MonthlyShiftStatus @default(DRAFT)
+  createdByUserId   String             @db.Uuid
+  confirmedByUserId String?            @db.Uuid
+  confirmedAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignments       ShiftAssignment[]
+
+  @@unique([tenantId, targetMonth])
+  @@index([tenantId, status, targetMonth])
+}
+
+model ShiftAssignment {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @db.Uuid
+  monthlyShiftId String       @db.Uuid
+  staffId        String       @db.Uuid
+  workDate       DateTime     @db.Date
+  shiftType      ShiftType
+  startTime      String?
+  endTime        String?
+  breakMinutes   Int?
+  note           String?
+  assignedClass  AssignedClass?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  monthlyShift   MonthlyShift @relation(fields: [monthlyShiftId], references: [id], onDelete: Cascade)
+  staff          Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@unique([monthlyShiftId, staffId, workDate])
+  @@index([tenantId, staffId, workDate])
+  @@index([monthlyShiftId, workDate])
+}
+
+model TenantShiftSetting {
+  id                      String   @id @default(uuid()) @db.Uuid
+  tenantId                String   @unique @db.Uuid
+  weekdayEarlyRequired    Int      @default(2)
+  weekdayLateRequired     Int      @default(2)
+  saturdayEarlyRequired   Int      @default(2)
+  saturdayLateRequired    Int      @default(2)
+  saturdayMinimumStaff    Int      @default(3)
+  directorCountsTowardStaffing Boolean @default(false)
+  directorClassPlacementMode String @default("NONE")
+  saturdayOperationEnabled Boolean @default(true)
+  sundayOperationEnabled  Boolean  @default(false)
+  maxConsecutiveWorkDays  Int      @default(6)
+  maxConsecutiveEarlyDays Int      @default(1)
+  maxConsecutiveLateDays  Int      @default(1)
+  defaultStartEarly       String   @default("07:00")
+  defaultEndEarly         String   @default("16:00")
+  defaultStartNormal      String   @default("08:30")
+  defaultEndNormal        String   @default("17:00")
+  defaultStartLate        String   @default("11:00")
+  defaultEndLate          String   @default("19:30")
+  defaultBreakMinutes     Int      @default(60)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model ClassStaffingRequirement {
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @db.Uuid
+  classType        AssignedClass
+  weekdayRequired  Int           @default(0)
+  saturdayRequired Int           @default(0)
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, classType])
+  @@index([tenantId, isActive])
+}
+
+model TenantClosedDate {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  closedDate DateTime @db.Date
+  name       String
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, closedDate])
+  @@index([tenantId, closedDate])
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @db.Uuid
+  memberId  String           @db.Uuid
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member    User             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, memberId, isRead, createdAt])
+}
+
+model ShiftSwapRequest {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @db.Uuid
+  requesterId    String          @db.Uuid
+  targetMemberId String          @db.Uuid
+  requestDate    DateTime        @db.Date
+  status         ShiftSwapStatus @default(PENDING)
+  requestComment String?
+  adminComment   String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requester      User            @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  targetMember   User            @relation("SwapTarget", fields: [targetMemberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, requesterId, createdAt])
+  @@index([tenantId, targetMemberId, status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  memberId   String   @db.Uuid
+  action     String
+  targetType String
+  targetId   String
+  detail     Json?
+  createdAt  DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member     User     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@index([tenantId, memberId, createdAt])
+}

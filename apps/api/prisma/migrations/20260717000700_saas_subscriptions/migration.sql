@@ -1,0 +1,15 @@
+CREATE TYPE "SubscriptionPlan" AS ENUM ('TRIAL','STANDARD','PROFESSIONAL');
+CREATE TYPE "SubscriptionStatus" AS ENUM ('TRIAL','ACTIVE','PAST_DUE','SUSPENDED','CANCELLED','EXPIRED');
+CREATE TYPE "SetupStatus" AS ENUM ('NOT_STARTED','IN_PROGRESS','COMPLETED');
+CREATE TYPE "InvitationStatus" AS ENUM ('PENDING','ACCEPTED','REVOKED','EXPIRED');
+ALTER TABLE "User" ADD COLUMN "isPlatformAdmin" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Tenant" ADD COLUMN "displayName" TEXT, ADD COLUMN "phone" TEXT, ADD COLUMN "postalCode" TEXT, ADD COLUMN "prefecture" TEXT, ADD COLUMN "city" TEXT, ADD COLUMN "addressLine" TEXT, ADD COLUMN "contactName" TEXT, ADD COLUMN "contactEmail" TEXT, ADD COLUMN "timezone" TEXT NOT NULL DEFAULT 'Asia/Tokyo', ADD COLUMN "setupStatus" "SetupStatus" NOT NULL DEFAULT 'COMPLETED', ADD COLUMN "setupCurrentStep" INTEGER NOT NULL DEFAULT 7, ADD COLUMN "setupCompletedAt" TIMESTAMP(3), ADD COLUMN "termsAcceptedAt" TIMESTAMP(3);
+CREATE TABLE "TenantSubscription" ("id" UUID NOT NULL, "tenantId" UUID NOT NULL, "plan" "SubscriptionPlan" NOT NULL DEFAULT 'TRIAL', "status" "SubscriptionStatus" NOT NULL DEFAULT 'TRIAL', "trialStartedAt" TIMESTAMP(3), "trialEndsAt" TIMESTAMP(3), "currentPeriodStartedAt" TIMESTAMP(3), "currentPeriodEndsAt" TIMESTAMP(3), "suspendedAt" TIMESTAMP(3), "cancelledAt" TIMESTAMP(3), "cancellationReason" TEXT, "suspensionReason" TEXT, "staffLimit" INTEGER NOT NULL DEFAULT 20, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "TenantSubscription_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "TenantSubscription_tenantId_key" ON "TenantSubscription"("tenantId");
+CREATE INDEX "TenantSubscription_status_trialEndsAt_idx" ON "TenantSubscription"("status","trialEndsAt");
+ALTER TABLE "TenantSubscription" ADD CONSTRAINT "TenantSubscription_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE "Invitation" ("id" UUID NOT NULL, "tenantId" UUID NOT NULL, "staffId" UUID, "email" TEXT, "role" "MembershipRole" NOT NULL DEFAULT 'STAFF', "tokenHash" TEXT NOT NULL, "status" "InvitationStatus" NOT NULL DEFAULT 'PENDING', "expiresAt" TIMESTAMP(3) NOT NULL, "acceptedAt" TIMESTAMP(3), "revokedAt" TIMESTAMP(3), "createdByUserId" UUID NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Invitation_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "Invitation_tokenHash_key" ON "Invitation"("tokenHash");
+CREATE INDEX "Invitation_tenantId_status_expiresAt_idx" ON "Invitation"("tenantId","status","expiresAt");
+ALTER TABLE "Invitation" ADD CONSTRAINT "Invitation_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+INSERT INTO "TenantSubscription" ("id","tenantId","plan","status","staffLimit","currentPeriodStartedAt","createdAt","updatedAt") SELECT gen_random_uuid(), "id", 'STANDARD', 'ACTIVE', 50, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM "Tenant";

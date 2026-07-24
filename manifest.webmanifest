@@ -1,9 +1,0 @@
-{
-  "name": "HoikuShift SaaS",
-  "short_name": "HoikuShift",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#f4f7fb",
-  "theme_color": "#1e3a5f",
-  "lang": "ja"
-}

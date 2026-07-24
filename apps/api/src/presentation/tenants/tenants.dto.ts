@@ -1,0 +1,1 @@
+import { IsOptional, IsString, Matches, MaxLength } from 'class-validator'; export class CreateTenantDto{@IsString()@MaxLength(100)name!:string;@Matches(/^[a-z0-9-]{3,40}$/)code!:string;@IsOptional()@IsString()@MaxLength(100)adminDisplayName?:string;@IsOptional()@IsString()timezone?:string}
