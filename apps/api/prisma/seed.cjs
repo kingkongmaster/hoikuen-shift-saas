@@ -91,9 +91,9 @@ async function main() {
     { employeeNumber: 'STAFF-009', displayName: '中村 葵', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_3, jobTitle: '3歳児担任' },
     { employeeNumber: 'STAFF-010', displayName: '小林 凛', employmentType: EmploymentType.PART_TIME, assignedClass: AssignedClass.AGE_3, jobTitle: '3歳児担任', monthlyWorkHourLimit: 120, weeklyAvailableDays: 4, canWorkSaturdays: false },
     { employeeNumber: 'STAFF-011', displayName: '加藤 芽依', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_4, jobTitle: '4歳児担任' },
-    { employeeNumber: 'STAFF-012', displayName: '吉田 美月', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_5, jobTitle: '5歳児担任', notes: '土曜保育対応を含む5歳児担当' },
-    { employeeNumber: 'STAFF-013', displayName: '山田 結月', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.FREE, jobTitle: '主任' },
-    { employeeNumber: 'STAFF-014', displayName: '佐々木 澪', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.FREE, jobTitle: 'フリー保育士' },
+    { employeeNumber: 'STAFF-012', displayName: '吉田 美月', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_4, jobTitle: '4歳児担任', notes: '土曜保育対応を含む4歳児担当' },
+    { employeeNumber: 'STAFF-013', displayName: '山田 結月', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_5, jobTitle: '5歳児担任' },
+    { employeeNumber: 'STAFF-014', displayName: '佐々木 澪', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_5, jobTitle: '子育て支援担当', notes: '子育て支援担当。通常の勤務条件に従い自動生成対象' },
   ];
 
   for (const member of demoStaff) {
@@ -130,8 +130,8 @@ async function main() {
   });
   await prisma.staff.upsert({
     where: { tenantId_userId: { tenantId: tenant.id, userId: staffUser.id } },
-    update: { employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: '保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT, isActive: true },
-    create: { tenantId: tenant.id, userId: staffUser.id, employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: '保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT },
+    update: { employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: 'フリー保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT, isActive: true },
+    create: { tenantId: tenant.id, userId: staffUser.id, employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: 'フリー保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT },
   });
   const activeDemoEmployeeNumbers = ['ADMIN-001', ...Array.from({ length: 14 }, (_, index) => `STAFF-${String(index + 1).padStart(3, '0')}`)];
   await prisma.staff.updateMany({

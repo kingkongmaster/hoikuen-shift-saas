@@ -78,6 +78,7 @@ export class ShiftsService {
         });
       }
     }
+    await this.validateFixedClassSpecialShiftUniqueness(user.tenantId, schedule.id, inputs, staff);
     await this.prisma.$transaction(inputs.map((input) => this.prisma.shiftAssignment.upsert({
       where: { monthlyShiftId_staffId_workDate: { monthlyShiftId: schedule.id, staffId: input.staffId, workDate: this.date(input.workDate) } },
       create: this.assignmentData(schedule, input),
@@ -106,16 +107,17 @@ export class ShiftsService {
     const startedAt = Date.now();
     const schedule = await this.requireEditable(user, id);
     const range = this.monthRange(schedule.targetMonth);
-    const [staff, requests, setting, requirements, closedDates, directorMemberships] = await Promise.all([
+    const [staff, requests, setting, requirements, closedDates, managerMemberships] = await Promise.all([
       this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, weeklyAvailableDays: true }, orderBy: { employeeNumber: 'asc' } }),
       this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
       this.settings.ensureSetting(user.tenantId),
       this.settings.requirements(user),
       this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } }, select: { closedDate: true, name: true } }),
-      this.prisma.membership.findMany({ where: { tenantId: user.tenantId, role: MembershipRole.DIRECTOR, isActive: true }, select: { userId: true } }),
+      this.prisma.membership.findMany({ where: { tenantId: user.tenantId, role: { in: [MembershipRole.ADMIN, MembershipRole.DIRECTOR] }, isActive: true }, select: { userId: true } }),
     ]);
-    const directorUserIds = new Set(directorMemberships.map((item) => item.userId));
-    const generated = generateRuleBasedSchedule(schedule.targetMonth, staff.map((item) => ({ ...item, isDirector: !!item.userId && directorUserIds.has(item.userId) })), requests, { ...setting, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates });
+    const managerUserIds = new Set(managerMemberships.map((item) => item.userId));
+    const generationStaff = staff.filter((item) => !item.userId || !managerUserIds.has(item.userId));
+    const generated = generateRuleBasedSchedule(schedule.targetMonth, generationStaff.map((item) => ({ ...item, isDirector: false })), requests, { ...setting, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates });
     await this.prisma.$transaction([
       this.prisma.shiftAssignment.deleteMany({ where: { monthlyShiftId: schedule.id } }),
       this.prisma.shiftAssignment.createMany({ data: generated.assignments.map((assignment) => ({ tenantId: user.tenantId, monthlyShiftId: schedule.id, ...assignment })) }),
@@ -154,14 +156,31 @@ export class ShiftsService {
       this.prisma.membership.findMany({ where: { tenantId: user.tenantId, role: MembershipRole.DIRECTOR, isActive: true }, select: { userId: true } }),
     ]);
     const directorUserIds = new Set(directorMemberships.map((item) => item.userId));
-    const mark = <T extends { userId: string | null }>(item: T) => ({ ...item, isDirector: !!item.userId && directorUserIds.has(item.userId) });
+    const mark = <T extends { id: string; userId: string | null }>(item: T) => ({ ...item, isDirector: !!item.userId && directorUserIds.has(item.userId) });
     const assignments = rawAssignments.map((item) => ({ ...item, staff: mark(item.staff) }));
     const staff = rawStaff.map(mark);
-    return { schedule, assignments, staff, requests, warnings: manager ? this.warnings(assignments, requests) : [] };
+    const summaries = staff.map((member) => { const rows = assignments.filter((item) => item.staffId === member.id); return { staffId: member.id, workDays: rows.filter((item) => (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length, workMinutes: rows.reduce((sum, item) => sum + this.minutes(item), 0) }; });
+    return { schedule, assignments, staff, requests, summaries, warnings: manager ? this.warnings(assignments, requests) : [] };
+  }
+
+  private async validateFixedClassSpecialShiftUniqueness(tenantId: string, scheduleId: string, inputs: AssignmentInputDto[], inputStaff: Array<{ id: string; assignedClass: any }>) {
+    const existing = await this.prisma.shiftAssignment.findMany({ where: { monthlyShiftId: scheduleId }, select: { staffId: true, workDate: true, shiftType: true, staff: { select: { assignedClass: true } } } });
+    const inputKeys = new Set(inputs.map((item) => `${item.staffId}:${item.workDate}`));
+    const classByStaff = new Map(inputStaff.map((item) => [item.id, item.assignedClass]));
+    const rows = existing.filter((item) => !inputKeys.has(`${item.staffId}:${this.isoDate(item.workDate)}`)).map((item) => ({ staffId: item.staffId, workDate: this.isoDate(item.workDate), shiftType: item.shiftType, assignedClass: item.staff.assignedClass }))
+      .concat(inputs.map((item) => ({ staffId: item.staffId, workDate: item.workDate, shiftType: item.shiftType, assignedClass: classByStaff.get(item.staffId) })));
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if ((row.shiftType !== ShiftType.EARLY && row.shiftType !== ShiftType.LATE) || !String(row.assignedClass).startsWith('AGE_')) continue;
+      const key = `${row.workDate}:${row.assignedClass}:${row.shiftType}`;
+      if (seen.has(key)) throw new ConflictException({ message: '同じ担当クラスの職員を同じ早出または同じ遅出に配置できません。', warnings: [{ code: 'FIXED_CLASS_SPECIAL_SHIFT_DUPLICATE', staffId: row.staffId, workDate: row.workDate, message: `${row.workDate}：${row.assignedClass}で${row.shiftType === ShiftType.EARLY ? '早出' : '遅出'}職員が重複しています。`, severity: 'blocking' }] });
+      seen.add(key);
+    }
   }
 
   private warnings(assignments: Array<any>, requests: Array<any>): Warning[] {
     const warnings: Warning[] = [];
+    const specialShiftClasses = new Set<string>();
     const requestMap = new Map(requests.filter((request) => request.status === ShiftRequestStatus.APPROVED || request.status === ShiftRequestStatus.PENDING).map((request) => [`${request.staffId}:${this.isoDate(request.requestDate)}`, request]));
     const byStaff = new Map<string, Array<any>>();
     for (const assignment of assignments) {
@@ -171,6 +190,11 @@ export class ShiftsService {
       if (request && workingShiftTypes.includes(assignment.shiftType)) warnings.push({ code: request.status === ShiftRequestStatus.APPROVED ? 'APPROVED_REQUEST_CONFLICT' : 'PENDING_REQUEST_CONFLICT', staffId: assignment.staffId, workDate: date, message: `${assignment.staff.displayName}さんの${request.status === ShiftRequestStatus.APPROVED ? '承認済み' : '申請中'}希望休と勤務が重複しています。`, severity: request.status === ShiftRequestStatus.APPROVED ? 'blocking' : 'warning' });
       if (assignment.shiftType === ShiftType.EARLY && !assignment.staff.canWorkEarly) warnings.push(this.warning('EARLY_NOT_AVAILABLE', assignment, '早出不可の職員に早出を割り当てています。'));
       if (assignment.shiftType === ShiftType.LATE && !assignment.staff.canWorkLate) warnings.push(this.warning('LATE_NOT_AVAILABLE', assignment, '遅出不可の職員に遅出を割り当てています。'));
+      if ((assignment.shiftType === ShiftType.EARLY || assignment.shiftType === ShiftType.LATE) && String(assignment.staff.assignedClass).startsWith('AGE_')) {
+        const classKey = `${date}:${assignment.staff.assignedClass}:${assignment.shiftType}`;
+        if (specialShiftClasses.has(classKey)) warnings.push({ code: 'FIXED_CLASS_SPECIAL_SHIFT_DUPLICATE', staffId: assignment.staffId, workDate: date, message: `${date}：${assignment.staff.assignedClass}で${assignment.shiftType === ShiftType.EARLY ? '早出' : '遅出'}職員が重複しています。`, severity: 'blocking' });
+        specialShiftClasses.add(classKey);
+      }
       if (new Date(`${date}T00:00:00Z`).getUTCDay() === 6 && workingShiftTypes.includes(assignment.shiftType) && !assignment.staff.canWorkSaturdays) warnings.push(this.warning('SATURDAY_NOT_AVAILABLE', assignment, '土曜日勤務不可の職員に勤務を割り当てています。'));
       const list = byStaff.get(assignment.staffId) ?? []; list.push(assignment); byStaff.set(assignment.staffId, list);
     }

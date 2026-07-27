@@ -26,6 +26,8 @@ export function HomeDashboard({ session, notifications, onOpen }: { session: Ses
   const unread = notifications.filter((item) => !item.isRead);
   if (loading) return <div><span className="sr-only" role="status">今日の予定を確認しています…</span><SkeletonState cards={3} label="今日の予定を確認しています…" /></div>;
   return <div className="space-y-5">
+    {(session.role === 'ADMIN' || session.role === 'DIRECTOR') && <AdminHomeSummary session={session} notifications={notifications} onOpen={onOpen} />}
+
     <section className="today-card" aria-labelledby="today-shift-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><p className="eyebrow">TODAY・{formatDate(today)}</p><h3 id="today-shift-title" className="mt-2 text-xl font-bold">今日の勤務</h3></div>
@@ -41,8 +43,6 @@ export function HomeDashboard({ session, notifications, onOpen }: { session: Ses
       </div> : <div className="mt-6 rounded-2xl bg-white/75 p-5"><p className="text-lg font-bold">{scheduleConfirmed ? '今日は勤務登録がありません' : '今日の勤務はまだ確定していません'}</p><p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">確定後、この場所に出勤・退勤時刻が表示されます。</p></div>}
       <button type="button" onClick={() => onOpen('shifts')} className="btn-primary mt-6 w-full sm:w-fit"><span className="action-symbol" aria-hidden="true">勤</span>月間シフトを見る</button>
     </section>
-
-    {(session.role === 'ADMIN' || session.role === 'DIRECTOR') && <AdminHomeSummary session={session} notifications={notifications} onOpen={onOpen} />}
 
     <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
       <section className="card" aria-labelledby="today-news-title">
