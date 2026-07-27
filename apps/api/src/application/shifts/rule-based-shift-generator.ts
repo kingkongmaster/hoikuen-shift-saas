@@ -66,7 +66,21 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     }
     function compare(type: ShiftType) { return (a: GeneratorStaff, b: GeneratorStaff) => score(a, type) - score(b, type) || a.employeeNumber.localeCompare(b.employeeNumber, 'ja'); }
     function score(member: GeneratorStaff, type: ShiftType) { const dedicated = type === ShiftType.EARLY ? member.earlyShiftOnly : type === ShiftType.LATE ? member.lateShiftOnly : false; return (dedicated ? 0 : 1000) + (member.isDirector ? 250 : 0) + ((saturday || sunday) ? (saturdayCount.get(member.id) ?? 0) * 100 : 0) + (workCount.get(member.id) ?? 0); }
-    function allocate(type: ShiftType, required: number) { let count = 0; for (const member of staff.filter((m) => day.get(m.id)?.shiftType === ShiftType.OFF && eligible(m, type)).sort(compare(type)).slice(0, required)) { day.set(member.id, assignment(member.id, workDate, type, options, null, member.isDirector ? null : member.assignedClass)); count += 1; } if (count < required) add({ code: type === ShiftType.EARLY ? 'EARLY_SHORTAGE' : 'LATE_SHORTAGE', level: 'ERROR', workDate: key, required, assigned: count, message: `${key}（${weekdays[workDate.getUTCDay()]}）の${type === ShiftType.EARLY ? '早出' : '遅出'}が${required - count}人不足しています。` }); if (saturday && count < required) add({ code: 'SATURDAY_SHORTAGE', level: 'WARNING', workDate: key, required, assigned: count, message: `${key}の土曜勤務可能職員が不足しています。` }); }
+    function allocate(type: ShiftType, required: number) {
+      let count = 0; const usedFixedClasses = new Set<AssignedClass>(); let rejectedByClass = false;
+      for (const member of staff.filter((m) => day.get(m.id)?.shiftType === ShiftType.OFF && eligible(m, type)).sort(compare(type))) {
+        if (count >= required) break;
+        if (isFixedClass(member.assignedClass) && usedFixedClasses.has(member.assignedClass)) { rejectedByClass = true; continue; }
+        day.set(member.id, assignment(member.id, workDate, type, options, null, member.isDirector ? null : member.assignedClass));
+        if (isFixedClass(member.assignedClass)) usedFixedClasses.add(member.assignedClass);
+        count += 1;
+      }
+      if (count < required) {
+        if (rejectedByClass) add({ code: type === ShiftType.EARLY ? 'EARLY_CLASS_DUPLICATE_SHORTAGE' : 'LATE_CLASS_DUPLICATE_SHORTAGE', level: 'ERROR', workDate: key, required, assigned: count, message: `${key}：同じ担当クラスの職員を同じ${type === ShiftType.EARLY ? '早出' : '遅出'}に配置できないため、必要人数を満たせません。` });
+        add({ code: type === ShiftType.EARLY ? 'EARLY_SHORTAGE' : 'LATE_SHORTAGE', level: 'ERROR', workDate: key, required, assigned: count, message: `${key}（${weekdays[workDate.getUTCDay()]}）の${type === ShiftType.EARLY ? '早出' : '遅出'}が${required - count}人不足しています。` });
+      }
+      if (saturday && count < required) add({ code: 'SATURDAY_SHORTAGE', level: 'WARNING', workDate: key, required, assigned: count, message: `${key}の土曜勤務可能職員が不足しています。` });
+    }
     function classTargets() {
       const requirements = (options.classRequirements ?? []).filter((r) => r.isActive && r.classType.startsWith('AGE_'));
       return requirements.length ? requirements : Object.entries(defaultTargets).map(([classType, weekdayRequired]) => ({ classType: classType as AssignedClass, weekdayRequired: weekdayRequired!, saturdayRequired: 0, isActive: true }));
@@ -93,6 +107,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
 }
 
 function classPriority(member: GeneratorStaff, target: AssignedClass) { if (member.assignedClass === target) return 0; if (member.assignedClass === AssignedClass.FREE) return 1; if (member.assignedClass === AssignedClass.SUPPORT) return 2; return 3; }
+function isFixedClass(value: AssignedClass) { return value.startsWith('AGE_'); }
 function assignment(staffId: string, workDate: Date, shiftType: ShiftType, options: GeneratorOptions, note: string | null = null, assignedClass: AssignedClass | null = null): GeneratedAssignment { const defaults = timesFor(shiftType, options); return { staffId, workDate: new Date(workDate), shiftType, startTime: defaults?.startTime ?? null, endTime: defaults?.endTime ?? null, breakMinutes: isWorking(shiftType) ? options.defaultBreakMinutes : null, note, assignedClass: isWorking(shiftType) ? assignedClass : null }; }
 function timesFor(type: ShiftType, options: GeneratorOptions) { if (type === ShiftType.EARLY) return { startTime: options.defaultStartEarly, endTime: options.defaultEndEarly }; if (type === ShiftType.NORMAL) return { startTime: options.defaultStartNormal, endTime: options.defaultEndNormal }; if (type === ShiftType.LATE) return { startTime: options.defaultStartLate, endTime: options.defaultEndLate }; return shiftTypeDefaults[type]; }
 function minutesFor(item: GeneratedAssignment) { if (!item.startTime || !item.endTime) return 0; const [sh, sm] = item.startTime.split(':').map(Number); const [eh, em] = item.endTime.split(':').map(Number); return Math.max(0, eh * 60 + em - sh * 60 - sm - (item.breakMinutes ?? 0)); }

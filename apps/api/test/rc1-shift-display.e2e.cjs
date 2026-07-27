@@ -27,7 +27,7 @@ async function main() {
 
   const generated = await call(`/shifts/${before.body.schedule.id}/generate`, { method: 'POST' }, token);
   assert.equal(generated.status, 201);
-  assert.equal(generated.body.generatedCount, 15 * 31);
+  assert.equal(generated.body.generatedCount, 14 * 31, '自動生成対象14名の8月31日分を生成');
   assert.equal(generated.body.workingAssignmentCount + generated.body.offAssignmentCount + generated.body.leaveAssignmentCount, generated.body.generatedCount);
   assert.ok(generated.body.workingAssignmentCount >= 200, '必要人数を満たす現実的なデモ配置');
 
@@ -39,6 +39,9 @@ async function main() {
   assert.ok(working.every((item) => item.startTime && item.endTime && item.assignedClass), '勤務区分・時刻・配置クラスを保存');
 
   const staffById = new Map(after.body.staff.map((staff) => [staff.id, staff]));
+  const director = after.body.staff.find((staff) => staff.employeeNumber === 'ADMIN-001');
+  assert.ok(director, 'デモ園長・管理者の職員情報を取得');
+  assert.ok(!after.body.assignments.some((item) => item.staffId === director.id), '園長・管理者を自動生成対象に含めない');
   assert.ok(working.some((item) => staffById.get(item.staffId)?.employmentType === 'PART_TIME' && item.shiftType === ShiftType.NORMAL), 'パートの通常勤務');
   assert.ok(working.some((item) => staffById.get(item.staffId)?.employmentType === 'REEMPLOYED'), '再雇用の勤務');
   const saturdays = new Map();
