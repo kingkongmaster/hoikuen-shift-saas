@@ -4,6 +4,7 @@ export type Session = {
   user: { id: string; email: string; displayName: string };
   tenant: { id: string; name: string };
   role: Role;
+  mustChangePassword: boolean;
 };
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'REEMPLOYED';
 export type AssignedClass = 'AGE_0' | 'AGE_1' | 'AGE_2' | 'AGE_3' | 'AGE_4' | 'AGE_5' | 'FREE' | 'SUPPORT';
@@ -181,6 +182,7 @@ async function download(path:string, token:string, init:RequestInit={}):Promise<
 export const api = {
   login(email: string, password: string) { return request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); },
   me(token: string) { return request<Omit<Session, 'accessToken'>>('/me', {}, token); },
+  changeInitialPassword(token: string, input: { currentPassword: string; newPassword: string; confirmPassword: string }) { return request<{ success: true; mustChangePassword: false; requiresReauthentication: true }>('/auth/change-initial-password', { method: 'POST', body: JSON.stringify(input) }, token); },
   staff(token: string, includeInactive = false) { return request<Staff[]>(`/staff${includeInactive ? '?includeInactive=true' : ''}`, {}, token); },
   createStaff(token: string, input: StaffInput) { return request<Staff>('/staff', { method: 'POST', body: JSON.stringify(input) }, token); },
   updateStaff(token: string, id: string, input: Partial<StaffInput>) { return request<Staff>(`/staff/${id}`, { method: 'PATCH', body: JSON.stringify(input) }, token); },

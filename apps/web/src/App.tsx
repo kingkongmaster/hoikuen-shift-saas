@@ -3,17 +3,23 @@ import { api, type Session } from './api/client';
 import { AppStatusLayer } from './components/AppStatusLayer';
 import { ErrorBoundary, ErrorPage } from './components/ErrorBoundary';
 import { LoginPage } from './features/auth/LoginPage';
+import { InitialPasswordChangePage } from './features/auth/InitialPasswordChangePage';
 import { AppFooter } from './features/info/AppFooter';
 import { PublicInfoPage, type InfoRoute } from './features/info/PublicInfoPage';
 import { SetupGate } from './features/setup/SetupGate';
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const [restoringSession, setRestoringSession] = useState(true);
   const [infoRoute, setInfoRoute] = useState<InfoRoute | null>(() => routeFromHash());
   const [notFound, setNotFound] = useState(() => isUnknownHash());
-  useEffect(() => { const token = sessionStorage.getItem('enshift.accessToken'); if (token) api.me(token).then((data) => setSession({ ...data, accessToken: token })).catch(() => sessionStorage.removeItem('enshift.accessToken')); }, []);
+  useEffect(() => { const token = sessionStorage.getItem('enshift.accessToken'); if (!token) { setRestoringSession(false); return; } api.me(token).then((data) => setSession({ ...data, accessToken: token })).catch(() => sessionStorage.removeItem('enshift.accessToken')).finally(() => setRestoringSession(false)); }, []);
   useEffect(() => { const update = () => { setInfoRoute(routeFromHash()); setNotFound(isUnknownHash()); }; window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update); }, []);
-  const content = notFound
+  const content = restoringSession
+    ? <main className="grid min-h-screen place-items-center bg-[var(--canvas)]"><p role="status" className="font-semibold">認証状態を確認しています…</p></main>
+    : session?.mustChangePassword
+    ? <InitialPasswordChangePage session={session} onCompleted={() => setSession(null)} />
+    : notFound
     ? <ErrorPage code="404" title="ページが見つかりません" message="指定されたページは存在しないか、移動した可能性があります。" />
     : infoRoute
     ? <PublicInfoPage route={infoRoute} />

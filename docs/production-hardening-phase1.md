@@ -29,6 +29,6 @@ Set `DEPLOYMENT_ENV`, `DATABASE_TARGET_ID`, `CONFIRM_DEPLOYMENT_ENV`, and `CONFI
 
 Run `npm run admin:bootstrap` from a one-off job. Supply the password through `INITIAL_ADMIN_PASSWORD`, never a command-line argument. Select an existing tenant with `INITIAL_ADMIN_TENANT_ID`, or create one with `INITIAL_TENANT_NAME` and `INITIAL_TENANT_CODE`. Production requires `ALLOW_PRODUCTION_ADMIN_BOOTSTRAP=true`. The command refuses a duplicate active administrator and does not print credentials.
 
-The command permits exactly one initial administrator per tenant. Forced password change and password-reset delivery are not implemented in phase 1 and remain release prerequisites.
+The command permits exactly one initial administrator per tenant and marks that user for a mandatory first-login password change. Password changes increment `tokenVersion` so JWTs issued with the temporary password are rejected immediately. Password-reset delivery remains a separate release prerequisite; see `docs/initial-password-change.md`.
 
 Demo seed exits with a non-zero status whenever `NODE_ENV=production` or `DEPLOYMENT_ENV=production`.
