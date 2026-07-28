@@ -5,5 +5,5 @@ export type AuthenticatedUser = {
   tenantId: string;
   role: MembershipRole;
   email: string;
+  tokenVersion: number;
 };
-

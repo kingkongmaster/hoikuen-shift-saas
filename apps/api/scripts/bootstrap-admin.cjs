@@ -13,8 +13,9 @@ async function main() {
   const password = process.env.INITIAL_ADMIN_PASSWORD;
   const displayName = process.env.INITIAL_ADMIN_DISPLAY_NAME?.trim();
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new Error('A valid INITIAL_ADMIN_EMAIL is required.');
-  if (!password || password.length < 12) throw new Error('INITIAL_ADMIN_PASSWORD must be supplied securely and contain at least 12 characters.');
+  if (!password || password !== password.trim() || password.length < 12 || password.length > 128 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) throw new Error('INITIAL_ADMIN_PASSWORD must be supplied securely, contain 12 to 128 characters, and include uppercase, lowercase, number, and symbol characters.');
   if (!displayName) throw new Error('INITIAL_ADMIN_DISPLAY_NAME is required.');
+  if (password.toLowerCase() === email.toLowerCase() || password.toLowerCase() === displayName.toLowerCase()) throw new Error('INITIAL_ADMIN_PASSWORD must not match the administrator email or display name.');
 
   await prisma.$transaction(async (tx) => {
     let tenant;
@@ -31,10 +32,10 @@ async function main() {
     if (activeAdministrator) throw new Error('An active administrator already exists for the tenant.');
     const existing = await tx.user.findUnique({ where: { email } });
     if (existing) throw new Error('A user with this email already exists.');
-    const user = await tx.user.create({ data: { email, displayName, passwordHash: hash(password), isActive: true } });
+    const user = await tx.user.create({ data: { email, displayName, passwordHash: hash(password), isActive: true, mustChangePassword: true } });
     await tx.membership.upsert({ where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } }, update: { role: MembershipRole.ADMIN, isActive: true }, create: { tenantId: tenant.id, userId: user.id, role: MembershipRole.ADMIN } });
     await tx.staff.upsert({ where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } }, update: { displayName, email, isActive: true }, create: { tenantId: tenant.id, userId: user.id, employeeNumber: process.env.INITIAL_ADMIN_EMPLOYEE_NUMBER ?? 'ADMIN-001', displayName, email, jobTitle: '管理者', employmentType: EmploymentType.FULL_TIME } });
-    await tx.auditLog.create({ data: { tenantId: tenant.id, memberId: user.id, action: 'INITIAL_ADMIN_CREATED', targetType: 'User', targetId: user.id, detail: { source: 'bootstrap-admin-cli' } } });
+    await tx.auditLog.create({ data: { tenantId: tenant.id, memberId: user.id, action: 'INITIAL_ADMIN_CREATED', targetType: 'User', targetId: user.id, detail: { source: 'bootstrap-admin-cli', mustChangePassword: true } } });
   });
   process.stdout.write('Initial administrator created successfully. Credentials were not printed.\n');
 }
