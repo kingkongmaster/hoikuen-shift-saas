@@ -7,7 +7,8 @@ export class PostgresDatabase implements OnModuleInit, OnModuleDestroy {
   private readonly pool: Pool;
 
   constructor(config: ConfigService) {
-    this.pool = new Pool({ connectionString: config.getOrThrow<string>('DATABASE_URL') });
+    const readinessTimeoutMs = config.get<number>('READINESS_DB_TIMEOUT_MS') ?? 3000;
+    this.pool = new Pool({ connectionString: config.getOrThrow<string>('DATABASE_URL'), connectionTimeoutMillis: readinessTimeoutMs, query_timeout: readinessTimeoutMs });
   }
 
   async onModuleInit(): Promise<void> {
@@ -31,4 +32,3 @@ export class PostgresDatabase implements OnModuleInit, OnModuleDestroy {
     return process.env.DATABASE_CONNECT_ON_STARTUP === 'true';
   }
 }
-

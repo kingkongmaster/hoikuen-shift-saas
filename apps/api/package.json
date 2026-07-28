@@ -10,6 +10,10 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.cjs",
+    "db:migrate:status": "node scripts/migration.cjs status",
+    "db:migrate:deploy": "node scripts/migration.cjs deploy",
+    "db:migrate:dry-run": "node scripts/migration.cjs deploy --dry-run",
+    "admin:bootstrap": "node scripts/bootstrap-admin.cjs",
     "test:sprint2": "node test/staff.e2e.cjs",
     "test:sprint3": "node test/requests.e2e.cjs",
     "test:sprint4": "node test/shifts.e2e.cjs",
@@ -31,8 +35,9 @@
     "test:fair-special-shifts": "node test/fair-special-shift-allocation.test.cjs",
     "audit:fair-special-shifts": "node test/fair-special-shift-august-audit.cjs",
     "test:monthly-targets": "node test/monthly-work-targets.test.cjs",
+    "test:production-hardening": "node test/production-hardening.test.cjs",
     "test:all": "npm run test:sprint2 && npm run test:sprint3 && npm run test:sprint4 && npm run test:sprint5 && npm run test:sprint6 && npm run test:sprint7 && npm run test:sprint8",
-    "test:regression": "npm run test:all && npm run test:sprint9a1 && npm run test:sprint9a2 && npm run test:sprint9b1a && npm run test:sprint9b1b && npm run test:sprint9b1b:final && npm run test:sprint9c && npm run test:sprint10a && npm run test:rc1-shift && npm run test:rc1-director && npm run test:individual-hours && npm run test:monthly-targets && npm run test:fair-special-shifts && npm run test:fixed-class"
+    "test:regression": "npm run test:all && npm run test:sprint9a1 && npm run test:sprint9a2 && npm run test:sprint9b1a && npm run test:sprint9b1b && npm run test:sprint9b1b:final && npm run test:sprint9c && npm run test:sprint10a && npm run test:rc1-shift && npm run test:rc1-director && npm run test:individual-hours && npm run test:monthly-targets && npm run test:fair-special-shifts && npm run test:fixed-class && npm run test:production-hardening"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",

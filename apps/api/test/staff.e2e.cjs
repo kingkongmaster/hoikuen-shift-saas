@@ -36,7 +36,9 @@ async function login(email, password) {
 
 async function main() {
   const health = await request('/health');
-  assert.deepEqual(health, { status: 200, body: { status: 'ok', database: 'up' } });
+  assert.deepEqual(health, { status: 200, body: { status: 'ok' } });
+  const readiness = await request('/ready');
+  assert.deepEqual(readiness, { status: 200, body: { status: 'ready', database: 'up' } });
   const adminToken = await login(ownerEmail, ownerPassword);
   const me = await request('/me', {}, adminToken);
   assert.equal(me.status, 200);
