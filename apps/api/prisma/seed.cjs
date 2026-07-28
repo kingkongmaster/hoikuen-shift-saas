@@ -1,6 +1,13 @@
 const { AssignedClass, EmploymentType, MembershipRole, MonthlyShiftStatus, PrismaClient, ShiftRequestStatus, ShiftRequestType, ShiftType } = require('@prisma/client');
 const { randomBytes, scryptSync } = require('node:crypto');
 
+const normalizedNodeEnvironment = process.env.NODE_ENV?.trim().toLowerCase();
+const normalizedDeploymentEnvironment = process.env.DEPLOYMENT_ENV?.trim().toLowerCase();
+if (normalizedNodeEnvironment === 'production' || normalizedDeploymentEnvironment === 'production') {
+  process.stderr.write('Demo seed is disabled in production.\n');
+  process.exit(1);
+}
+
 const prisma = new PrismaClient();
 
 function passwordHash(password) {

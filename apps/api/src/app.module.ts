@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/environment.validation';
 import { DatabaseModule } from './infrastructure/database/database.module';
@@ -18,6 +18,7 @@ import { BackupsModule } from './presentation/backups/backups.module';
 import { SubscriptionsModule } from './presentation/subscriptions/subscriptions.module';
 import { TenantsModule } from './presentation/tenants/tenants.module';
 import { SetupModule } from './presentation/setup/setup.module';
+import { AuthRateLimitMiddleware } from './infrastructure/http/auth-rate-limit.middleware';
 
 @Module({
   imports: [
@@ -41,4 +42,8 @@ import { SetupModule } from './presentation/setup/setup.module';
     SetupModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(AuthRateLimitMiddleware).forRoutes({ path: 'auth/{*splat}', method: RequestMethod.ALL });
+  }
+}
