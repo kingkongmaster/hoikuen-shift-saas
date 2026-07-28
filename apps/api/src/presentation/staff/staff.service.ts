@@ -6,6 +6,7 @@ import { CreateStaffDto } from './create-staff.dto';
 import { UpdateStaffDto } from './update-staff.dto';
 import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { individualRegularWorkHoursError } from '../../domain/staff/staff-master';
 
 @Injectable()
 export class StaffService {
@@ -72,11 +73,13 @@ export class StaffService {
     const updated=await this.prisma.staff.update({ where: { id: current.id }, data: { isActive: false } }); await this.audit.create(user.tenantId,user.sub,'STAFF_DEACTIVATED','Staff',updated.id); return updated;
   }
 
-  private validateRules(input: { canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean }): void {
+  private validateRules(input: { canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean; regularWorkStartTime?: string | null; regularWorkEndTime?: string | null }): void {
     if (!input.canWorkEarly && !input.canWorkRegular && !input.canWorkLate) throw new BadRequestException('勤務区分を1つ以上選択してください。');
     if (input.earlyShiftOnly && input.lateShiftOnly) throw new BadRequestException('早出専任と遅出専任は同時に指定できません。');
     if (input.earlyShiftOnly && !input.canWorkEarly) throw new BadRequestException('早出専任には早出可能の指定が必要です。');
     if (input.lateShiftOnly && !input.canWorkLate) throw new BadRequestException('遅出専任には遅出可能の指定が必要です。');
+    const individualHoursError = individualRegularWorkHoursError(input.regularWorkStartTime, input.regularWorkEndTime);
+    if (individualHoursError) throw new BadRequestException(individualHoursError);
   }
 
   private handleWriteError(error: unknown): never {

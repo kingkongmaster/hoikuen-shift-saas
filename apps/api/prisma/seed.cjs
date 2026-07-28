@@ -76,7 +76,8 @@ async function main() {
       employeeNumber: 'STAFF-002', displayName: '鈴木 あおい', employmentType: EmploymentType.PART_TIME,
       assignedClass: AssignedClass.AGE_0, canWorkEarly: false, canWorkRegular: true, canWorkLate: false,
       earlyShiftOnly: false, lateShiftOnly: false, canWorkSaturdays: false, monthlyWorkHourLimit: 96,
-      weeklyAvailableDays: 4, jobTitle: '0歳児担任', notes: 'パート・土曜日勤務不可',
+      weeklyAvailableDays: 4, regularWorkStartTime: '09:00', regularWorkEndTime: '15:00',
+      jobTitle: '0歳児担任', notes: '時短勤務 9:00〜15:00・早出遅出不可・土曜日勤務不可',
     },
     {
       employeeNumber: 'STAFF-003', displayName: '高橋 みのり', employmentType: EmploymentType.REEMPLOYED,
@@ -84,7 +85,12 @@ async function main() {
       earlyShiftOnly: false, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: 120,
       weeklyAvailableDays: 4, jobTitle: '0歳児担任', notes: '遅出専任の再雇用職員',
     },
-    { employeeNumber: 'STAFF-005', displayName: '田中 さくら', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_1, jobTitle: '1歳児担任' },
+    {
+      employeeNumber: 'STAFF-005', displayName: '田中 さくら', employmentType: EmploymentType.FULL_TIME,
+      assignedClass: AssignedClass.AGE_1, canWorkEarly: false, canWorkLate: false,
+      regularWorkStartTime: '09:00', regularWorkEndTime: '16:00',
+      jobTitle: '1歳児担任', notes: '時短勤務 9:00〜16:00・早出遅出不可',
+    },
     { employeeNumber: 'STAFF-006', displayName: '伊藤 結衣', employmentType: EmploymentType.PART_TIME, assignedClass: AssignedClass.AGE_1, jobTitle: '1歳児担任', monthlyWorkHourLimit: 120, weeklyAvailableDays: 4, canWorkSaturdays: false },
     { employeeNumber: 'STAFF-007', displayName: '渡辺 陽菜', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_2, jobTitle: '2歳児担任' },
     { employeeNumber: 'STAFF-008', displayName: '山本 莉子', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_2, jobTitle: '2歳児担任' },
@@ -105,6 +111,8 @@ async function main() {
     member.canWorkSaturdays ??= true;
     member.monthlyWorkHourLimit ??= 192;
     member.weeklyAvailableDays ??= 5;
+    member.regularWorkStartTime ??= null;
+    member.regularWorkEndTime ??= null;
     member.notes ??= 'RC1 プレゼン用デモ職員';
   }
 

@@ -9,7 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 import type { AssignmentInputDto } from './save-assignments.dto';
 
-const staffSelect = { id: true, userId: true, employeeNumber: true, displayName: true, employmentType: true, assignedClass: true, canWorkEarly: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, weeklyAvailableDays: true, isActive: true } as const;
+const staffSelect = { id: true, userId: true, employeeNumber: true, displayName: true, employmentType: true, assignedClass: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true, isActive: true } as const;
 const assignmentInclude = { staff: { select: staffSelect } } as const;
 type Warning = { code: string; staffId: string; workDate: string; message: string; severity: 'warning' | 'blocking' };
 
@@ -79,10 +79,11 @@ export class ShiftsService {
       }
     }
     await this.validateFixedClassSpecialShiftUniqueness(user.tenantId, schedule.id, inputs, staff);
+    const staffById = new Map(staff.map((member) => [member.id, member]));
     await this.prisma.$transaction(inputs.map((input) => this.prisma.shiftAssignment.upsert({
       where: { monthlyShiftId_staffId_workDate: { monthlyShiftId: schedule.id, staffId: input.staffId, workDate: this.date(input.workDate) } },
-      create: this.assignmentData(schedule, input),
-      update: this.assignmentData(schedule, input),
+      create: this.assignmentData(schedule, input, staffById.get(input.staffId)),
+      update: this.assignmentData(schedule, input, staffById.get(input.staffId)),
     })));
     await this.audit.create(user.tenantId,user.sub,'SHIFT_ASSIGNMENTS_SAVED','MonthlyShift',schedule.id,{assignmentCount:inputs.length}); await this.notifications.notifyRoles(user.tenantId,['ADMIN','DIRECTOR'],NotificationType.SHIFT_UPDATED,'シフト更新','月間シフトが手動更新されました。'); return this.buildView(user, schedule);
   }
@@ -108,7 +109,7 @@ export class ShiftsService {
     const schedule = await this.requireEditable(user, id);
     const range = this.monthRange(schedule.targetMonth);
     const [staff, requests, setting, requirements, closedDates, managerMemberships] = await Promise.all([
-      this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, weeklyAvailableDays: true }, orderBy: { employeeNumber: 'asc' } }),
+      this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true }, orderBy: { employeeNumber: 'asc' } }),
       this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
       this.settings.ensureSetting(user.tenantId),
       this.settings.requirements(user),
@@ -209,8 +210,15 @@ export class ShiftsService {
     return warnings;
   }
 
-  private assignmentData(schedule: { id: string; tenantId: string }, input: AssignmentInputDto) {
-    const defaults = shiftTypeDefaults[input.shiftType as ShiftType];
+  private assignmentData(
+    schedule: { id: string; tenantId: string },
+    input: AssignmentInputDto,
+    staff?: { regularWorkStartTime: string | null; regularWorkEndTime: string | null },
+  ) {
+    const individualRegularHours = input.shiftType === ShiftType.NORMAL && staff?.regularWorkStartTime && staff.regularWorkEndTime
+      ? { startTime: staff.regularWorkStartTime, endTime: staff.regularWorkEndTime }
+      : null;
+    const defaults = individualRegularHours ?? shiftTypeDefaults[input.shiftType as ShiftType];
     return { tenantId: schedule.tenantId, monthlyShiftId: schedule.id, staffId: input.staffId, workDate: this.date(input.workDate), shiftType: input.shiftType, startTime: input.startTime === undefined ? (defaults?.startTime ?? null) : input.startTime, endTime: input.endTime === undefined ? (defaults?.endTime ?? null) : input.endTime, breakMinutes: input.breakMinutes ?? null, note: input.note?.trim() || null, assignedClass: (workingShiftTypes as readonly ShiftType[]).includes(input.shiftType) ? (input.assignedClass ?? null) : null };
   }
 

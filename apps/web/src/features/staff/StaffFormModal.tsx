@@ -4,7 +4,8 @@ import type { AssignedClass, EmploymentType, Staff, StaffInput } from '../../api
 type FormState = {
   employeeNumber: string; displayName: string; email: string; employmentType: EmploymentType; assignedClass: AssignedClass;
   canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean;
-  canWorkSaturdays: boolean; monthlyWorkHourLimit: string; weeklyAvailableDays: string; notes: string;
+  canWorkSaturdays: boolean; monthlyWorkHourLimit: string; weeklyAvailableDays: string;
+  regularWorkStartTime: string; regularWorkEndTime: string; notes: string;
 };
 
 const employmentOptions: { value: EmploymentType; label: string }[] = [
@@ -24,6 +25,7 @@ function initialState(staff?: Staff): FormState {
     earlyShiftOnly: staff?.earlyShiftOnly ?? false, lateShiftOnly: staff?.lateShiftOnly ?? false,
     canWorkSaturdays: staff?.canWorkSaturdays ?? true,
     monthlyWorkHourLimit: staff?.monthlyWorkHourLimit?.toString() ?? '', weeklyAvailableDays: staff?.weeklyAvailableDays?.toString() ?? '',
+    regularWorkStartTime: staff?.regularWorkStartTime ?? '', regularWorkEndTime: staff?.regularWorkEndTime ?? '',
     notes: staff?.notes ?? '',
   };
 }
@@ -37,6 +39,8 @@ export function StaffFormModal({ staff, saving, onClose, onSave }: { staff?: Sta
     event.preventDefault(); setLocalError('');
     if (!form.canWorkEarly && !form.canWorkRegular && !form.canWorkLate) { setLocalError('勤務区分を1つ以上選択してください。'); return; }
     if (form.earlyShiftOnly && form.lateShiftOnly) { setLocalError('早出専任と遅出専任は同時に選択できません。'); return; }
+    if (!!form.regularWorkStartTime !== !!form.regularWorkEndTime) { setLocalError('個別通常勤務時間は開始・終了を両方入力してください。'); return; }
+    if (form.regularWorkStartTime && form.regularWorkStartTime >= form.regularWorkEndTime) { setLocalError('個別通常勤務の終了時刻は開始時刻より後にしてください。'); return; }
     const input: StaffInput = {
       employeeNumber: form.employeeNumber.trim(), displayName: form.displayName.trim(), employmentType: form.employmentType,
       assignedClass: form.assignedClass, canWorkEarly: form.canWorkEarly, canWorkRegular: form.canWorkRegular,
@@ -45,6 +49,8 @@ export function StaffFormModal({ staff, saving, onClose, onSave }: { staff?: Sta
       email: form.email.trim() || null,
       monthlyWorkHourLimit: form.monthlyWorkHourLimit ? Number(form.monthlyWorkHourLimit) : null,
       weeklyAvailableDays: form.weeklyAvailableDays ? Number(form.weeklyAvailableDays) : null,
+      regularWorkStartTime: form.regularWorkStartTime || null,
+      regularWorkEndTime: form.regularWorkEndTime || null,
       notes: form.notes.trim() || null,
     };
     await onSave(input);
@@ -63,7 +69,10 @@ export function StaffFormModal({ staff, saving, onClose, onSave }: { staff?: Sta
         <Field label="土曜日勤務"><Checkbox checked={form.canWorkSaturdays} onChange={(value) => set('canWorkSaturdays', value)} label="勤務可能" /></Field>
         <Field label="月間勤務時間上限"><input type="number" min={1} max={744} value={form.monthlyWorkHourLimit} onChange={(e) => set('monthlyWorkHourLimit', e.target.value)} className="input" placeholder="任意" /></Field>
         <Field label="週の勤務可能日数"><input type="number" min={1} max={7} value={form.weeklyAvailableDays} onChange={(e) => set('weeklyAvailableDays', e.target.value)} className="input" placeholder="1〜7日（任意）" /></Field>
+        <Field label="個別通常勤務の開始"><input type="time" value={form.regularWorkStartTime} onChange={(e) => set('regularWorkStartTime', e.target.value)} className="input" aria-describedby="individual-hours-help" /></Field>
+        <Field label="個別通常勤務の終了"><input type="time" value={form.regularWorkEndTime} onChange={(e) => set('regularWorkEndTime', e.target.value)} className="input" aria-describedby="individual-hours-help" /></Field>
       </div>
+      <p id="individual-hours-help" className="mt-2 text-sm text-slate-500">開始・終了を両方未設定にすると園共通の通常勤務時間を使用します。</p>
       <fieldset className="mt-5 rounded-xl border border-slate-200 p-4"><legend className="px-1 text-sm font-semibold">勤務区分 <span className="text-rose-600">*</span></legend><div className="grid gap-3 sm:grid-cols-3"><Checkbox checked={form.canWorkEarly} onChange={(value) => set('canWorkEarly', value)} label="早出可能" /><Checkbox checked={form.canWorkRegular} onChange={(value) => set('canWorkRegular', value)} label="通常勤務可能" /><Checkbox checked={form.canWorkLate} onChange={(value) => set('canWorkLate', value)} label="遅出可能" /></div></fieldset>
       <fieldset className="mt-5 rounded-xl border border-slate-200 p-4"><legend className="px-1 text-sm font-semibold">専任区分</legend><div className="grid gap-3 sm:grid-cols-2"><Checkbox checked={form.earlyShiftOnly} onChange={(value) => set('earlyShiftOnly', value)} label="早出専任" /><Checkbox checked={form.lateShiftOnly} onChange={(value) => set('lateShiftOnly', value)} label="遅出専任" /></div></fieldset>
       <Field label="備考" className="mt-5"><textarea maxLength={2000} rows={4} value={form.notes} onChange={(e) => set('notes', e.target.value)} className="input resize-y" /></Field>

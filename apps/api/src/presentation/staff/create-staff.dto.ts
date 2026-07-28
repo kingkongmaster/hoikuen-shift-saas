@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { assignedClasses, employmentTypes, type AssignedClass, type EmploymentType } from '../../domain/staff/staff-master';
 
 export class CreateStaffDto {
@@ -40,6 +40,12 @@ export class CreateStaffDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(7)
   weeklyAvailableDays?: number | null;
+
+  @IsOptional() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'regularWorkStartTimeはHH:mm形式で指定してください。' })
+  regularWorkStartTime?: string | null;
+
+  @IsOptional() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'regularWorkEndTimeはHH:mm形式で指定してください。' })
+  regularWorkEndTime?: string | null;
 
   @IsOptional() @IsString() @MaxLength(2000)
   notes?: string | null;
