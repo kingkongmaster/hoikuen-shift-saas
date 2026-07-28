@@ -24,6 +24,8 @@ export type Staff = {
   lateShiftOnly: boolean;
   canWorkSaturdays: boolean;
   monthlyWorkHourLimit: number | null;
+  monthlyTargetWorkDays: number | null;
+  monthlyTargetWorkHours: number | null;
   weeklyAvailableDays: number | null;
   regularWorkStartTime: string | null;
   regularWorkEndTime: string | null;
@@ -35,6 +37,8 @@ export type Staff = {
 export type StaffInput = Pick<Staff, 'employeeNumber' | 'displayName' | 'employmentType' | 'assignedClass' | 'canWorkEarly' | 'canWorkRegular' | 'canWorkLate' | 'earlyShiftOnly' | 'lateShiftOnly' | 'canWorkSaturdays'> & {
   email?: string | null;
   monthlyWorkHourLimit?: number | null;
+  monthlyTargetWorkDays?: number | null;
+  monthlyTargetWorkHours?: number | null;
   weeklyAvailableDays?: number | null;
   regularWorkStartTime?: string | null;
   regularWorkEndTime?: string | null;
@@ -60,10 +64,10 @@ export type ShiftRequestInput = { staffId?: string; requestDate: string; request
 export type ShiftRequestUpdate = Partial<Pick<ShiftRequest, 'requestType' | 'status' | 'reason' | 'adminComment'>> & { requestDate?: string };
 export type ShiftType = 'EARLY' | 'NORMAL' | 'LATE' | 'OFF' | 'PAID_LEAVE' | 'SUMMER_LEAVE' | 'AM_HALF' | 'PM_HALF' | 'OTHER';
 export type MonthlyShiftStatus = 'DRAFT' | 'CONFIRMED';
-export type ShiftAssignment = { id: string; tenantId: string; monthlyShiftId: string; staffId: string; workDate: string; shiftType: ShiftType; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null; staff: Pick<Staff, 'id' | 'employeeNumber' | 'displayName' | 'employmentType' | 'assignedClass' | 'canWorkEarly' | 'canWorkRegular' | 'canWorkLate' | 'earlyShiftOnly' | 'lateShiftOnly' | 'canWorkSaturdays' | 'monthlyWorkHourLimit' | 'weeklyAvailableDays' | 'regularWorkStartTime' | 'regularWorkEndTime' | 'isActive'> & { isDirector: boolean }; };
+export type ShiftAssignment = { id: string; tenantId: string; monthlyShiftId: string; staffId: string; workDate: string; shiftType: ShiftType; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null; staff: Pick<Staff, 'id' | 'employeeNumber' | 'displayName' | 'employmentType' | 'assignedClass' | 'canWorkEarly' | 'canWorkRegular' | 'canWorkLate' | 'earlyShiftOnly' | 'lateShiftOnly' | 'canWorkSaturdays' | 'monthlyWorkHourLimit' | 'monthlyTargetWorkDays' | 'monthlyTargetWorkHours' | 'weeklyAvailableDays' | 'regularWorkStartTime' | 'regularWorkEndTime' | 'isActive'> & { isDirector: boolean }; };
 export type MonthlyShift = { id: string; tenantId: string; targetMonth: string; status: MonthlyShiftStatus; createdByUserId: string; confirmedByUserId: string | null; confirmedAt: string | null; createdAt: string; updatedAt: string; };
 export type ShiftWarning = { code: string; staffId: string; workDate: string; message: string; severity: 'info' | 'warning' | 'blocking' };
-export type ShiftView = { schedule: MonthlyShift | null; assignments: ShiftAssignment[]; staff: ShiftAssignment['staff'][]; requests: Array<Pick<ShiftRequest, 'id' | 'staffId' | 'requestDate' | 'requestType' | 'status' | 'reason'> & { staff: Pick<Staff, 'id' | 'displayName'> }>; summaries?: Array<{ staffId: string; workDays: number; workMinutes: number }>; warnings: ShiftWarning[] };
+export type ShiftView = { schedule: MonthlyShift | null; assignments: ShiftAssignment[]; staff: ShiftAssignment['staff'][]; requests: Array<Pick<ShiftRequest, 'id' | 'staffId' | 'requestDate' | 'requestType' | 'status' | 'reason'> & { staff: Pick<Staff, 'id' | 'displayName'> }>; summaries?: Array<{ staffId: string; workDays: number; targetWorkDays: number | null; workDaysDifference: number | null; workMinutes: number; targetWorkMinutes: number | null; workMinutesDifference: number | null; monthlyWorkHourLimit: number | null; statuses: string[] }>; warnings: ShiftWarning[] };
 export type ShiftAssignmentInput = { staffId: string; workDate: string; shiftType: ShiftType; startTime?: string | null; endTime?: string | null; breakMinutes?: number | null; note?: string | null; assignedClass?: AssignedClass | null };
 export type GenerationWarning = { code: string; level: 'INFO' | 'WARNING' | 'ERROR'; workDate: string; staffId?: string; classType?: AssignedClass; required?: number; assigned?: number; message: string };
 export type GenerationResult = { generatedCount: number; workingAssignmentCount: number; offAssignmentCount: number; leaveAssignmentCount: number; warnings: GenerationWarning[]; processingTimeMs: number; durationMs: number; warningSummary: { INFO: number; WARNING: number; ERROR: number; byCode: Record<string, number> }; appliedSettingsSummary: Record<string, unknown>; closedDateCount: number };

@@ -4,7 +4,7 @@ import type { AssignedClass, EmploymentType, Staff, StaffInput } from '../../api
 type FormState = {
   employeeNumber: string; displayName: string; email: string; employmentType: EmploymentType; assignedClass: AssignedClass;
   canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean;
-  canWorkSaturdays: boolean; monthlyWorkHourLimit: string; weeklyAvailableDays: string;
+  canWorkSaturdays: boolean; monthlyWorkHourLimit: string; monthlyTargetWorkDays: string; monthlyTargetWorkHours: string; weeklyAvailableDays: string;
   regularWorkStartTime: string; regularWorkEndTime: string; notes: string;
 };
 
@@ -25,6 +25,7 @@ function initialState(staff?: Staff): FormState {
     earlyShiftOnly: staff?.earlyShiftOnly ?? false, lateShiftOnly: staff?.lateShiftOnly ?? false,
     canWorkSaturdays: staff?.canWorkSaturdays ?? true,
     monthlyWorkHourLimit: staff?.monthlyWorkHourLimit?.toString() ?? '', weeklyAvailableDays: staff?.weeklyAvailableDays?.toString() ?? '',
+    monthlyTargetWorkDays: staff?.monthlyTargetWorkDays?.toString() ?? '', monthlyTargetWorkHours: staff?.monthlyTargetWorkHours?.toString() ?? '',
     regularWorkStartTime: staff?.regularWorkStartTime ?? '', regularWorkEndTime: staff?.regularWorkEndTime ?? '',
     notes: staff?.notes ?? '',
   };
@@ -41,6 +42,7 @@ export function StaffFormModal({ staff, saving, onClose, onSave }: { staff?: Sta
     if (form.earlyShiftOnly && form.lateShiftOnly) { setLocalError('早出専任と遅出専任は同時に選択できません。'); return; }
     if (!!form.regularWorkStartTime !== !!form.regularWorkEndTime) { setLocalError('個別通常勤務時間は開始・終了を両方入力してください。'); return; }
     if (form.regularWorkStartTime && form.regularWorkStartTime >= form.regularWorkEndTime) { setLocalError('個別通常勤務の終了時刻は開始時刻より後にしてください。'); return; }
+    if (form.monthlyTargetWorkHours && form.monthlyWorkHourLimit && Number(form.monthlyTargetWorkHours) > Number(form.monthlyWorkHourLimit)) { setLocalError('月間目標勤務時間は月間勤務時間上限以下にしてください。'); return; }
     const input: StaffInput = {
       employeeNumber: form.employeeNumber.trim(), displayName: form.displayName.trim(), employmentType: form.employmentType,
       assignedClass: form.assignedClass, canWorkEarly: form.canWorkEarly, canWorkRegular: form.canWorkRegular,
@@ -48,6 +50,8 @@ export function StaffFormModal({ staff, saving, onClose, onSave }: { staff?: Sta
       canWorkSaturdays: form.canWorkSaturdays,
       email: form.email.trim() || null,
       monthlyWorkHourLimit: form.monthlyWorkHourLimit ? Number(form.monthlyWorkHourLimit) : null,
+      monthlyTargetWorkDays: form.monthlyTargetWorkDays ? Number(form.monthlyTargetWorkDays) : null,
+      monthlyTargetWorkHours: form.monthlyTargetWorkHours ? Number(form.monthlyTargetWorkHours) : null,
       weeklyAvailableDays: form.weeklyAvailableDays ? Number(form.weeklyAvailableDays) : null,
       regularWorkStartTime: form.regularWorkStartTime || null,
       regularWorkEndTime: form.regularWorkEndTime || null,
@@ -68,6 +72,8 @@ export function StaffFormModal({ staff, saving, onClose, onSave }: { staff?: Sta
         <Field label="担当クラス" required><select value={form.assignedClass} onChange={(e) => set('assignedClass', e.target.value as AssignedClass)} className="input">{classOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
         <Field label="土曜日勤務"><Checkbox checked={form.canWorkSaturdays} onChange={(value) => set('canWorkSaturdays', value)} label="勤務可能" /></Field>
         <Field label="月間勤務時間上限"><input type="number" min={1} max={744} value={form.monthlyWorkHourLimit} onChange={(e) => set('monthlyWorkHourLimit', e.target.value)} className="input" placeholder="任意" /></Field>
+        <Field label="月間目標勤務日数"><input type="number" min={1} max={31} step={1} value={form.monthlyTargetWorkDays} onChange={(e) => set('monthlyTargetWorkDays', e.target.value)} className="input" placeholder="任意（1〜31日）" /></Field>
+        <Field label="月間目標勤務時間"><input type="number" min={0.01} max={744} step={0.25} value={form.monthlyTargetWorkHours} onChange={(e) => set('monthlyTargetWorkHours', e.target.value)} className="input" placeholder="任意" /></Field>
         <Field label="週の勤務可能日数"><input type="number" min={1} max={7} value={form.weeklyAvailableDays} onChange={(e) => set('weeklyAvailableDays', e.target.value)} className="input" placeholder="1〜7日（任意）" /></Field>
         <Field label="個別通常勤務の開始"><input type="time" value={form.regularWorkStartTime} onChange={(e) => set('regularWorkStartTime', e.target.value)} className="input" aria-describedby="individual-hours-help" /></Field>
         <Field label="個別通常勤務の終了"><input type="time" value={form.regularWorkEndTime} onChange={(e) => set('regularWorkEndTime', e.target.value)} className="input" aria-describedby="individual-hours-help" /></Field>

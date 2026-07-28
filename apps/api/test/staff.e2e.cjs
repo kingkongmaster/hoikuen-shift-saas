@@ -60,17 +60,24 @@ async function main() {
     employeeNumber, displayName: 'E2E テスト職員', email: `staff-master-${runId.toLowerCase()}@e2e.local`,
     employmentType: 'PART_TIME', assignedClass: 'SUPPORT', canWorkEarly: false, canWorkRegular: true,
     canWorkLate: false, earlyShiftOnly: false, lateShiftOnly: false, canWorkSaturdays: false,
-    monthlyWorkHourLimit: 80, weeklyAvailableDays: 4, regularWorkStartTime: '09:00', regularWorkEndTime: '15:00',
+    monthlyWorkHourLimit: 80, monthlyTargetWorkDays: 16, monthlyTargetWorkHours: 75, weeklyAvailableDays: 4, regularWorkStartTime: '09:00', regularWorkEndTime: '15:00',
     notes: 'Sprint 2 API統合テスト',
   };
   assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-START`, regularWorkEndTime: null }) }, adminToken)).status, 400);
   assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-FORMAT`, regularWorkStartTime: '9:00' }) }, adminToken)).status, 400);
   assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-ORDER`, regularWorkStartTime: '16:00', regularWorkEndTime: '09:00' }) }, adminToken)).status, 400);
+  assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-DAYS-ZERO`, monthlyTargetWorkDays: 0 }) }, adminToken)).status, 400);
+  assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-DAYS-DECIMAL`, monthlyTargetWorkDays: 12.5 }) }, adminToken)).status, 400);
+  assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-DAYS-HIGH`, monthlyTargetWorkDays: 32 }) }, adminToken)).status, 400);
+  assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-HOURS-ZERO`, monthlyTargetWorkHours: 0 }) }, adminToken)).status, 400);
+  assert.equal((await request('/staff', { method: 'POST', body: JSON.stringify({ ...input, employeeNumber: `${employeeNumber}-LIMIT`, monthlyTargetWorkHours: 81 }) }, adminToken)).status, 400);
   const created = await request('/staff', { method: 'POST', body: JSON.stringify(input) }, adminToken);
   assert.equal(created.status, 201);
   assert.equal(created.body.employeeNumber, employeeNumber);
   assert.equal(created.body.regularWorkStartTime, '09:00');
   assert.equal(created.body.regularWorkEndTime, '15:00');
+  assert.equal(created.body.monthlyTargetWorkDays, 16);
+  assert.equal(created.body.monthlyTargetWorkHours, 75);
   createdStaffId = created.body.id;
 
   const duplicate = await request('/staff', { method: 'POST', body: JSON.stringify(input) }, adminToken);
@@ -83,7 +90,8 @@ async function main() {
   assert.equal(detail.body.regularWorkEndTime, '15:00');
 
   assert.equal((await request(`/staff/${createdStaffId}`, { method: 'PATCH', body: JSON.stringify({ regularWorkEndTime: null }) }, adminToken)).status, 400);
-  const updated = await request(`/staff/${createdStaffId}`, { method: 'PATCH', body: JSON.stringify({ displayName: 'E2E 更新済み職員', canWorkLate: true, regularWorkStartTime: '09:00', regularWorkEndTime: '16:00' }) }, adminToken);
+  assert.equal((await request(`/staff/${createdStaffId}`, { method: 'PATCH', body: JSON.stringify({ monthlyWorkHourLimit: 70 }) }, adminToken)).status, 400);
+  const updated = await request(`/staff/${createdStaffId}`, { method: 'PATCH', body: JSON.stringify({ displayName: 'E2E 更新済み職員', canWorkLate: true, monthlyWorkHourLimit: 90, monthlyTargetWorkHours: 85, regularWorkStartTime: '09:00', regularWorkEndTime: '16:00' }) }, adminToken);
   assert.equal(updated.status, 200, JSON.stringify(updated.body));
   assert.equal(updated.body.displayName, 'E2E 更新済み職員');
   assert.equal(updated.body.canWorkLate, true);

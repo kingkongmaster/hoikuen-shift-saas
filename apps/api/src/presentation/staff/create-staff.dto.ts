@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { assignedClasses, employmentTypes, type AssignedClass, type EmploymentType } from '../../domain/staff/staff-master';
 
 export class CreateStaffDto {
@@ -37,6 +37,12 @@ export class CreateStaffDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(744)
   monthlyWorkHourLimit?: number | null;
+
+  @IsOptional() @IsInt() @Min(1) @Max(31)
+  monthlyTargetWorkDays?: number | null;
+
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(744)
+  monthlyTargetWorkHours?: number | null;
 
   @IsOptional() @IsInt() @Min(1) @Max(7)
   weeklyAvailableDays?: number | null;
