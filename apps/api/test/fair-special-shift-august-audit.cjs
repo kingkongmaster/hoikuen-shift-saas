@@ -27,6 +27,7 @@ async function main() {
   const working = new Set(['EARLY', 'NORMAL', 'LATE']);
   const approvedRequestKeys = new Set(requests.map((row) => `${row.staffId}:${row.requestDate.toISOString().slice(0, 10)}`));
   const violations = [];
+  const actualMinutesByStaff = new Map();
   for (const assignment of result.assignments) {
     const member = staffById.get(assignment.staffId); const day = assignment.workDate.getUTCDay();
     if (assignment.shiftType === 'EARLY' && !member.canWorkEarly) violations.push(`EARLY:${member.employeeNumber}:${assignment.workDate.toISOString()}`);
@@ -47,6 +48,7 @@ async function main() {
     }
     if (member.monthlyWorkHourLimit && minutes > member.monthlyWorkHourLimit * 60) violations.push(`MONTHLY_LIMIT:${member.employeeNumber}`);
     if (member.weeklyAvailableDays && [...weekDays.values()].some((count) => count > member.weeklyAvailableDays)) violations.push(`WEEKLY_LIMIT:${member.employeeNumber}`);
+    actualMinutesByStaff.set(member.id, minutes);
   }
   const fixedDuplicates = new Map();
   for (const row of result.assignments.filter((item) => item.shiftType === 'EARLY' || item.shiftType === 'LATE')) {
@@ -58,11 +60,14 @@ async function main() {
   if ([...fixedDuplicates.values()].some((count) => count > 1)) violations.push('FIXED_CLASS_DUPLICATE');
   const table = result.specialShiftSummary.map((row) => {
     const previous = before[row.employeeNumber] || [0, 0];
-    return { employeeNumber: row.employeeNumber, name: row.displayName, early: row.earlyCount, late: row.lateCount, special: row.totalSpecialShiftCount, saturday: row.saturdayCount, workDays: row.workCount, earlyGroup: row.earlyCategory, lateGroup: row.lateCategory, earlyDelta: row.earlyCount - previous[0], lateDelta: row.lateCount - previous[1] };
+    const member = staffById.get(row.staffId); const actualHours = Number(((actualMinutesByStaff.get(row.staffId) || 0) / 60).toFixed(2)); const targetDays = member.monthlyTargetWorkDays; const targetHours = member.monthlyTargetWorkHours;
+    const dayDifference = targetDays == null ? null : row.workCount - targetDays; const hourDifference = targetHours == null ? null : Number((actualHours - targetHours).toFixed(2)); const status = [dayDifference < 0 || hourDifference < 0 ? '目標未達' : null, dayDifference > 0 || hourDifference > 0 ? '目標超過' : null, member.monthlyWorkHourLimit && actualHours > member.monthlyWorkHourLimit ? '上限超過' : null].filter(Boolean).join('・') || '目標達成';
+    return { employeeNumber: row.employeeNumber, name: row.displayName, employmentType: member.employmentType, targetDays, workDays: row.workCount, dayDifference, targetHours, actualHours, hourDifference, limitHours: member.monthlyWorkHourLimit, early: row.earlyCount, late: row.lateCount, saturday: row.saturdayCount, status, earlyGroup: row.earlyCategory, lateGroup: row.lateCategory, earlyDelta: row.earlyCount - previous[0], lateDelta: row.lateCount - previous[1] };
   });
   const spread = (field, category) => { const values = table.filter((row) => row[category] === 'GENERAL').map((row) => row[field]); return { max: Math.max(...values), min: Math.min(...values), difference: Math.max(...values) - Math.min(...values) }; };
   console.table(table);
-  console.log(JSON.stringify({ generatedStaff: generationStaff.length, totalAssignments: result.assignments.length, generalEarlySpread: spread('early', 'earlyGroup'), generalLateSpread: spread('late', 'lateGroup'), dedicated: table.filter((row) => row.earlyGroup === 'DEDICATED' || row.lateGroup === 'DEDICATED'), placementShortageWarnings: result.warnings.filter((row) => row.code === 'CLASS_SHORTAGE').length, warningCounts: result.warnings.reduce((acc, row) => ({ ...acc, [row.code]: (acc[row.code] || 0) + 1 }), {}), conditionViolations: violations.length }, null, 2));
+  const targetCounts = { daysMet: table.filter((row) => row.dayDifference === 0).length, daysShort: table.filter((row) => row.dayDifference < 0).length, daysExcess: table.filter((row) => row.dayDifference > 0).length, hoursMet: table.filter((row) => row.hourDifference === 0).length, hoursShort: table.filter((row) => row.hourDifference < 0).length, hoursExcess: table.filter((row) => row.hourDifference > 0).length, limitExcess: table.filter((row) => row.limitHours && row.actualHours > row.limitHours).length };
+  console.log(JSON.stringify({ generatedStaff: generationStaff.length, totalAssignments: result.assignments.length, targetCounts, generalEarlySpread: spread('early', 'earlyGroup'), generalLateSpread: spread('late', 'lateGroup'), dedicated: table.filter((row) => row.earlyGroup === 'DEDICATED' || row.lateGroup === 'DEDICATED'), placementShortageWarnings: result.warnings.filter((row) => row.code === 'CLASS_SHORTAGE').length, warningCounts: result.warnings.reduce((acc, row) => ({ ...acc, [row.code]: (acc[row.code] || 0) + 1 }), {}), conditionViolations: violations.length }, null, 2));
   if (generationStaff.length !== 14 || result.assignments.length !== 434 || violations.length) process.exitCode = 1;
 }
 

@@ -102,6 +102,14 @@ async function main() {
     { employeeNumber: 'STAFF-014', displayName: '佐々木 澪', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.AGE_5, jobTitle: '子育て支援担当', notes: '子育て支援担当。通常の勤務条件に従い自動生成対象' },
   ];
 
+  // デモ表示・生成検証用の目標値であり、実際の雇用契約値ではありません。
+  const demoMonthlyTargets = new Map([
+    ['STAFF-001', [14, 112]], ['STAFF-002', [17, 85]], ['STAFF-003', [14, 105]], ['STAFF-004', [20, 150]],
+    ['STAFF-005', [20, 120]], ['STAFF-006', [15, 110]], ['STAFF-007', [20, 150]], ['STAFF-008', [19, 145]],
+    ['STAFF-009', [19, 145]], ['STAFF-010', [15, 110]], ['STAFF-011', [20, 150]], ['STAFF-012', [19, 145]],
+    ['STAFF-013', [19, 145]], ['STAFF-014', [19, 145]],
+  ]);
+
   for (const member of demoStaff) {
     member.canWorkEarly ??= true;
     member.canWorkRegular ??= true;
@@ -113,6 +121,9 @@ async function main() {
     member.weeklyAvailableDays ??= 5;
     member.regularWorkStartTime ??= null;
     member.regularWorkEndTime ??= null;
+    const [targetDays, targetHours] = demoMonthlyTargets.get(member.employeeNumber);
+    member.monthlyTargetWorkDays = targetDays;
+    member.monthlyTargetWorkHours = targetHours;
     member.notes ??= 'RC1 プレゼン用デモ職員';
   }
 
@@ -138,8 +149,8 @@ async function main() {
   });
   await prisma.staff.upsert({
     where: { tenantId_userId: { tenantId: tenant.id, userId: staffUser.id } },
-    update: { employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: 'フリー保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT, isActive: true },
-    create: { tenantId: tenant.id, userId: staffUser.id, employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: 'フリー保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT },
+    update: { employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: 'フリー保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT, monthlyTargetWorkDays: 20, monthlyTargetWorkHours: 150, isActive: true },
+    create: { tenantId: tenant.id, userId: staffUser.id, employeeNumber: 'STAFF-004', displayName: staffUser.displayName, email: staffUser.email, jobTitle: 'フリー保育補助', employmentType: EmploymentType.FULL_TIME, assignedClass: AssignedClass.SUPPORT, monthlyTargetWorkDays: 20, monthlyTargetWorkHours: 150 },
   });
   const activeDemoEmployeeNumbers = ['ADMIN-001', ...Array.from({ length: 14 }, (_, index) => `STAFF-${String(index + 1).padStart(3, '0')}`)];
   await prisma.staff.updateMany({

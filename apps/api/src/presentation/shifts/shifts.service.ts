@@ -9,9 +9,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 import type { AssignmentInputDto } from './save-assignments.dto';
 
-const staffSelect = { id: true, userId: true, employeeNumber: true, displayName: true, employmentType: true, assignedClass: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true, isActive: true } as const;
+const staffSelect = { id: true, userId: true, employeeNumber: true, displayName: true, employmentType: true, assignedClass: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true, isActive: true } as const;
 const assignmentInclude = { staff: { select: staffSelect } } as const;
-type Warning = { code: string; staffId: string; workDate: string; message: string; severity: 'warning' | 'blocking' };
+type Warning = { code: string; staffId: string; workDate: string; message: string; severity: 'info' | 'warning' | 'blocking' };
 
 @Injectable()
 export class ShiftsService {
@@ -109,7 +109,7 @@ export class ShiftsService {
     const schedule = await this.requireEditable(user, id);
     const range = this.monthRange(schedule.targetMonth);
     const [staff, requests, setting, requirements, closedDates, managerMemberships] = await Promise.all([
-      this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true }, orderBy: { employeeNumber: 'asc' } }),
+      this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true }, orderBy: { employeeNumber: 'asc' } }),
       this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
       this.settings.ensureSetting(user.tenantId),
       this.settings.requirements(user),
@@ -159,8 +159,8 @@ export class ShiftsService {
     const directorUserIds = new Set(directorMemberships.map((item) => item.userId));
     const mark = <T extends { id: string; userId: string | null }>(item: T) => ({ ...item, isDirector: !!item.userId && directorUserIds.has(item.userId) });
     const assignments = rawAssignments.map((item) => ({ ...item, staff: mark(item.staff) }));
-    const staff = rawStaff.map(mark);
-    const summaries = staff.map((member) => { const rows = assignments.filter((item) => item.staffId === member.id); return { staffId: member.id, workDays: rows.filter((item) => (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length, workMinutes: rows.reduce((sum, item) => sum + this.minutes(item), 0) }; });
+    const staff = rawStaff.map(mark) as Array<(typeof rawAssignments)[number]['staff'] & { isDirector: boolean }>;
+    const summaries = staff.map((member) => { const rows = assignments.filter((item) => item.staffId === member.id); const workDays = rows.filter((item) => (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length; const workMinutes = rows.reduce((sum, item) => sum + this.minutes(item), 0); const targetMinutes = member.monthlyTargetWorkHours == null ? null : Math.round(member.monthlyTargetWorkHours * 60); const limitMinutes = member.monthlyWorkHourLimit == null ? null : member.monthlyWorkHourLimit * 60; const statuses = [member.monthlyTargetWorkDays != null && workDays < member.monthlyTargetWorkDays ? '目標未達' : null, member.monthlyTargetWorkDays != null && workDays > member.monthlyTargetWorkDays ? '目標超過' : null, targetMinutes != null && workMinutes < targetMinutes ? '目標未達' : null, targetMinutes != null && workMinutes > targetMinutes ? '目標超過' : null, limitMinutes != null && workMinutes > limitMinutes ? '上限超過' : null, limitMinutes != null && workMinutes <= limitMinutes && workMinutes >= limitMinutes * 0.9 ? '上限接近' : null].filter((value, index, all): value is string => !!value && all.indexOf(value) === index); return { staffId: member.id, workDays, targetWorkDays: member.monthlyTargetWorkDays, workDaysDifference: member.monthlyTargetWorkDays == null ? null : workDays - member.monthlyTargetWorkDays, workMinutes, targetWorkMinutes: targetMinutes, workMinutesDifference: targetMinutes == null ? null : workMinutes - targetMinutes, monthlyWorkHourLimit: member.monthlyWorkHourLimit, statuses: statuses.length ? statuses : ['目標内'] }; });
     return { schedule, assignments, staff, requests, summaries, warnings: manager ? this.warnings(assignments, requests) : [] };
   }
 
@@ -203,6 +203,10 @@ export class ShiftsService {
       const staff = list[0].staff;
       const minutes = list.reduce((sum, assignment) => sum + this.minutes(assignment), 0);
       if (staff.monthlyWorkHourLimit && minutes > staff.monthlyWorkHourLimit * 60) warnings.push({ code: 'MONTHLY_HOURS_LIMIT', staffId, workDate: this.isoDate(list[0].workDate), message: `${staff.displayName}さんの月間勤務時間が上限を超えています（概算）。`, severity: 'warning' });
+      const workDays = list.filter((item) => workingShiftTypes.includes(item.shiftType)).length;
+      if (staff.monthlyTargetWorkDays && workDays !== staff.monthlyTargetWorkDays) warnings.push({ code: workDays < staff.monthlyTargetWorkDays ? 'TARGET_WORK_DAYS_SHORTAGE' : 'TARGET_WORK_DAYS_EXCESS', staffId, workDate: this.isoDate(list[0].workDate), message: `${staff.displayName}さんの勤務日数は目標${staff.monthlyTargetWorkDays}日に対して${workDays}日です。`, severity: workDays < staff.monthlyTargetWorkDays ? 'warning' : 'info' });
+      const targetMinutes = staff.monthlyTargetWorkHours == null ? null : Math.round(staff.monthlyTargetWorkHours * 60);
+      if (targetMinutes != null && minutes !== targetMinutes) warnings.push({ code: minutes < targetMinutes ? 'TARGET_WORK_HOURS_SHORTAGE' : 'TARGET_WORK_HOURS_EXCESS', staffId, workDate: this.isoDate(list[0].workDate), message: `${staff.displayName}さんの勤務時間は目標${staff.monthlyTargetWorkHours}時間に対して${Number((minutes / 60).toFixed(2))}時間です。`, severity: minutes < targetMinutes ? 'warning' : 'info' });
       const weeks = new Map<string, number>();
       for (const assignment of list.filter((item) => workingShiftTypes.includes(item.shiftType))) { const week = this.weekKey(this.isoDate(assignment.workDate)); weeks.set(week, (weeks.get(week) ?? 0) + 1); }
       if (staff.weeklyAvailableDays && [...weeks.values()].some((days) => days > staff.weeklyAvailableDays)) warnings.push({ code: 'WEEKLY_DAYS_LIMIT', staffId, workDate: this.isoDate(list[0].workDate), message: `${staff.displayName}さんの週勤務可能日数を超えています。`, severity: 'warning' });

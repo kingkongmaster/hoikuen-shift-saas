@@ -230,6 +230,8 @@ model Staff {
   lateShiftOnly        Boolean        @default(false)
   canWorkSaturdays     Boolean        @default(true)
   monthlyWorkHourLimit Int?
+  monthlyTargetWorkDays Int?
+  monthlyTargetWorkHours Float?
   weeklyAvailableDays  Int?
   regularWorkStartTime String?
   regularWorkEndTime   String?
