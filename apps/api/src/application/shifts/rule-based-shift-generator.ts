@@ -5,6 +5,7 @@ export type GeneratorStaff = { id: string; employeeNumber: string; displayName: 
 export type GeneratorRequest = { staffId: string; requestDate: Date; requestType: ShiftRequestType; reason: string | null };
 export type GenerationWarning = { code: string; level: 'INFO' | 'WARNING' | 'ERROR'; workDate: string; staffId?: string; classType?: AssignedClass; required?: number; assigned?: number; message: string };
 export type GeneratedAssignment = { staffId: string; workDate: Date; shiftType: ShiftType; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null };
+export type SpecialShiftSummary = { staffId: string; employeeNumber: string; displayName: string; earlyCount: number; lateCount: number; totalSpecialShiftCount: number; saturdayCount: number; workCount: number; earlyCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE'; lateCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE' };
 export type GeneratorOptions = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff?: number; saturdayOperationEnabled?: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing?: boolean; directorClassPlacementMode?: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number; closedDates?: Array<{ closedDate: Date; name: string }>; classRequirements?: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean }> };
 
 const defaultTargets: Partial<Record<AssignedClass, number>> = { AGE_0: 3, AGE_1: 2, AGE_2: 2, AGE_3: 2, AGE_4: 2, AGE_5: 2 };
@@ -16,6 +17,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
   const fixed = new Map(requests.map((request) => [`${request.staffId}:${iso(request.requestDate)}`, request]));
   const closed = new Map((options.closedDates ?? []).map((item) => [iso(item.closedDate), item.name]));
   const minutes = new Map<string, number>(); const days = new Map<string, number>(); const workCount = new Map<string, number>(); const saturdayCount = new Map<string, number>();
+  const earlyCountByStaff = new Map<string, number>(); const lateCountByStaff = new Map<string, number>();
   const workStreak = new Map<string, number>(); const earlyStreak = new Map<string, number>(); const lateStreak = new Map<string, number>();
   const warned = new Set<string>();
   const add = (warning: GenerationWarning) => { const key = `${warning.code}:${warning.workDate}:${warning.staffId ?? ''}:${warning.classType ?? ''}`; if (!warned.has(key)) { warned.add(key); warnings.push(warning); } };
@@ -49,9 +51,12 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       const item = day.get(member.id)!; assignments.push(item); const working = isWorking(item.shiftType);
       workStreak.set(member.id, working ? (workStreak.get(member.id) ?? 0) + 1 : 0); earlyStreak.set(member.id, item.shiftType === ShiftType.EARLY ? (earlyStreak.get(member.id) ?? 0) + 1 : 0); lateStreak.set(member.id, item.shiftType === ShiftType.LATE ? (lateStreak.get(member.id) ?? 0) + 1 : 0);
       if (working) { minutes.set(member.id, (minutes.get(member.id) ?? 0) + minutesFor(item)); days.set(`${member.id}:${weekKey(key)}`, (days.get(`${member.id}:${weekKey(key)}`) ?? 0) + 1); workCount.set(member.id, (workCount.get(member.id) ?? 0) + 1); if (saturday) saturdayCount.set(member.id, (saturdayCount.get(member.id) ?? 0) + 1); }
+      if (item.shiftType === ShiftType.EARLY) earlyCountByStaff.set(member.id, (earlyCountByStaff.get(member.id) ?? 0) + 1);
+      if (item.shiftType === ShiftType.LATE) lateCountByStaff.set(member.id, (lateCountByStaff.get(member.id) ?? 0) + 1);
     }
 
     function eligible(member: GeneratorStaff, type: ShiftType) {
+      if (fixed.has(`${member.id}:${key}`)) return false;
       if (saturday && !member.canWorkSaturdays) return false;
       if (type === ShiftType.EARLY && (!member.canWorkEarly || member.lateShiftOnly || (earlyStreak.get(member.id) ?? 0) >= options.maxConsecutiveEarlyDays)) return false;
       if (type === ShiftType.LATE && (!member.canWorkLate || member.earlyShiftOnly || (lateStreak.get(member.id) ?? 0) >= options.maxConsecutiveLateDays)) return false;
@@ -64,8 +69,23 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       if (member.weeklyAvailableDays && nextDays > member.weeklyAvailableDays) return false;
       return true;
     }
-    function compare(type: ShiftType) { return (a: GeneratorStaff, b: GeneratorStaff) => score(a, type) - score(b, type) || a.employeeNumber.localeCompare(b.employeeNumber, 'ja'); }
-    function score(member: GeneratorStaff, type: ShiftType) { const dedicated = type === ShiftType.EARLY ? member.earlyShiftOnly : type === ShiftType.LATE ? member.lateShiftOnly : false; return (dedicated ? 0 : 1000) + (member.isDirector ? 250 : 0) + ((saturday || sunday) ? (saturdayCount.get(member.id) ?? 0) * 100 : 0) + (workCount.get(member.id) ?? 0); }
+    function compare(type: ShiftType) {
+      return (a: GeneratorStaff, b: GeneratorStaff) => {
+        const dedicated = dedicatedRank(a, type) - dedicatedRank(b, type);
+        if (dedicated) return dedicated;
+        // EARLY and LATE remain part of class coverage, so the existing fixed-class
+        // duplicate filter and later class assignment preserve placement capacity.
+        const specialCount = countFor(a, type) - countFor(b, type);
+        if (specialCount) return specialCount;
+        const totalWork = (workCount.get(a.id) ?? 0) - (workCount.get(b.id) ?? 0);
+        if (totalWork) return totalWork;
+        const saturdays = (saturdayCount.get(a.id) ?? 0) - (saturdayCount.get(b.id) ?? 0);
+        if (saturdays) return saturdays;
+        return a.employeeNumber.localeCompare(b.employeeNumber, 'ja');
+      };
+    }
+    function dedicatedRank(member: GeneratorStaff, type: ShiftType) { return type === ShiftType.EARLY ? (member.earlyShiftOnly ? 0 : 1) : type === ShiftType.LATE ? (member.lateShiftOnly ? 0 : 1) : 0; }
+    function countFor(member: GeneratorStaff, type: ShiftType) { return type === ShiftType.EARLY ? (earlyCountByStaff.get(member.id) ?? 0) : type === ShiftType.LATE ? (lateCountByStaff.get(member.id) ?? 0) : 0; }
     function allocate(type: ShiftType, required: number) {
       let count = 0; const usedFixedClasses = new Set<AssignedClass>(); let rejectedByClass = false;
       for (const member of staff.filter((m) => day.get(m.id)?.shiftType === ShiftType.OFF && eligible(m, type)).sort(compare(type))) {
@@ -103,7 +123,11 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       }
     }
   }
-  return { assignments, warnings };
+  const specialShiftSummary: SpecialShiftSummary[] = staff.map((member) => {
+    const earlyCount = earlyCountByStaff.get(member.id) ?? 0; const lateCount = lateCountByStaff.get(member.id) ?? 0;
+    return { staffId: member.id, employeeNumber: member.employeeNumber, displayName: member.displayName, earlyCount, lateCount, totalSpecialShiftCount: earlyCount + lateCount, saturdayCount: saturdayCount.get(member.id) ?? 0, workCount: workCount.get(member.id) ?? 0, earlyCategory: !member.canWorkEarly || member.lateShiftOnly ? 'NOT_ELIGIBLE' : member.earlyShiftOnly ? 'DEDICATED' : 'GENERAL', lateCategory: !member.canWorkLate || member.earlyShiftOnly ? 'NOT_ELIGIBLE' : member.lateShiftOnly ? 'DEDICATED' : 'GENERAL' };
+  });
+  return { assignments, warnings, specialShiftSummary };
 }
 
 function classPriority(member: GeneratorStaff, target: AssignedClass) { if (member.assignedClass === target) return 0; if (member.assignedClass === AssignedClass.FREE) return 1; if (member.assignedClass === AssignedClass.SUPPORT) return 2; return 3; }

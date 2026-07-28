@@ -28,8 +28,10 @@
     "test:rc1-director": "node test/rc1-director-rules.test.cjs",
     "test:fixed-class": "node test/fixed-class-special-shift.test.cjs",
     "test:individual-hours": "node test/individual-working-hours.test.cjs",
+    "test:fair-special-shifts": "node test/fair-special-shift-allocation.test.cjs",
+    "audit:fair-special-shifts": "node test/fair-special-shift-august-audit.cjs",
     "test:all": "npm run test:sprint2 && npm run test:sprint3 && npm run test:sprint4 && npm run test:sprint5 && npm run test:sprint6 && npm run test:sprint7 && npm run test:sprint8",
-    "test:regression": "npm run test:all && npm run test:sprint9a1 && npm run test:sprint9a2 && npm run test:sprint9b1a && npm run test:sprint9b1b && npm run test:sprint9b1b:final && npm run test:sprint9c && npm run test:sprint10a && npm run test:rc1-shift && npm run test:rc1-director && npm run test:individual-hours && npm run test:fixed-class"
+    "test:regression": "npm run test:all && npm run test:sprint9a1 && npm run test:sprint9a2 && npm run test:sprint9b1a && npm run test:sprint9b1b && npm run test:sprint9b1b:final && npm run test:sprint9c && npm run test:sprint10a && npm run test:rc1-shift && npm run test:rc1-director && npm run test:individual-hours && npm run test:fair-special-shifts && npm run test:fixed-class"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
