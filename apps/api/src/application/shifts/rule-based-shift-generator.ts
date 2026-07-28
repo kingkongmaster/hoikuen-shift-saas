@@ -1,7 +1,7 @@
 import { AssignedClass, EmploymentType, ShiftRequestType, ShiftType } from '@prisma/client';
 import { shiftTypeDefaults, workingShiftTypes } from '../../domain/shifts/monthly-shift';
 
-export type GeneratorStaff = { id: string; employeeNumber: string; displayName: string; assignedClass: AssignedClass; employmentType: EmploymentType; isDirector?: boolean; canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean; canWorkSaturdays: boolean; monthlyWorkHourLimit: number | null; weeklyAvailableDays: number | null };
+export type GeneratorStaff = { id: string; employeeNumber: string; displayName: string; assignedClass: AssignedClass; employmentType: EmploymentType; isDirector?: boolean; canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean; canWorkSaturdays: boolean; monthlyWorkHourLimit: number | null; weeklyAvailableDays: number | null; regularWorkStartTime?: string | null; regularWorkEndTime?: string | null };
 export type GeneratorRequest = { staffId: string; requestDate: Date; requestType: ShiftRequestType; reason: string | null };
 export type GenerationWarning = { code: string; level: 'INFO' | 'WARNING' | 'ERROR'; workDate: string; staffId?: string; classType?: AssignedClass; required?: number; assigned?: number; message: string };
 export type GeneratedAssignment = { staffId: string; workDate: Date; shiftType: ShiftType; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null };
@@ -24,7 +24,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
   for (let current = new Date(start); current < end; current.setUTCDate(current.getUTCDate() + 1)) {
     const workDate = new Date(current); const key = iso(workDate); const saturday = workDate.getUTCDay() === 6; const sunday = workDate.getUTCDay() === 0; const closedName = closed.get(key);
     const day = new Map<string, GeneratedAssignment>();
-    for (const member of staff) { const request = fixed.get(`${member.id}:${key}`); day.set(member.id, request ? assignment(member.id, workDate, requestTypeToShiftType(request.requestType), options, '承認済み希望休') : assignment(member.id, workDate, ShiftType.OFF, options)); }
+    for (const member of staff) { const request = fixed.get(`${member.id}:${key}`); day.set(member.id, request ? assignment(member, workDate, requestTypeToShiftType(request.requestType), options, '承認済み希望休') : assignment(member, workDate, ShiftType.OFF, options)); }
     if (closedName || (saturday && options.saturdayOperationEnabled === false) || (sunday && !options.sundayOperationEnabled)) {
       const saturdayClosed = saturday && options.saturdayOperationEnabled === false;
       add({ code: closedName ? 'CLOSED_DATE' : saturdayClosed ? 'SATURDAY_CLOSED' : 'SUNDAY_CLOSED', level: 'INFO', workDate: key, message: closedName ? `${key}は「${closedName}」のため全職員をOFFにしました。` : `${key}は${saturdayClosed ? '土曜' : '日曜'}休園設定のため全職員をOFFにしました。` });
@@ -40,7 +40,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       const minimumWorking = saturday || sunday ? Math.max(requiredWorking, saturdayMinimumStaff) : requiredWorking + staffingBuffer;
       const normalNeeded = Math.max(0, minimumWorking - alreadyWorking);
       const normal = staff.filter((member) => day.get(member.id)?.shiftType === ShiftType.OFF && eligible(member, ShiftType.NORMAL));
-      normal.sort(compare(ShiftType.NORMAL)); for (const member of normal.slice(0, normalNeeded)) day.set(member.id, assignment(member.id, workDate, ShiftType.NORMAL, options, null, member.isDirector ? null : member.assignedClass));
+      normal.sort(compare(ShiftType.NORMAL)); for (const member of normal.slice(0, normalNeeded)) day.set(member.id, assignment(member, workDate, ShiftType.NORMAL, options, null, member.isDirector ? null : member.assignedClass));
       const assignedWorking = [...day.values()].filter((item) => isWorking(item.shiftType)).length;
       if ((saturday || sunday) && assignedWorking < saturdayMinimumStaff) add({ code: 'SATURDAY_MINIMUM_SHORTAGE', level: 'ERROR', workDate: key, required: saturdayMinimumStaff, assigned: assignedWorking, message: `${key}（${weekdays[workDate.getUTCDay()]}）の最低勤務人数が${saturdayMinimumStaff - assignedWorking}人不足しています。` });
       assignClasses(targets);
@@ -57,7 +57,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       if (type === ShiftType.LATE && (!member.canWorkLate || member.earlyShiftOnly || (lateStreak.get(member.id) ?? 0) >= options.maxConsecutiveLateDays)) return false;
       if (type === ShiftType.NORMAL && (!member.canWorkRegular || member.earlyShiftOnly || member.lateShiftOnly)) return false;
       if ((workStreak.get(member.id) ?? 0) >= options.maxConsecutiveWorkDays) return false;
-      const nextMinutes = (minutes.get(member.id) ?? 0) + minutesForType(type, options); const nextDays = (days.get(`${member.id}:${weekKey(key)}`) ?? 0) + 1;
+      const nextMinutes = (minutes.get(member.id) ?? 0) + minutesForType(type, options, member); const nextDays = (days.get(`${member.id}:${weekKey(key)}`) ?? 0) + 1;
       // These are hard constraints. Rejected candidates are normal solver decisions,
       // not warnings: only an assignment that actually violates a limit is actionable.
       if (member.monthlyWorkHourLimit && nextMinutes > member.monthlyWorkHourLimit * 60) return false;
@@ -71,7 +71,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       for (const member of staff.filter((m) => day.get(m.id)?.shiftType === ShiftType.OFF && eligible(m, type)).sort(compare(type))) {
         if (count >= required) break;
         if (isFixedClass(member.assignedClass) && usedFixedClasses.has(member.assignedClass)) { rejectedByClass = true; continue; }
-        day.set(member.id, assignment(member.id, workDate, type, options, null, member.isDirector ? null : member.assignedClass));
+        day.set(member.id, assignment(member, workDate, type, options, null, member.isDirector ? null : member.assignedClass));
         if (isFixedClass(member.assignedClass)) usedFixedClasses.add(member.assignedClass);
         count += 1;
       }
@@ -108,10 +108,11 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
 
 function classPriority(member: GeneratorStaff, target: AssignedClass) { if (member.assignedClass === target) return 0; if (member.assignedClass === AssignedClass.FREE) return 1; if (member.assignedClass === AssignedClass.SUPPORT) return 2; return 3; }
 function isFixedClass(value: AssignedClass) { return value.startsWith('AGE_'); }
-function assignment(staffId: string, workDate: Date, shiftType: ShiftType, options: GeneratorOptions, note: string | null = null, assignedClass: AssignedClass | null = null): GeneratedAssignment { const defaults = timesFor(shiftType, options); return { staffId, workDate: new Date(workDate), shiftType, startTime: defaults?.startTime ?? null, endTime: defaults?.endTime ?? null, breakMinutes: isWorking(shiftType) ? options.defaultBreakMinutes : null, note, assignedClass: isWorking(shiftType) ? assignedClass : null }; }
+function assignment(member: GeneratorStaff, workDate: Date, shiftType: ShiftType, options: GeneratorOptions, note: string | null = null, assignedClass: AssignedClass | null = null): GeneratedAssignment { const defaults = timesForMember(shiftType, options, member); return { staffId: member.id, workDate: new Date(workDate), shiftType, startTime: defaults?.startTime ?? null, endTime: defaults?.endTime ?? null, breakMinutes: isWorking(shiftType) ? options.defaultBreakMinutes : null, note, assignedClass: isWorking(shiftType) ? assignedClass : null }; }
 function timesFor(type: ShiftType, options: GeneratorOptions) { if (type === ShiftType.EARLY) return { startTime: options.defaultStartEarly, endTime: options.defaultEndEarly }; if (type === ShiftType.NORMAL) return { startTime: options.defaultStartNormal, endTime: options.defaultEndNormal }; if (type === ShiftType.LATE) return { startTime: options.defaultStartLate, endTime: options.defaultEndLate }; return shiftTypeDefaults[type]; }
+function timesForMember(type: ShiftType, options: GeneratorOptions, member: GeneratorStaff) { if (type === ShiftType.NORMAL && member.regularWorkStartTime && member.regularWorkEndTime) return { startTime: member.regularWorkStartTime, endTime: member.regularWorkEndTime }; return timesFor(type, options); }
 function minutesFor(item: GeneratedAssignment) { if (!item.startTime || !item.endTime) return 0; const [sh, sm] = item.startTime.split(':').map(Number); const [eh, em] = item.endTime.split(':').map(Number); return Math.max(0, eh * 60 + em - sh * 60 - sm - (item.breakMinutes ?? 0)); }
-function minutesForType(type: ShiftType, options: GeneratorOptions) { const times = timesFor(type, options); if (!times) return 0; const [sh, sm] = times.startTime.split(':').map(Number); const [eh, em] = times.endTime.split(':').map(Number); return Math.max(0, eh * 60 + em - sh * 60 - sm - options.defaultBreakMinutes); }
+function minutesForType(type: ShiftType, options: GeneratorOptions, member: GeneratorStaff) { const times = timesForMember(type, options, member); if (!times) return 0; const [sh, sm] = times.startTime.split(':').map(Number); const [eh, em] = times.endTime.split(':').map(Number); return Math.max(0, eh * 60 + em - sh * 60 - sm - options.defaultBreakMinutes); }
 function isWorking(type: ShiftType) { return (workingShiftTypes as readonly ShiftType[]).includes(type); }
 function requestTypeToShiftType(type: ShiftRequestType) { if (type === ShiftRequestType.PAID_LEAVE) return ShiftType.PAID_LEAVE; if (type === ShiftRequestType.SUMMER_LEAVE) return ShiftType.SUMMER_LEAVE; if (type === ShiftRequestType.HALF_DAY_AM) return ShiftType.AM_HALF; if (type === ShiftRequestType.HALF_DAY_PM) return ShiftType.PM_HALF; return ShiftType.OFF; }
 function iso(value: Date) { return value.toISOString().slice(0, 10); }

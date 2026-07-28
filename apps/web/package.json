@@ -16,7 +16,8 @@
     "test:sprint10c": "node test/sprint10c.test.mjs",
     "test:sprint11a": "node test/sprint11a.test.mjs",
     "test:shift-display": "node test/shift-assignment-display.test.mjs",
-    "test:regression": "npm run test:month && npm run test:sprint9b2 && npm run test:sprint9c && npm run test:sprint10a && npm run test:sprint10b && npm run test:sprint10c && npm run test:sprint11a && npm run test:shift-display"
+    "test:individual-hours": "node test/individual-working-hours.test.mjs",
+    "test:regression": "npm run test:month && npm run test:sprint9b2 && npm run test:sprint9c && npm run test:sprint10a && npm run test:sprint10b && npm run test:sprint10c && npm run test:sprint11a && npm run test:shift-display && npm run test:individual-hours"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.3",

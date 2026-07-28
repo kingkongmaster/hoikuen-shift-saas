@@ -231,6 +231,8 @@ model Staff {
   canWorkSaturdays     Boolean        @default(true)
   monthlyWorkHourLimit Int?
   weeklyAvailableDays  Int?
+  regularWorkStartTime String?
+  regularWorkEndTime   String?
   isActive             Boolean        @default(true)
   notes                String?
   createdAt            DateTime       @default(now())
