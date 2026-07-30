@@ -58,6 +58,17 @@ async function main() {
     update: { saturdayOperationEnabled: true, weekdayEarlyRequired: 2, weekdayLateRequired: 2, saturdayMinimumStaff: 3, saturdayEarlyRequired: 1, saturdayLateRequired: 1, defaultStartEarly: '07:00', defaultEndEarly: '16:00', defaultStartNormal: '08:30', defaultEndNormal: '17:00', defaultStartLate: '11:00', defaultEndLate: '19:30' },
     create: { tenantId: tenant.id, saturdayOperationEnabled: true, weekdayEarlyRequired: 2, weekdayLateRequired: 2, saturdayMinimumStaff: 3, saturdayEarlyRequired: 1, saturdayLateRequired: 1, defaultStartEarly: '07:00', defaultEndEarly: '16:00', defaultStartNormal: '08:30', defaultEndNormal: '17:00', defaultStartLate: '11:00', defaultEndLate: '19:30' },
   });
+  const systemWorkPatterns = [
+    { code: 'EARLY', name: '早出', shortName: '早', displayOrder: 10, startTime: '07:00', endTime: '16:00', breakMinutes: 60, color: '#f59e0b', isWorking: true, isDefault: false },
+    { code: 'NORMAL', name: '通常', shortName: '通', displayOrder: 20, startTime: '08:30', endTime: '17:00', breakMinutes: 60, color: '#10b981', isWorking: true, isDefault: true },
+    { code: 'LATE', name: '遅出', shortName: '遅', displayOrder: 30, startTime: '11:00', endTime: '19:30', breakMinutes: 60, color: '#6366f1', isWorking: true, isDefault: false },
+    { code: 'OFF', name: '休み', shortName: '休', displayOrder: 40, startTime: null, endTime: null, breakMinutes: 0, color: '#94a3b8', isWorking: false, isDefault: false },
+  ];
+  for (const pattern of systemWorkPatterns) await prisma.workPattern.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: pattern.code } },
+    update: { ...pattern, isSystem: true, isActive: true },
+    create: { tenantId: tenant.id, ...pattern, isSystem: true, isActive: true },
+  });
   const demoClassRequirements = new Map([
     [AssignedClass.AGE_0, 2], [AssignedClass.AGE_1, 2], [AssignedClass.AGE_2, 2],
     [AssignedClass.AGE_3, 2], [AssignedClass.AGE_4, 1], [AssignedClass.AGE_5, 1],

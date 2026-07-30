@@ -12,8 +12,9 @@ import { SubscriptionInfo } from '../subscription/SubscriptionInfo';
 import { FeedbackManagement } from '../support/FeedbackManagement';
 import { UpdateHistory } from '../support/UpdateHistory';
 import { HomeDashboard } from './HomeDashboard';
+import { WorkPatternManagement } from '../work-patterns/WorkPatternManagement';
 
-type View = 'home' | 'staff' | 'requests' | 'shifts' | 'settings' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates';
+type View = 'home' | 'staff' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates';
 const roleLabels = { ADMIN: '管理者', DIRECTOR: '園長', CHIEF: '主任', STAFF: '一般職員' } as const;
 const viewInfo: Record<View, { title: string; description: string }> = {
   home: { title: 'ホーム', description: '今日の勤務と大切なお知らせを確認できます。' },
@@ -21,6 +22,7 @@ const viewInfo: Record<View, { title: string; description: string }> = {
   requests: { title: '希望休管理', description: '希望休の申請と確認を行います。' },
   shifts: { title: '月間シフト管理', description: '月間勤務表を確認・管理します。' },
   settings: { title: '園設定', description: '必要人数、勤務ルール、クラス配置、休園日を管理します。' },
+  'work-patterns': { title: '勤務パターン管理', description: '勤務区分の時間、名称、表示を管理します。' },
   notifications: { title: '通知', description: '自分宛のお知らせを確認します。' },
   swaps: { title: 'シフト交換', description: '確定済みシフトの交換を申請・管理します。' },
   audit: { title: '監査ログ', description: '園内の操作履歴を確認します。' },
@@ -81,6 +83,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
           <details className="other-menu mt-4"><summary><span className="action-symbol action-symbol-soft" aria-hidden="true">他</span><span><strong>その他のメニュー</strong><small>管理・設定・サポート</small></span></summary><div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
             {isAdmin && <OtherButton symbol="職" label="職員マスター" onClick={() => selectView('staff')} />}
             {canManageShifts && <OtherButton symbol="園" label="園設定" onClick={() => selectView('settings')} />}
+            {isAdmin && <OtherButton symbol="時" label="勤務パターン" onClick={() => selectView('work-patterns')} />}
             {canManageShifts && <OtherButton symbol="契" label="契約情報" onClick={() => selectView('subscription')} />}
             {canManageShifts && <OtherButton symbol="録" label="監査ログ" onClick={() => selectView('audit')} />}
             {canManageShifts && <OtherButton symbol="出" label="データ出力" onClick={() => selectView('exports')} />}
@@ -105,6 +108,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
 
 function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange }: { view: View; session: Session; isAdmin: boolean; canManageShifts: boolean; onUnreadChange: (count: number) => void }) {
   return view === 'staff' && isAdmin ? <StaffManagement token={session.accessToken} />
+    : view === 'work-patterns' && isAdmin ? <WorkPatternManagement token={session.accessToken} />
     : view === 'requests' ? <RequestManagement session={session} />
       : view === 'settings' && canManageShifts ? <ShiftSettings session={session} />
         : view === 'subscription' && canManageShifts ? <SubscriptionInfo session={session} />

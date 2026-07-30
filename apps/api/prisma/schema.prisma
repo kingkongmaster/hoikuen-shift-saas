@@ -127,6 +127,7 @@ model Tenant {
   subscription TenantSubscription?
   invitations Invitation[]
   features TenantFeature[]
+  workPatterns WorkPattern[]
   displayName String?
   phone String?
   postalCode String?
@@ -320,15 +321,43 @@ model ShiftAssignment {
   breakMinutes   Int?
   note           String?
   assignedClass  AssignedClass?
+  workPatternId  String?      @db.Uuid
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   monthlyShift   MonthlyShift @relation(fields: [monthlyShiftId], references: [id], onDelete: Cascade)
   staff          Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  workPattern    WorkPattern? @relation(fields: [workPatternId], references: [id], onDelete: SetNull)
 
   @@unique([monthlyShiftId, staffId, workDate])
   @@index([tenantId, staffId, workDate])
   @@index([monthlyShiftId, workDate])
+  @@index([tenantId, workPatternId])
+}
+
+model WorkPattern {
+  /// A migration-level partial unique index permits at most one active default pattern per tenant.
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  code           String
+  name           String
+  shortName      String
+  displayOrder   Int      @default(0)
+  startTime      String?
+  endTime        String?
+  breakMinutes   Int      @default(0)
+  color          String?
+  isWorking      Boolean  @default(true)
+  isDefault      Boolean  @default(false)
+  isSystem       Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignments    ShiftAssignment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive, displayOrder])
 }
 
 model TenantShiftSetting {
