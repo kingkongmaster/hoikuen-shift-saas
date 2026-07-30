@@ -5,6 +5,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { FeaturesModule } from '../features/features.module';
 
-@Module({ imports: [SettingsModule, NotificationsModule, AuditModule, SubscriptionsModule], controllers: [ShiftsController], providers: [ShiftsService] })
+@Module({ imports: [SettingsModule, NotificationsModule, AuditModule, SubscriptionsModule, FeaturesModule], controllers: [ShiftsController], providers: [ShiftsService] })
 export class ShiftsModule {}

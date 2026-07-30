@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type AssignedClass, type ClosedDate, type GenerationResult, type GenerationWarning, type PrecheckResult, type Session, type ShiftAssignmentInput, type ShiftType, type ShiftView } from '../../api/client';
 import { assignmentKey } from './assignment-key.js';
 import { currentMonthKey, monthChangeReset, moveMonthKey } from './month-utils.js';
+import { useFeature } from '../features/use-feature';
 
 const labels: Record<ShiftType, string> = { EARLY: '早', NORMAL: '通', LATE: '遅', OFF: '休', PAID_LEAVE: '有', SUMMER_LEAVE: '夏', AM_HALF: '半', PM_HALF: '半', OTHER: '他' };
 const fullLabels: Record<ShiftType, string> = { EARLY: '早出', NORMAL: '通常', LATE: '遅出', OFF: '休', PAID_LEAVE: '有給', SUMMER_LEAVE: '夏季', AM_HALF: '半休（午前）', PM_HALF: '半休（午後）', OTHER: 'その他勤務' };
@@ -21,7 +22,8 @@ const summarizeWarnings = (warnings: WarningLike[]) => warnings.reduce<{ INFO: n
 
 export function ShiftManagement({ session }: { session: Session }) {
   const manager = session.role === 'ADMIN' || session.role === 'DIRECTOR';
-  const canGenerate = session.role === 'ADMIN';
+  const basicGeneration = useFeature(session.accessToken, 'BASIC_SHIFT_GENERATION');
+  const canGenerate = session.role === 'ADMIN' && basicGeneration.enabled;
   const [month, setMonth] = useState(currentMonthKey); const [view, setView] = useState<ShiftView | null>(null); const [changes, setChanges] = useState<Record<string, ShiftAssignmentInput>>({}); const [message, setMessage] = useState(''); const [generationWarnings, setGenerationWarnings] = useState<GenerationWarning[]>([]); const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null); const [precheck, setPrecheck] = useState<PrecheckResult | null>(null); const [closedDates, setClosedDates] = useState<ClosedDate[]>([]); const [loading, setLoading] = useState(true);
   const reloadMonthData = async (targetMonth: string) => { setLoading(true); try { const [nextView, nextClosed] = await Promise.all([api.shifts(session.accessToken, targetMonth), api.closedDates(session.accessToken, targetMonth)]); setView(nextView); setClosedDates(nextClosed); setChanges({}); } catch (error) { setMessage(error instanceof Error ? error.message : 'シフトを確認できませんでした。時間をおいてもう一度お試しください。'); } finally { setLoading(false); } };
   useEffect(() => { void reloadMonthData(month); }, [month]);
