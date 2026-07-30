@@ -22,6 +22,7 @@ import { AuthRateLimitMiddleware } from './infrastructure/http/auth-rate-limit.m
 import { FeaturesModule } from './presentation/features/features.module';
 import { WorkPatternsModule } from './presentation/work-patterns/work-patterns.module';
 import { StaffWorkRulesModule } from './presentation/staff-work-rules/staff-work-rules.module';
+import { StaffAttributesModule } from './presentation/staff-attributes/staff-attributes.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { StaffWorkRulesModule } from './presentation/staff-work-rules/staff-work
     FeaturesModule,
     WorkPatternsModule,
     StaffWorkRulesModule,
+    StaffAttributesModule,
   ],
 })
 export class AppModule implements NestModule {

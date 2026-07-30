@@ -133,6 +133,11 @@ export type WorkPatternInput = Pick<WorkPattern, 'code' | 'name' | 'shortName' |
 export type StaffWorkRuleType = 'AVAILABLE_WORK_PATTERN'|'UNAVAILABLE_WORK_PATTERN'|'AVAILABLE_DAY_OF_WEEK'|'UNAVAILABLE_DAY_OF_WEEK'|'AVAILABLE_TIME_RANGE'|'UNAVAILABLE_TIME_RANGE'|'MAX_WORK_DAYS_PER_WEEK'|'MAX_WORK_DAYS_PER_MONTH'|'MAX_WORK_MINUTES_PER_MONTH'|'MIN_WORK_DAYS_PER_MONTH'|'MIN_WORK_MINUTES_PER_MONTH'|'MAX_CONSECUTIVE_WORK_DAYS'|'REQUIRED_DAY_OFF'|'FIXED_WORK_PATTERN'|'PREFERRED_WORK_PATTERN';
 export type StaffWorkRule = { id:string; tenantId:string; staffId:string; ruleType:StaffWorkRuleType; workPatternId:string|null; workPattern?:WorkPattern|null; dayOfWeek:number|null; startDate:string|null; endDate:string|null; startTime:string|null; endTime:string|null; numericValue:number|null; booleanValue:boolean|null; priority:number; isHardConstraint:boolean; reason:string|null; isActive:boolean; createdAt:string; updatedAt:string };
 export type StaffWorkRuleInput = Pick<StaffWorkRule,'ruleType'|'workPatternId'|'dayOfWeek'|'startDate'|'endDate'|'startTime'|'endTime'|'numericValue'|'booleanValue'|'priority'|'isHardConstraint'|'reason'|'isActive'>;
+export type StaffAttributeCategory='ROLE'|'QUALIFICATION'|'ASSIGNMENT'|'SKILL';
+export type StaffAttributeDefinition={id:string;tenantId:string;code:string;name:string;shortName:string|null;category:StaffAttributeCategory;description:string|null;displayOrder:number;color:string|null;isSystem:boolean;isActive:boolean;createdAt:string;updatedAt:string};
+export type StaffAttributeDefinitionInput=Pick<StaffAttributeDefinition,'code'|'name'|'shortName'|'category'|'description'|'displayOrder'|'color'|'isActive'>;
+export type StaffAttributeAssignment={id:string;tenantId:string;staffId:string;attributeDefinitionId:string;attributeDefinition:StaffAttributeDefinition;startDate:string|null;endDate:string|null;notes:string|null;isPrimary:boolean;isActive:boolean;createdAt:string;updatedAt:string};
+export type StaffAttributeAssignmentInput=Pick<StaffAttributeAssignment,'attributeDefinitionId'|'startDate'|'endDate'|'notes'|'isPrimary'|'isActive'>;
 export type SubscriptionInfo = {
   id?: string;
   tenantId: string;
@@ -247,4 +252,12 @@ export const api = {
   createStaffWorkRule(token:string,staffId:string,input:StaffWorkRuleInput){return request<StaffWorkRule>(`/staff/${staffId}/work-rules`,{method:'POST',body:JSON.stringify(input)},token);},
   updateStaffWorkRule(token:string,staffId:string,id:string,input:StaffWorkRuleInput){return request<StaffWorkRule>(`/staff/${staffId}/work-rules/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
   deactivateStaffWorkRule(token:string,staffId:string,id:string){return request<StaffWorkRule>(`/staff/${staffId}/work-rules/${id}`,{method:'DELETE'},token);},
+  staffAttributes(token:string){return request<StaffAttributeDefinition[]>('/staff-attributes',{},token);},
+  createStaffAttribute(token:string,input:StaffAttributeDefinitionInput){return request<StaffAttributeDefinition>('/staff-attributes',{method:'POST',body:JSON.stringify(input)},token);},
+  updateStaffAttribute(token:string,id:string,input:StaffAttributeDefinitionInput){return request<StaffAttributeDefinition>(`/staff-attributes/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
+  deactivateStaffAttribute(token:string,id:string){return request<StaffAttributeDefinition>(`/staff-attributes/${id}`,{method:'DELETE'},token);},
+  staffAttributeAssignments(token:string,staffId:string){return request<StaffAttributeAssignment[]>(`/staff/${staffId}/attributes`,{},token);},
+  createStaffAttributeAssignment(token:string,staffId:string,input:StaffAttributeAssignmentInput){return request<StaffAttributeAssignment>(`/staff/${staffId}/attributes`,{method:'POST',body:JSON.stringify(input)},token);},
+  updateStaffAttributeAssignment(token:string,staffId:string,id:string,input:StaffAttributeAssignmentInput){return request<StaffAttributeAssignment>(`/staff/${staffId}/attributes/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
+  deactivateStaffAttributeAssignment(token:string,staffId:string,id:string){return request<StaffAttributeAssignment>(`/staff/${staffId}/attributes/${id}`,{method:'DELETE'},token);},
 };
