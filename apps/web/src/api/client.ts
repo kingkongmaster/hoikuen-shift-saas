@@ -130,6 +130,9 @@ export type FeatureCode = 'BASIC_SHIFT_GENERATION' | 'ADVANCED_WORK_PATTERNS' | 
 export type EffectiveFeatures = { enabledFeatures: FeatureCode[]; features: Array<{ featureCode: FeatureCode; enabled: boolean; source: 'CONTRACT' | 'TENANT_OVERRIDE' | 'PLAN' | 'NONE'; code?: string }> };
 export type WorkPattern = { id: string; tenantId: string; code: string; name: string; shortName: string; displayOrder: number; startTime: string | null; endTime: string | null; breakMinutes: number; color: string | null; isWorking: boolean; isDefault: boolean; isSystem: boolean; isActive: boolean; createdAt: string; updatedAt: string };
 export type WorkPatternInput = Pick<WorkPattern, 'code' | 'name' | 'shortName' | 'displayOrder' | 'startTime' | 'endTime' | 'breakMinutes' | 'color' | 'isWorking' | 'isDefault' | 'isActive'>;
+export type StaffWorkRuleType = 'AVAILABLE_WORK_PATTERN'|'UNAVAILABLE_WORK_PATTERN'|'AVAILABLE_DAY_OF_WEEK'|'UNAVAILABLE_DAY_OF_WEEK'|'AVAILABLE_TIME_RANGE'|'UNAVAILABLE_TIME_RANGE'|'MAX_WORK_DAYS_PER_WEEK'|'MAX_WORK_DAYS_PER_MONTH'|'MAX_WORK_MINUTES_PER_MONTH'|'MIN_WORK_DAYS_PER_MONTH'|'MIN_WORK_MINUTES_PER_MONTH'|'MAX_CONSECUTIVE_WORK_DAYS'|'REQUIRED_DAY_OFF'|'FIXED_WORK_PATTERN'|'PREFERRED_WORK_PATTERN';
+export type StaffWorkRule = { id:string; tenantId:string; staffId:string; ruleType:StaffWorkRuleType; workPatternId:string|null; workPattern?:WorkPattern|null; dayOfWeek:number|null; startDate:string|null; endDate:string|null; startTime:string|null; endTime:string|null; numericValue:number|null; booleanValue:boolean|null; priority:number; isHardConstraint:boolean; reason:string|null; isActive:boolean; createdAt:string; updatedAt:string };
+export type StaffWorkRuleInput = Pick<StaffWorkRule,'ruleType'|'workPatternId'|'dayOfWeek'|'startDate'|'endDate'|'startTime'|'endTime'|'numericValue'|'booleanValue'|'priority'|'isHardConstraint'|'reason'|'isActive'>;
 export type SubscriptionInfo = {
   id?: string;
   tenantId: string;
@@ -240,4 +243,8 @@ export const api = {
   createWorkPattern(token:string,input:WorkPatternInput){return request<WorkPattern>('/work-patterns',{method:'POST',body:JSON.stringify(input)},token);},
   updateWorkPattern(token:string,id:string,input:WorkPatternInput){return request<WorkPattern>(`/work-patterns/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
   deleteWorkPattern(token:string,id:string){return request<WorkPattern>(`/work-patterns/${id}`,{method:'DELETE'},token);},
+  staffWorkRules(token:string,staffId:string){return request<StaffWorkRule[]>(`/staff/${staffId}/work-rules`,{},token);},
+  createStaffWorkRule(token:string,staffId:string,input:StaffWorkRuleInput){return request<StaffWorkRule>(`/staff/${staffId}/work-rules`,{method:'POST',body:JSON.stringify(input)},token);},
+  updateStaffWorkRule(token:string,staffId:string,id:string,input:StaffWorkRuleInput){return request<StaffWorkRule>(`/staff/${staffId}/work-rules/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
+  deactivateStaffWorkRule(token:string,staffId:string,id:string){return request<StaffWorkRule>(`/staff/${staffId}/work-rules/${id}`,{method:'DELETE'},token);},
 };
