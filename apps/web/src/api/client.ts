@@ -126,6 +126,8 @@ export type SetupTenantInput = {
 };
 export type SubscriptionPlan = 'TRIAL' | 'STANDARD' | 'PROFESSIONAL';
 export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED' | 'EXPIRED';
+export type FeatureCode = 'BASIC_SHIFT_GENERATION' | 'ADVANCED_WORK_PATTERNS' | 'STAFF_WORK_RULES' | 'ROLE_QUALIFICATION_MANAGEMENT' | 'ADVANCED_STAFFING_REQUIREMENTS' | 'TENANT_CUSTOM_RULES';
+export type EffectiveFeatures = { enabledFeatures: FeatureCode[]; features: Array<{ featureCode: FeatureCode; enabled: boolean; source: 'CONTRACT' | 'TENANT_OVERRIDE' | 'PLAN' | 'NONE'; code?: string }> };
 export type SubscriptionInfo = {
   id?: string;
   tenantId: string;
@@ -231,4 +233,5 @@ export const api = {
   updateSetupConsents(token:string,input:{acceptTerms:boolean;acceptPrivacy:boolean}){return request<SetupState>('/setup/consents',{method:'PATCH',body:JSON.stringify(input)},token);},
   completeSetup(token:string){return request<SetupState>('/setup/complete',{method:'POST'},token);},
   subscription(token:string){return request<SubscriptionInfo>('/subscription',{},token);},
+  features(token:string){return request<EffectiveFeatures>('/features',{},token);},
 };

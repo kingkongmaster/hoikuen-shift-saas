@@ -19,6 +19,7 @@ import { SubscriptionsModule } from './presentation/subscriptions/subscriptions.
 import { TenantsModule } from './presentation/tenants/tenants.module';
 import { SetupModule } from './presentation/setup/setup.module';
 import { AuthRateLimitMiddleware } from './infrastructure/http/auth-rate-limit.middleware';
+import { FeaturesModule } from './presentation/features/features.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AuthRateLimitMiddleware } from './infrastructure/http/auth-rate-limit.m
     SubscriptionsModule,
     TenantsModule,
     SetupModule,
+    FeaturesModule,
   ],
 })
 export class AppModule implements NestModule {
