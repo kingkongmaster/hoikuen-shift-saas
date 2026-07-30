@@ -17,11 +17,11 @@ export class ExportsService {
     const schedule = await this.prisma.monthlyShift.findUnique({ where: { tenantId_targetMonth: { tenantId: user.tenantId, targetMonth: range.start } } });
     if (!schedule) throw new NotFoundException('対象月の月間シフトが見つかりません。');
     const [assignments, closed] = await Promise.all([
-      this.prisma.shiftAssignment.findMany({ where: { monthlyShiftId: schedule.id, tenantId: user.tenantId }, include: { staff: true }, orderBy: [{ workDate: 'asc' }, { staff: { employeeNumber: 'asc' } }] }),
+      this.prisma.shiftAssignment.findMany({ where: { monthlyShiftId: schedule.id, tenantId: user.tenantId }, include: { staff: true, workPattern: { select: { name: true } } }, orderBy: [{ workDate: 'asc' }, { staff: { employeeNumber: 'asc' } }] }),
       this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } } }),
     ]);
     const closedMap = new Map(closed.map((item) => [this.isoDate(item.closedDate), item.name]));
-    const rows = assignments.map((item) => [item.staff.employeeNumber, item.staff.displayName, employmentLabels[item.staff.employmentType], classLabels[item.staff.assignedClass], this.isoDate(item.workDate), this.weekday(item.workDate), item.shiftType, item.assignedClass ? classLabels[item.assignedClass] : '', item.startTime ?? '', item.endTime ?? '', item.breakMinutes ?? '', closedMap.get(this.isoDate(item.workDate)) ?? '', item.note ?? '', schedule.status]);
+    const rows = assignments.map((item) => [item.staff.employeeNumber, item.staff.displayName, employmentLabels[item.staff.employmentType], classLabels[item.staff.assignedClass], this.isoDate(item.workDate), this.weekday(item.workDate), item.workPattern?.name ?? item.shiftType, item.assignedClass ? classLabels[item.assignedClass] : '', item.startTime ?? '', item.endTime ?? '', item.breakMinutes ?? '', closedMap.get(this.isoDate(item.workDate)) ?? '', item.note ?? '', schedule.status]);
     await this.audit.create(user.tenantId, user.sub, 'SHIFT_CSV_EXPORTED', 'MonthlyShift', schedule.id, { month, rowCount: rows.length });
     return this.csv(['職員番号', '職員名', '雇用形態', '所属クラス', '日付', '曜日', '勤務区分', '配置クラス', '開始時刻', '終了時刻', '休憩分', '休園日名', '備考', 'シフト状態'], rows);
   }
@@ -58,11 +58,11 @@ export class ExportsService {
     if (ownOnly && !ownStaff) throw new NotFoundException('職員情報が見つかりません。');
     const [tenant, assignments, closed] = await Promise.all([
       this.prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { name: true } }),
-      this.prisma.shiftAssignment.findMany({ where: { monthlyShiftId: schedule.id, ...(ownStaff ? { staffId: ownStaff.id } : {}) }, include: { staff: { select: { employeeNumber: true, displayName: true } } }, orderBy: [{ staff: { employeeNumber: 'asc' } }, { workDate: 'asc' }] }),
+      this.prisma.shiftAssignment.findMany({ where: { monthlyShiftId: schedule.id, ...(ownStaff ? { staffId: ownStaff.id } : {}) }, include: { staff: { select: { employeeNumber: true, displayName: true } }, workPattern: { select: { name: true } } }, orderBy: [{ staff: { employeeNumber: 'asc' } }, { workDate: 'asc' }] }),
       this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } } }),
     ]);
     await this.audit.create(user.tenantId, user.sub, 'SHIFT_PRINT_VIEWED', 'MonthlyShift', schedule.id, { month, ownOnly });
-    return { tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.shiftType, assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
+    return { tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.workPattern?.name ?? item.shiftType, assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
   }
 
   private csv(headers: string[], rows: unknown[][]) { return BOM + [headers, ...rows].map((row) => row.map((value) => this.cell(value)).join(',')).join('\r\n') + '\r\n'; }

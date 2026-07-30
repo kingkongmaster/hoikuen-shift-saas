@@ -65,7 +65,7 @@ export type ShiftRequestInput = { staffId?: string; requestDate: string; request
 export type ShiftRequestUpdate = Partial<Pick<ShiftRequest, 'requestType' | 'status' | 'reason' | 'adminComment'>> & { requestDate?: string };
 export type ShiftType = 'EARLY' | 'NORMAL' | 'LATE' | 'OFF' | 'PAID_LEAVE' | 'SUMMER_LEAVE' | 'AM_HALF' | 'PM_HALF' | 'OTHER';
 export type MonthlyShiftStatus = 'DRAFT' | 'CONFIRMED';
-export type ShiftAssignment = { id: string; tenantId: string; monthlyShiftId: string; staffId: string; workDate: string; shiftType: ShiftType; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null; staff: Pick<Staff, 'id' | 'employeeNumber' | 'displayName' | 'employmentType' | 'assignedClass' | 'canWorkEarly' | 'canWorkRegular' | 'canWorkLate' | 'earlyShiftOnly' | 'lateShiftOnly' | 'canWorkSaturdays' | 'monthlyWorkHourLimit' | 'monthlyTargetWorkDays' | 'monthlyTargetWorkHours' | 'weeklyAvailableDays' | 'regularWorkStartTime' | 'regularWorkEndTime' | 'isActive'> & { isDirector: boolean }; };
+export type ShiftAssignment = { id: string; tenantId: string; monthlyShiftId: string; staffId: string; workDate: string; shiftType: ShiftType; workPatternId: string | null; workPattern: Pick<WorkPattern, 'id' | 'code' | 'name' | 'shortName' | 'color' | 'isActive'> | null; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null; staff: Pick<Staff, 'id' | 'employeeNumber' | 'displayName' | 'employmentType' | 'assignedClass' | 'canWorkEarly' | 'canWorkRegular' | 'canWorkLate' | 'earlyShiftOnly' | 'lateShiftOnly' | 'canWorkSaturdays' | 'monthlyWorkHourLimit' | 'monthlyTargetWorkDays' | 'monthlyTargetWorkHours' | 'weeklyAvailableDays' | 'regularWorkStartTime' | 'regularWorkEndTime' | 'isActive'> & { isDirector: boolean }; };
 export type MonthlyShift = { id: string; tenantId: string; targetMonth: string; status: MonthlyShiftStatus; createdByUserId: string; confirmedByUserId: string | null; confirmedAt: string | null; createdAt: string; updatedAt: string; };
 export type ShiftWarning = { code: string; staffId: string; workDate: string; message: string; severity: 'info' | 'warning' | 'blocking' };
 export type ShiftView = { schedule: MonthlyShift | null; assignments: ShiftAssignment[]; staff: ShiftAssignment['staff'][]; requests: Array<Pick<ShiftRequest, 'id' | 'staffId' | 'requestDate' | 'requestType' | 'status' | 'reason'> & { staff: Pick<Staff, 'id' | 'displayName'> }>; summaries?: Array<{ staffId: string; workDays: number; targetWorkDays: number | null; workDaysDifference: number | null; workMinutes: number; targetWorkMinutes: number | null; workMinutesDifference: number | null; monthlyWorkHourLimit: number | null; statuses: string[] }>; warnings: ShiftWarning[] };
@@ -128,6 +128,8 @@ export type SubscriptionPlan = 'TRIAL' | 'STANDARD' | 'PROFESSIONAL';
 export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED' | 'EXPIRED';
 export type FeatureCode = 'BASIC_SHIFT_GENERATION' | 'ADVANCED_WORK_PATTERNS' | 'STAFF_WORK_RULES' | 'ROLE_QUALIFICATION_MANAGEMENT' | 'ADVANCED_STAFFING_REQUIREMENTS' | 'TENANT_CUSTOM_RULES';
 export type EffectiveFeatures = { enabledFeatures: FeatureCode[]; features: Array<{ featureCode: FeatureCode; enabled: boolean; source: 'CONTRACT' | 'TENANT_OVERRIDE' | 'PLAN' | 'NONE'; code?: string }> };
+export type WorkPattern = { id: string; tenantId: string; code: string; name: string; shortName: string; displayOrder: number; startTime: string | null; endTime: string | null; breakMinutes: number; color: string | null; isWorking: boolean; isDefault: boolean; isSystem: boolean; isActive: boolean; createdAt: string; updatedAt: string };
+export type WorkPatternInput = Pick<WorkPattern, 'code' | 'name' | 'shortName' | 'displayOrder' | 'startTime' | 'endTime' | 'breakMinutes' | 'color' | 'isWorking' | 'isDefault' | 'isActive'>;
 export type SubscriptionInfo = {
   id?: string;
   tenantId: string;
@@ -234,4 +236,8 @@ export const api = {
   completeSetup(token:string){return request<SetupState>('/setup/complete',{method:'POST'},token);},
   subscription(token:string){return request<SubscriptionInfo>('/subscription',{},token);},
   features(token:string){return request<EffectiveFeatures>('/features',{},token);},
+  workPatterns(token:string){return request<WorkPattern[]>('/work-patterns',{},token);},
+  createWorkPattern(token:string,input:WorkPatternInput){return request<WorkPattern>('/work-patterns',{method:'POST',body:JSON.stringify(input)},token);},
+  updateWorkPattern(token:string,id:string,input:WorkPatternInput){return request<WorkPattern>(`/work-patterns/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
+  deleteWorkPattern(token:string,id:string){return request<WorkPattern>(`/work-patterns/${id}`,{method:'DELETE'},token);},
 };

@@ -8,14 +8,15 @@ import { SettingsService } from '../settings/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 import type { AssignmentInputDto } from './save-assignments.dto';
+import { WorkPatternsService } from '../work-patterns/work-patterns.service';
 
 const staffSelect = { id: true, userId: true, employeeNumber: true, displayName: true, employmentType: true, assignedClass: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true, isActive: true } as const;
-const assignmentInclude = { staff: { select: staffSelect } } as const;
+const assignmentInclude = { staff: { select: staffSelect }, workPattern: { select: { id: true, code: true, name: true, shortName: true, color: true, isActive: true } } } as const;
 type Warning = { code: string; staffId: string; workDate: string; message: string; severity: 'info' | 'warning' | 'blocking' };
 
 @Injectable()
 export class ShiftsService {
-  constructor(private readonly prisma: PrismaService, private readonly settings: SettingsService, private readonly notifications: NotificationsService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly settings: SettingsService, private readonly notifications: NotificationsService, private readonly audit: AuditService, private readonly workPatterns: WorkPatternsService) {}
 
   async list(user: AuthenticatedUser, month: string, requestedStaffId?: string) {
     const targetMonth = this.monthDate(month);
@@ -108,20 +109,25 @@ export class ShiftsService {
     const startedAt = Date.now();
     const schedule = await this.requireEditable(user, id);
     const range = this.monthRange(schedule.targetMonth);
-    const [staff, requests, setting, requirements, closedDates, managerMemberships] = await Promise.all([
+    await this.workPatterns.ensureSystemPatterns(user.tenantId);
+    const [staff, requests, setting, requirements, closedDates, managerMemberships, systemPatterns] = await Promise.all([
       this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true }, orderBy: { employeeNumber: 'asc' } }),
       this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
       this.settings.ensureSetting(user.tenantId),
       this.settings.requirements(user),
       this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } }, select: { closedDate: true, name: true } }),
       this.prisma.membership.findMany({ where: { tenantId: user.tenantId, role: { in: [MembershipRole.ADMIN, MembershipRole.DIRECTOR] }, isActive: true }, select: { userId: true } }),
+      this.prisma.workPattern.findMany({ where: { tenantId: user.tenantId, code: { in: ['EARLY', 'NORMAL', 'LATE', 'OFF'] }, isSystem: true } }),
     ]);
     const managerUserIds = new Set(managerMemberships.map((item) => item.userId));
     const generationStaff = staff.filter((item) => !item.userId || !managerUserIds.has(item.userId));
-    const generated = generateRuleBasedSchedule(schedule.targetMonth, generationStaff.map((item) => ({ ...item, isDirector: false })), requests, { ...setting, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates });
+    const patternByCode = new Map(systemPatterns.map((pattern) => [pattern.code, pattern]));
+    const early = patternByCode.get('EARLY'); const normal = patternByCode.get('NORMAL'); const late = patternByCode.get('LATE');
+    const effectiveSetting = { ...setting, defaultStartEarly: early?.startTime ?? setting.defaultStartEarly, defaultEndEarly: early?.endTime ?? setting.defaultEndEarly, defaultStartNormal: normal?.startTime ?? setting.defaultStartNormal, defaultEndNormal: normal?.endTime ?? setting.defaultEndNormal, defaultStartLate: late?.startTime ?? setting.defaultStartLate, defaultEndLate: late?.endTime ?? setting.defaultEndLate, defaultBreakMinutes: normal?.breakMinutes ?? setting.defaultBreakMinutes };
+    const generated = generateRuleBasedSchedule(schedule.targetMonth, generationStaff.map((item) => ({ ...item, isDirector: false })), requests, { ...effectiveSetting, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates });
     await this.prisma.$transaction([
       this.prisma.shiftAssignment.deleteMany({ where: { monthlyShiftId: schedule.id } }),
-      this.prisma.shiftAssignment.createMany({ data: generated.assignments.map((assignment) => ({ tenantId: user.tenantId, monthlyShiftId: schedule.id, ...assignment })) }),
+      this.prisma.shiftAssignment.createMany({ data: generated.assignments.map((assignment) => ({ tenantId: user.tenantId, monthlyShiftId: schedule.id, ...assignment, workPatternId: patternByCode.get(assignment.shiftType)?.id ?? null })) }),
     ]);
     const processingTimeMs = Date.now() - startedAt;
     const workingAssignmentCount = generated.assignments.filter((item) => (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length;
