@@ -16,7 +16,7 @@ export class StaffController {
   constructor(private readonly staff: StaffService) {}
 
   @Get()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'DIRECTOR')
   list(@Req() request: Request & { user: AuthenticatedUser }, @Query() query: ListStaffQueryDto) {
     return this.staff.list(request.user, query.includeInactive);
   }
@@ -27,7 +27,7 @@ export class StaffController {
   }
 
   @Get(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'DIRECTOR')
   get(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.staff.get(request.user, id);
   }

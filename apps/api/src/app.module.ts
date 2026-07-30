@@ -21,6 +21,7 @@ import { SetupModule } from './presentation/setup/setup.module';
 import { AuthRateLimitMiddleware } from './infrastructure/http/auth-rate-limit.middleware';
 import { FeaturesModule } from './presentation/features/features.module';
 import { WorkPatternsModule } from './presentation/work-patterns/work-patterns.module';
+import { StaffWorkRulesModule } from './presentation/staff-work-rules/staff-work-rules.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { WorkPatternsModule } from './presentation/work-patterns/work-patterns.m
     SetupModule,
     FeaturesModule,
     WorkPatternsModule,
+    StaffWorkRulesModule,
   ],
 })
 export class AppModule implements NestModule {

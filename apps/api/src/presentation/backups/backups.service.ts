@@ -7,7 +7,7 @@ import { AuditService } from '../audit/audit.service';
 const MAX_BYTES = 10 * 1024 * 1024;
 const legacyArrays = ['members', 'staff', 'shiftRequests', 'monthlyShifts', 'shiftAssignments', 'classRequirements', 'closedDates', 'notifications', 'shiftSwapRequests', 'auditLogs'] as const;
 const version2RequiredArrays = [...legacyArrays, 'tenantFeatures'] as const;
-const arrays = [...version2RequiredArrays, 'workPatterns'] as const;
+const arrays = [...version2RequiredArrays, 'workPatterns', 'staffWorkRules'] as const;
 type BackupData = Record<(typeof arrays)[number], unknown[]> & { tenant: Record<string, unknown>; shiftSetting: Record<string, unknown> | null };
 
 @Injectable()
@@ -42,13 +42,14 @@ export class BackupsService {
   }
 
   private async collect(tenantId: string): Promise<BackupData> {
-    const [tenant, memberships, staff, shiftRequests, monthlyShifts, shiftAssignments, shiftSetting, classRequirements, closedDates, notifications, shiftSwapRequests, auditLogs, tenantFeatures, workPatterns] = await Promise.all([
+    const [tenant, memberships, staff, shiftRequests, monthlyShifts, shiftAssignments, shiftSetting, classRequirements, closedDates, notifications, shiftSwapRequests, auditLogs, tenantFeatures, workPatterns, staffWorkRules] = await Promise.all([
       this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { id: true, name: true, createdAt: true, updatedAt: true } }),
       this.prisma.membership.findMany({ where: { tenantId }, include: { user: { select: { id: true, email: true, displayName: true, isActive: true, createdAt: true, updatedAt: true } } } }),
       this.prisma.staff.findMany({ where: { tenantId } }), this.prisma.shiftRequest.findMany({ where: { tenantId } }), this.prisma.monthlyShift.findMany({ where: { tenantId } }), this.prisma.shiftAssignment.findMany({ where: { tenantId } }), this.prisma.tenantShiftSetting.findUnique({ where: { tenantId } }), this.prisma.classStaffingRequirement.findMany({ where: { tenantId } }), this.prisma.tenantClosedDate.findMany({ where: { tenantId } }), this.prisma.notification.findMany({ where: { tenantId } }), this.prisma.shiftSwapRequest.findMany({ where: { tenantId } }), this.prisma.auditLog.findMany({ where: { tenantId } }), this.prisma.tenantFeature.findMany({ where: { tenantId } }),
       this.prisma.workPattern.findMany({ where: { tenantId } }),
+      this.prisma.staffWorkRule.findMany({ where: { tenantId } }),
     ]);
-    return { tenant: this.clean(tenant), members: memberships.map((item) => this.clean(item)), staff: staff.map((item) => this.clean(item)), shiftRequests: shiftRequests.map((item) => this.clean(item)), monthlyShifts: monthlyShifts.map((item) => this.clean(item)), shiftAssignments: shiftAssignments.map((item) => this.clean(item)), shiftSetting: shiftSetting ? this.clean(shiftSetting) : null, classRequirements: classRequirements.map((item) => this.clean(item)), closedDates: closedDates.map((item) => this.clean(item)), notifications: notifications.map((item) => this.clean(item)), shiftSwapRequests: shiftSwapRequests.map((item) => this.clean(item)), auditLogs: auditLogs.map((item) => this.clean(item)), tenantFeatures: tenantFeatures.map((item) => this.clean(item)), workPatterns: workPatterns.map((item) => this.clean(item)) };
+    return { tenant: this.clean(tenant), members: memberships.map((item) => this.clean(item)), staff: staff.map((item) => this.clean(item)), shiftRequests: shiftRequests.map((item) => this.clean(item)), monthlyShifts: monthlyShifts.map((item) => this.clean(item)), shiftAssignments: shiftAssignments.map((item) => this.clean(item)), shiftSetting: shiftSetting ? this.clean(shiftSetting) : null, classRequirements: classRequirements.map((item) => this.clean(item)), closedDates: closedDates.map((item) => this.clean(item)), notifications: notifications.map((item) => this.clean(item)), shiftSwapRequests: shiftSwapRequests.map((item) => this.clean(item)), auditLogs: auditLogs.map((item) => this.clean(item)), tenantFeatures: tenantFeatures.map((item) => this.clean(item)), workPatterns: workPatterns.map((item) => this.clean(item)), staffWorkRules: staffWorkRules.map((item) => this.clean(item)) };
   }
 
   private wrap(tenantId: string, data: BackupData) { const counts = this.counts(data); const integrity = { algorithm: 'SHA-256', checksum: this.checksum(data) }; return { format: 'enshift-backup', version: 2, exportedAt: new Date().toISOString(), tenantId, tenantName: String(data.tenant.name), application: 'EnShift', counts, data, integrity }; }
@@ -57,9 +58,11 @@ export class BackupsService {
     if (backup.format !== 'enshift-backup' || backup.application !== 'EnShift') throw new BadRequestException('対応していないバックアップ形式です。'); if (![1, 2].includes(backup.version)) throw new BadRequestException('対応していないバックアップversionです。'); if (!backup.tenantId || !backup.tenantName || !backup.data || !backup.counts || !backup.integrity) throw new BadRequestException('バックアップの必須項目が不足しています。'); if (backup.integrity.algorithm !== 'SHA-256' || typeof backup.integrity.checksum !== 'string') throw new BadRequestException('チェックサム情報が正しくありません。');
     for (const key of this.requiredArrayKeys(backup.version)) { if (!Array.isArray(backup.data[key]) || backup.counts[key] !== backup.data[key].length) throw new UnprocessableEntityException(`バックアップ件数が一致しません: ${key}`); if (backup.data[key].length > 100000) throw new UnprocessableEntityException('バックアップ件数が上限を超えています。'); }
     if (backup.version === 2 && Object.prototype.hasOwnProperty.call(backup.data, 'workPatterns')) { if (!Array.isArray(backup.data.workPatterns) || backup.counts.workPatterns !== backup.data.workPatterns.length) throw new UnprocessableEntityException('バックアップ件数が一致しません: workPatterns'); }
+    if (backup.version === 2 && Object.prototype.hasOwnProperty.call(backup.data, 'staffWorkRules')) { if (!Array.isArray(backup.data.staffWorkRules) || backup.counts.staffWorkRules !== backup.data.staffWorkRules.length) throw new UnprocessableEntityException('バックアップ件数が一致しません: staffWorkRules'); }
     if (!backup.data.tenant || !Object.prototype.hasOwnProperty.call(backup.data, 'shiftSetting')) throw new UnprocessableEntityException('バックアップdata構造が正しくありません。'); if (this.checksum(backup.data) !== backup.integrity.checksum) throw new BadRequestException('バックアップのチェックサムが一致しません。');
     for (const key of this.presentArrayKeys(backup)) { const ids = backup.data[key].map((item: any) => item?.id).filter(Boolean); if (ids.length !== new Set(ids).size) throw new UnprocessableEntityException(`重複IDが含まれています: ${key}`); }
     this.validateWorkPatternReferences(backup);
+    this.validateStaffWorkRules(backup);
     return backup;
   }
   private counts(data: BackupData) { return Object.fromEntries(arrays.map((key) => [key, data[key].length])); }
@@ -83,6 +86,30 @@ export class BackupsService {
       if (assignment.workPatternId != null && !ids.has(assignment.workPatternId)) throw new UnprocessableEntityException('存在しない勤務パターンを参照するシフトが含まれています。');
     }
   }
+  private validateStaffWorkRules(backup: any) {
+    const rules = Array.isArray(backup.data.staffWorkRules) ? backup.data.staffWorkRules : [];
+    const staffIds = new Set(backup.data.staff.map((row: any) => row.id));
+    const patternIds = new Set((backup.data.workPatterns ?? []).map((row: any) => row.id));
+    const patternRules = new Set(['AVAILABLE_WORK_PATTERN','UNAVAILABLE_WORK_PATTERN','FIXED_WORK_PATTERN','PREFERRED_WORK_PATTERN']);
+    const dayRules = new Set(['AVAILABLE_DAY_OF_WEEK','UNAVAILABLE_DAY_OF_WEEK','REQUIRED_DAY_OFF']);
+    const timeRules = new Set(['AVAILABLE_TIME_RANGE','UNAVAILABLE_TIME_RANGE']);
+    const numericLimits: Record<string, number> = { MAX_WORK_DAYS_PER_WEEK:7, MAX_WORK_DAYS_PER_MONTH:31, MIN_WORK_DAYS_PER_MONTH:31, MAX_CONSECUTIVE_WORK_DAYS:31, MAX_WORK_MINUTES_PER_MONTH:44640, MIN_WORK_MINUTES_PER_MONTH:44640 };
+    for (const row of rules) {
+      if (row.tenantId !== backup.tenantId || !staffIds.has(row.staffId)) throw new UnprocessableEntityException('別Tenantまたは存在しない職員を参照する勤務条件があります。');
+      if (row.workPatternId != null && !patternIds.has(row.workPatternId)) throw new UnprocessableEntityException('別Tenantまたは存在しない勤務パターンを参照する勤務条件があります。');
+      if (row.startDate != null && row.endDate != null && row.startDate > row.endDate) throw new UnprocessableEntityException('勤務条件の日付範囲が正しくありません。');
+      if (row.startTime != null && row.endTime != null && row.startTime >= row.endTime) throw new UnprocessableEntityException('勤務条件の時刻範囲が正しくありません。');
+      if (row.dayOfWeek != null && (!Number.isInteger(row.dayOfWeek) || row.dayOfWeek < 0 || row.dayOfWeek > 6)) throw new UnprocessableEntityException('勤務条件の曜日が正しくありません。');
+      const pattern = row.workPatternId != null, day = row.dayOfWeek != null, time = row.startTime != null && row.endTime != null, numeric = Number.isInteger(row.numericValue) && row.numericValue >= 0 && row.numericValue <= (numericLimits[row.ruleType] ?? -1);
+      if (row.booleanValue != null || !Number.isInteger(row.priority) || row.priority < 0 || row.priority > 1000 || typeof row.isHardConstraint !== 'boolean' || typeof row.isActive !== 'boolean') throw new UnprocessableEntityException('勤務条件の共通項目が正しくありません。');
+      if (typeof row.reason === 'string' && (row.reason.length > 500 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(row.reason))) throw new UnprocessableEntityException('勤務条件の理由が正しくありません。');
+      if (patternRules.has(row.ruleType) ? !pattern : dayRules.has(row.ruleType) ? !day : timeRules.has(row.ruleType) ? !time : numericLimits[row.ruleType] != null ? !numeric : true) throw new UnprocessableEntityException('勤務条件の種別と入力値が一致しません。');
+    }
+    const active = rules.filter((row: any) => row.isActive);
+    for (let i=0;i<active.length;i++) for (let j=i+1;j<active.length;j++) { const a=active[i],b=active[j]; if(a.staffId!==b.staffId||!this.rulePeriodsOverlap(a,b)||!this.ruleDaysOverlap(a,b))continue; const exact=a.ruleType===b.ruleType&&a.workPatternId===b.workPatternId&&a.dayOfWeek===b.dayOfWeek&&a.startDate===b.startDate&&a.endDate===b.endDate&&a.startTime===b.startTime&&a.endTime===b.endTime&&a.numericValue===b.numericValue; const opposite=new Set([`${a.ruleType}:${b.ruleType}`,`${b.ruleType}:${a.ruleType}`]); if(exact||opposite.has('AVAILABLE_WORK_PATTERN:UNAVAILABLE_WORK_PATTERN')&&a.workPatternId===b.workPatternId||opposite.has('AVAILABLE_DAY_OF_WEEK:UNAVAILABLE_DAY_OF_WEEK')||opposite.has('AVAILABLE_TIME_RANGE:UNAVAILABLE_TIME_RANGE')&&a.startTime===b.startTime&&a.endTime===b.endTime||a.ruleType==='FIXED_WORK_PATTERN'&&b.ruleType==='FIXED_WORK_PATTERN'&&a.workPatternId!==b.workPatternId)throw new UnprocessableEntityException('有効な勤務条件に重複または矛盾があります。'); }
+  }
+  private rulePeriodsOverlap(a:any,b:any){if(a.startDate==null||a.endDate==null||b.startDate==null||b.endDate==null)return true;return a.startDate<=b.endDate&&b.startDate<=a.endDate;}
+  private ruleDaysOverlap(a:any,b:any){return a.dayOfWeek==null||b.dayOfWeek==null||a.dayOfWeek===b.dayOfWeek;}
   private metadata(backup: any) { return { format: backup.format, version: backup.version, exportedAt: backup.exportedAt, tenantName: backup.tenantName, integrity: backup.integrity }; }
   private compare(source: Array<{ id?: string; updatedAt?: string }>, current: Array<{ id?: string; updatedAt?: string }>) { const currentById = new Map(current.filter((item) => item.id).map((item) => [item.id, item])); let add = 0; let update = 0; for (const item of source) { const existing = item.id ? currentById.get(item.id) : undefined; if (!existing) add += 1; else if (this.stable(item) !== this.stable(existing)) update += 1; } const sourceIds = new Set(source.map((item) => item.id).filter(Boolean)); return { add, update, missing: current.filter((item) => item.id && !sourceIds.has(item.id)).length }; }
   private checksum(data: unknown) { return createHash('sha256').update(this.stable(data), 'utf8').digest('hex'); }

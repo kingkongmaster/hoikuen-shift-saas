@@ -81,7 +81,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
           <div className="mb-4"><p className="eyebrow">MENU</p><h2 id="menu-heading" className="mt-1 text-xl font-black">よく使うメニュー</h2></div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{everydayMenu.map((item) => <MenuTile key={item.view} {...item} badge={item.view === 'notifications' ? unread : 0} onClick={() => selectView(item.view)} />)}</div>
           <details className="other-menu mt-4"><summary><span className="action-symbol action-symbol-soft" aria-hidden="true">他</span><span><strong>その他のメニュー</strong><small>管理・設定・サポート</small></span></summary><div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
-            {isAdmin && <OtherButton symbol="職" label="職員マスター" onClick={() => selectView('staff')} />}
+            {canManageShifts && <OtherButton symbol="職" label="職員マスター" onClick={() => selectView('staff')} />}
             {canManageShifts && <OtherButton symbol="園" label="園設定" onClick={() => selectView('settings')} />}
             {isAdmin && <OtherButton symbol="時" label="勤務パターン" onClick={() => selectView('work-patterns')} />}
             {canManageShifts && <OtherButton symbol="契" label="契約情報" onClick={() => selectView('subscription')} />}
@@ -107,7 +107,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
 }
 
 function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange }: { view: View; session: Session; isAdmin: boolean; canManageShifts: boolean; onUnreadChange: (count: number) => void }) {
-  return view === 'staff' && isAdmin ? <StaffManagement token={session.accessToken} />
+  return view === 'staff' && canManageShifts ? <StaffManagement token={session.accessToken} readOnly={!isAdmin} />
     : view === 'work-patterns' && isAdmin ? <WorkPatternManagement token={session.accessToken} />
     : view === 'requests' ? <RequestManagement session={session} />
       : view === 'settings' && canManageShifts ? <ShiftSettings session={session} />

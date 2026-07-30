@@ -128,6 +128,7 @@ model Tenant {
   invitations Invitation[]
   features TenantFeature[]
   workPatterns WorkPattern[]
+  staffWorkRules StaffWorkRule[]
   displayName String?
   phone String?
   postalCode String?
@@ -267,6 +268,7 @@ model Staff {
   user                 User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   requests             ShiftRequest[]
   assignments          ShiftAssignment[]
+  workRules            StaffWorkRule[]
 
   @@unique([tenantId, employeeNumber])
   @@unique([tenantId, userId])
@@ -355,9 +357,55 @@ model WorkPattern {
   updatedAt      DateTime @updatedAt
   tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignments    ShiftAssignment[]
+  staffWorkRules StaffWorkRule[]
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive, displayOrder])
+}
+
+enum StaffWorkRuleType {
+  AVAILABLE_WORK_PATTERN
+  UNAVAILABLE_WORK_PATTERN
+  AVAILABLE_DAY_OF_WEEK
+  UNAVAILABLE_DAY_OF_WEEK
+  AVAILABLE_TIME_RANGE
+  UNAVAILABLE_TIME_RANGE
+  MAX_WORK_DAYS_PER_WEEK
+  MAX_WORK_DAYS_PER_MONTH
+  MAX_WORK_MINUTES_PER_MONTH
+  MIN_WORK_DAYS_PER_MONTH
+  MIN_WORK_MINUTES_PER_MONTH
+  MAX_CONSECUTIVE_WORK_DAYS
+  REQUIRED_DAY_OFF
+  FIXED_WORK_PATTERN
+  PREFERRED_WORK_PATTERN
+}
+
+model StaffWorkRule {
+  id               String            @id @default(uuid()) @db.Uuid
+  tenantId         String            @db.Uuid
+  staffId          String            @db.Uuid
+  ruleType         StaffWorkRuleType
+  workPatternId    String?           @db.Uuid
+  dayOfWeek        Int?
+  startDate        DateTime?         @db.Date
+  endDate          DateTime?         @db.Date
+  startTime        String?
+  endTime          String?
+  numericValue     Int?
+  booleanValue     Boolean?
+  priority         Int               @default(100)
+  isHardConstraint Boolean           @default(true)
+  reason           String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff            Staff             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  workPattern      WorkPattern?      @relation(fields: [workPatternId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, staffId, isActive])
+  @@index([tenantId, ruleType])
 }
 
 model TenantShiftSetting {
