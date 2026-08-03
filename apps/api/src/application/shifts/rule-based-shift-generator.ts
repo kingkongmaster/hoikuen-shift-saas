@@ -1,12 +1,13 @@
 import { AssignedClass, EmploymentType, ShiftRequestType, ShiftType } from '@prisma/client';
 import { shiftTypeDefaults, workingShiftTypes } from '../../domain/shifts/monthly-shift';
+import { evaluateStaffingRequirements, evaluationWarnings, staffingPriority, type GeneratorAttributeAssignment, type GeneratorStaffingRequirement } from './staffing-requirement-evaluator';
 
 export type GeneratorStaff = { id: string; employeeNumber: string; displayName: string; assignedClass: AssignedClass; employmentType: EmploymentType; isDirector?: boolean; canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean; canWorkSaturdays: boolean; monthlyWorkHourLimit: number | null; monthlyTargetWorkDays?: number | null; monthlyTargetWorkHours?: number | null; weeklyAvailableDays: number | null; regularWorkStartTime?: string | null; regularWorkEndTime?: string | null };
 export type GeneratorRequest = { staffId: string; requestDate: Date; requestType: ShiftRequestType; reason: string | null };
 export type GenerationWarning = { code: string; level: 'INFO' | 'WARNING' | 'ERROR'; workDate: string; staffId?: string; classType?: AssignedClass; required?: number; assigned?: number; message: string };
 export type GeneratedAssignment = { staffId: string; workDate: Date; shiftType: ShiftType; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null };
 export type SpecialShiftSummary = { staffId: string; employeeNumber: string; displayName: string; earlyCount: number; lateCount: number; totalSpecialShiftCount: number; saturdayCount: number; workCount: number; earlyCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE'; lateCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE' };
-export type GeneratorOptions = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff?: number; saturdayOperationEnabled?: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing?: boolean; directorClassPlacementMode?: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number; closedDates?: Array<{ closedDate: Date; name: string }>; classRequirements?: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean }> };
+export type GeneratorOptions = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff?: number; saturdayOperationEnabled?: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing?: boolean; directorClassPlacementMode?: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number; closedDates?: Array<{ closedDate: Date; name: string }>; classRequirements?: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean }>; staffingRequirements?: GeneratorStaffingRequirement[]; staffAttributeAssignments?: GeneratorAttributeAssignment[] };
 
 const defaultTargets: Partial<Record<AssignedClass, number>> = { AGE_0: 3, AGE_1: 2, AGE_2: 2, AGE_3: 2, AGE_4: 2, AGE_5: 2 };
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -75,6 +76,17 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
         if (dedicated) return dedicated;
         const specialCount = countFor(a, type) - countFor(b, type);
         if (specialCount) return specialCount;
+        if (options.staffingRequirements?.length) {
+          const assigned = [...day.values()].filter((item) => isWorking(item.shiftType));
+          const priority = (member: GeneratorStaff) => {
+            const garden = staffingPriority(options.staffingRequirements!, options.staffAttributeAssignments ?? [], workDate, member.id, null, assigned);
+            const classroom = isFixedClass(member.assignedClass) ? staffingPriority(options.staffingRequirements!, options.staffAttributeAssignments ?? [], workDate, member.id, member.assignedClass, assigned) : { hard: 0, soft: 0 };
+            return { hard: garden.hard + classroom.hard, soft: garden.soft + classroom.soft };
+          };
+          const ap = priority(a); const bp = priority(b);
+          if (ap.hard !== bp.hard) return bp.hard - ap.hard;
+          if (ap.soft !== bp.soft) return bp.soft - ap.soft;
+        }
         // Monthly targets guide NORMAL assignments only. Special shifts keep their
         // type-specific fairness ahead of every soft target consideration.
         if (type === ShiftType.NORMAL) {
@@ -127,7 +139,18 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
         const directors = staff.filter((m) => m.isDirector && isWorking(day.get(m.id)!.shiftType) && !used.has(m.id));
         const placement = options.directorClassPlacementMode ?? 'NONE';
         const allowDirector = options.directorCountsTowardStaffing && (placement === 'NORMAL' || (placement === 'SHORTAGE_ONLY' && regularCandidates.length < target));
-        const candidates = [...regularCandidates, ...(allowDirector ? directors : [])].sort((a, b) => classPriority(a, requirement.classType) - classPriority(b, requirement.classType) || a.employeeNumber.localeCompare(b.employeeNumber, 'ja'));
+        const candidates = [...regularCandidates, ...(allowDirector ? directors : [])].sort((a, b) => {
+          const existingClassPriority = classPriority(a, requirement.classType) - classPriority(b, requirement.classType);
+          if (existingClassPriority) return existingClassPriority;
+          if (options.staffingRequirements?.length) {
+            const assigned = [...day.values()].filter((item) => isWorking(item.shiftType) && used.has(item.staffId));
+            const ap = staffingPriority(options.staffingRequirements, options.staffAttributeAssignments ?? [], workDate, a.id, requirement.classType, assigned);
+            const bp = staffingPriority(options.staffingRequirements, options.staffAttributeAssignments ?? [], workDate, b.id, requirement.classType, assigned);
+            if (ap.hard !== bp.hard) return bp.hard - ap.hard;
+            if (ap.soft !== bp.soft) return bp.soft - ap.soft;
+          }
+          return a.employeeNumber.localeCompare(b.employeeNumber, 'ja');
+        });
         for (const member of candidates.slice(0, target)) { const item = day.get(member.id)!; item.assignedClass = requirement.classType; used.add(member.id); count += 1; if (member.assignedClass !== requirement.classType) add({ code: member.assignedClass === AssignedClass.FREE || member.assignedClass === AssignedClass.SUPPORT ? 'FREE_SUPPORT_COVERAGE' : 'CROSS_CLASS_SUPPORT', level: 'INFO', workDate: key, staffId: member.id, classType: requirement.classType, message: `${member.displayName}さんを${classLabel(requirement.classType)}へ補完配置しました。` }); }
         if (placement === 'SHORTAGE_ONLY' && count < target) {
           const helper = directors.find((member) => !used.has(member.id));
@@ -146,7 +169,10 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     if (member.monthlyTargetWorkDays && actualDays !== member.monthlyTargetWorkDays) add({ code: actualDays < member.monthlyTargetWorkDays ? 'TARGET_WORK_DAYS_SHORTAGE' : 'TARGET_WORK_DAYS_EXCESS', level: actualDays < member.monthlyTargetWorkDays ? 'WARNING' : 'INFO', workDate: iso(new Date(end.getTime() - 86400000)), staffId: member.id, message: `${member.displayName}さんの月間勤務日数は目標${member.monthlyTargetWorkDays}日に対して${actualDays}日です。` });
     if (member.monthlyTargetWorkHours && Math.abs(actualHours - member.monthlyTargetWorkHours) > 0.01) add({ code: actualHours < member.monthlyTargetWorkHours ? 'TARGET_WORK_HOURS_SHORTAGE' : 'TARGET_WORK_HOURS_EXCESS', level: actualHours < member.monthlyTargetWorkHours ? 'WARNING' : 'INFO', workDate: iso(new Date(end.getTime() - 86400000)), staffId: member.id, message: `${member.displayName}さんの月間勤務時間は目標${member.monthlyTargetWorkHours}時間に対して${Number(actualHours.toFixed(2))}時間です。` });
   }
-  return { assignments, warnings, specialShiftSummary };
+  if (!options.staffingRequirements?.length) return { assignments, warnings, specialShiftSummary };
+  const staffingRequirementEvaluations = evaluateStaffingRequirements(options.staffingRequirements, options.staffAttributeAssignments ?? [], assignments.filter((item) => isWorking(item.shiftType)));
+  warnings.push(...evaluationWarnings(staffingRequirementEvaluations));
+  return { assignments, warnings, specialShiftSummary, staffingRequirementEvaluations };
 }
 
 function classPriority(member: GeneratorStaff, target: AssignedClass) { if (member.assignedClass === target) return 0; if (member.assignedClass === AssignedClass.FREE) return 1; if (member.assignedClass === AssignedClass.SUPPORT) return 2; return 3; }

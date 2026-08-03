@@ -1,0 +1,40 @@
+const assert = require('node:assert/strict');
+const { AssignedClass, StaffingConstraintLevel, ShiftType } = require('@prisma/client');
+const { generateRuleBasedSchedule } = require('../dist/application/shifts/rule-based-shift-generator');
+const { evaluateStaffingRequirements } = require('../dist/application/shifts/staffing-requirement-evaluator');
+
+const date = new Date('2035-01-01T00:00:00.000Z');
+const requirement = (overrides = {}) => ({ id: 'r1', code: 'QUAL', name: '資格者', attributeDefinitionId: 'a1', classType: null, dayOfWeek: null, startDate: null, endDate: null, requiredCount: 1, constraintLevel: StaffingConstraintLevel.HARD, ...overrides });
+const assignment = (staffId, assignedClass = AssignedClass.AGE_0) => ({ staffId, workDate: date, shiftType: ShiftType.NORMAL, startTime: '08:30', endTime: '17:00', breakMinutes: 60, note: null, assignedClass });
+const attr = (staffId, overrides = {}) => ({ staffId, attributeDefinitionId: 'a1', startDate: null, endDate: null, ...overrides });
+
+const hard = evaluateStaffingRequirements([requirement()], [attr('s1')], [assignment('s1')]);
+assert.equal(hard.length, 1); assert.equal(hard[0].isSatisfied, true); assert.deepEqual(hard[0].matchedStaffIds, ['s1']);
+const unmet = evaluateStaffingRequirements([requirement({ requiredCount: 2 })], [attr('s1')], [assignment('s1')]);
+assert.equal(unmet[0].level, 'ERROR');
+const soft = evaluateStaffingRequirements([requirement({ constraintLevel: StaffingConstraintLevel.SOFT, requiredCount: 2 })], [attr('s1')], [assignment('s1')]);
+assert.equal(soft[0].level, 'WARNING');
+const info = evaluateStaffingRequirements([requirement({ constraintLevel: StaffingConstraintLevel.INFO, requiredCount: 2 })], [], [assignment('s1')]);
+assert.equal(info[0].level, 'INFO');
+const scoped = evaluateStaffingRequirements([requirement({ classType: AssignedClass.AGE_0 })], [attr('s1')], [assignment('s1', AssignedClass.AGE_1)]);
+assert.equal(scoped[0].actualCount, 0);
+const inactiveDate = evaluateStaffingRequirements([requirement()], [attr('s1', { startDate: new Date('2035-01-02T00:00:00.000Z'), endDate: new Date('2035-01-03T00:00:00.000Z') })], [assignment('s1')]);
+assert.equal(inactiveDate[0].actualCount, 0);
+const duplicate = evaluateStaffingRequirements([requirement()], [attr('s1'), attr('s1')], [assignment('s1'), assignment('s1')]);
+assert.equal(duplicate[0].actualCount, 1);
+
+const staff = [{ id: 's1', employeeNumber: '001', displayName: 'A', assignedClass: AssignedClass.AGE_0, employmentType: 'FULL_TIME', canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: false, lateShiftOnly: false, canWorkSaturdays: true, monthlyWorkHourLimit: null, weeklyAvailableDays: null }];
+const options = { weekdayEarlyRequired: 0, weekdayLateRequired: 0, saturdayEarlyRequired: 0, saturdayLateRequired: 0, saturdayMinimumStaff: 0, saturdayOperationEnabled: false, sundayOperationEnabled: false, maxConsecutiveWorkDays: 6, maxConsecutiveEarlyDays: 1, maxConsecutiveLateDays: 1, defaultStartEarly: '07:00', defaultEndEarly: '16:00', defaultStartNormal: '08:30', defaultEndNormal: '17:00', defaultStartLate: '11:00', defaultEndLate: '19:30', defaultBreakMinutes: 60, classRequirements: [] };
+const baseline = generateRuleBasedSchedule(date, staff, [], options);
+const noConditions = generateRuleBasedSchedule(date, staff, [], { ...options, staffingRequirements: [], staffAttributeAssignments: [] });
+assert.deepEqual(noConditions, baseline, 'Feature ON・条件0件の出力は従来結果と完全一致する');
+const candidateStaff = [staff[0], { ...staff[0], id: 's2', employeeNumber: '002', displayName: 'B' }];
+const saturdayOptions = { ...options, saturdayOperationEnabled: true, saturdayMinimumStaff: 1 };
+const traditional = generateRuleBasedSchedule(date, candidateStaff, [], saturdayOptions);
+const prioritized = generateRuleBasedSchedule(date, candidateStaff, [], { ...saturdayOptions, staffingRequirements: [requirement({ dayOfWeek: 6 })], staffAttributeAssignments: [attr('s2')] });
+const firstSaturday = prioritized.assignments.find((item) => item.workDate.getUTCDay() === 6 && item.shiftType === ShiftType.NORMAL);
+assert.equal(firstSaturday.staffId, 's2', 'HARD属性を満たせる適格候補を優先する');
+const infoSchedule = generateRuleBasedSchedule(date, candidateStaff, [], { ...saturdayOptions, staffingRequirements: [requirement({ dayOfWeek: 6, constraintLevel: StaffingConstraintLevel.INFO })], staffAttributeAssignments: [attr('s2')] });
+const stripEvaluation = ({ staffingRequirementEvaluations: _, warnings, ...result }) => ({ ...result, warnings: warnings.filter((item) => !item.code.startsWith('STAFFING_REQUIREMENT_')) });
+assert.deepEqual(stripEvaluation(infoSchedule).assignments, traditional.assignments, 'INFOは割当順位を変更しない');
+console.log('Staffing requirement generator unit tests: PASS (11 scenarios)');
