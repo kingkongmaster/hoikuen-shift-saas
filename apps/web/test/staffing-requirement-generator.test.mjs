@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const shift = readFileSync(new URL('../src/features/shifts/ShiftManagement.tsx', import.meta.url), 'utf8');
+const settings = readFileSync(new URL('../src/features/settings/StaffingRequirementManagement.tsx', import.meta.url), 'utf8');
+const client = readFileSync(new URL('../src/api/client.ts', import.meta.url), 'utf8');
+assert.match(client, /staffingRequirementEvaluations\?:/);
+assert.match(shift, /属性別配置条件の評価/); assert.match(shift, /HARDは必須条件/);
+assert.match(shift, /必要 \{item\.requiredCount\}名・実績 \{item\.actualCount\}名/);
+assert.match(settings, /自動シフト生成時に評価されます/); assert.doesNotMatch(settings, /現在、自動シフト生成には反映されません/);
+console.log('Staffing requirement generator Web tests: PASS (5 scenarios)');
