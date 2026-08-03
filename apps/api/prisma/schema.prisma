@@ -129,6 +129,8 @@ model Tenant {
   features TenantFeature[]
   workPatterns WorkPattern[]
   staffWorkRules StaffWorkRule[]
+  staffAttributeDefinitions StaffAttributeDefinition[]
+  staffAttributeAssignments StaffAttributeAssignment[]
   displayName String?
   phone String?
   postalCode String?
@@ -269,6 +271,7 @@ model Staff {
   requests             ShiftRequest[]
   assignments          ShiftAssignment[]
   workRules            StaffWorkRule[]
+  attributeAssignments StaffAttributeAssignment[]
 
   @@unique([tenantId, employeeNumber])
   @@unique([tenantId, userId])
@@ -381,6 +384,13 @@ enum StaffWorkRuleType {
   PREFERRED_WORK_PATTERN
 }
 
+enum StaffAttributeCategory {
+  ROLE
+  QUALIFICATION
+  ASSIGNMENT
+  SKILL
+}
+
 model StaffWorkRule {
   id               String            @id @default(uuid()) @db.Uuid
   tenantId         String            @db.Uuid
@@ -406,6 +416,47 @@ model StaffWorkRule {
 
   @@index([tenantId, staffId, isActive])
   @@index([tenantId, ruleType])
+}
+
+model StaffAttributeDefinition {
+  id           String                 @id @default(uuid()) @db.Uuid
+  tenantId     String                 @db.Uuid
+  code         String
+  name         String
+  shortName    String?
+  category     StaffAttributeCategory
+  description  String?
+  displayOrder Int                    @default(0)
+  color        String?
+  isSystem     Boolean                @default(false)
+  isActive     Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignments  StaffAttributeAssignment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, category, isActive, displayOrder])
+}
+
+model StaffAttributeAssignment {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  tenantId              String                   @db.Uuid
+  staffId               String                   @db.Uuid
+  attributeDefinitionId String                   @db.Uuid
+  startDate             DateTime?                @db.Date
+  endDate               DateTime?                @db.Date
+  notes                 String?
+  isPrimary             Boolean                  @default(false)
+  isActive              Boolean                  @default(true)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  tenant                Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff                 Staff                    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  attributeDefinition   StaffAttributeDefinition @relation(fields: [attributeDefinitionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, staffId, isActive])
+  @@index([tenantId, attributeDefinitionId])
 }
 
 model TenantShiftSetting {
