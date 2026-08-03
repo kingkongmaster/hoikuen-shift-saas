@@ -2,7 +2,7 @@ export type Role = 'ADMIN' | 'DIRECTOR' | 'CHIEF' | 'STAFF';
 export type Session = {
   accessToken: string;
   user: { id: string; email: string; displayName: string };
-  tenant: { id: string; name: string };
+  tenant: { id: string; name: string; code?: string | null };
   role: Role;
   mustChangePassword: boolean;
 };
@@ -73,6 +73,7 @@ export type ShiftAssignmentInput = { staffId: string; workDate: string; shiftTyp
 export type GenerationWarning = { code: string; level: 'INFO' | 'WARNING' | 'ERROR'; workDate: string; staffId?: string; classType?: AssignedClass; required?: number; assigned?: number; message: string };
 export type StaffingRequirementEvaluation = { requirementId: string; code: string; name: string; date: string; classType: AssignedClass | null; constraintLevel: StaffingConstraintLevel; requiredCount: number; actualCount: number; isSatisfied: boolean; matchedStaffIds: string[]; message: string; level: 'INFO' | 'WARNING' | 'ERROR' };
 export type GenerationResult = { generatedCount: number; workingAssignmentCount: number; offAssignmentCount: number; leaveAssignmentCount: number; warnings: GenerationWarning[]; processingTimeMs: number; durationMs: number; warningSummary: { INFO: number; WARNING: number; ERROR: number; byCode: Record<string, number> }; appliedSettingsSummary: Record<string, unknown>; closedDateCount: number; staffingRequirementEvaluations?: StaffingRequirementEvaluation[] };
+export type MusubiProvisionalReport = { provisional: true; productionUseAllowed: false; month: string; tenantName: string; notice: string; staffCountNotice: string; counts: { reportedTotalStaffCount: number; representedStaffCount: number; unconfirmedStaffCount: number; generatorCandidateCount: number; generatorExcludedCount: number }; generatorExcludedCodes: string[]; supportRules: Array<{ code: string; time: string; rule: string }>; settings: Record<string, number> | null; classRequirements: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number }>; groupAssignmentCounts: { infant: number; child: number }; schedule: { id: string; status: MonthlyShiftStatus; assignmentCount: number } | null; warnings: Array<{ level: 'ERROR'; code: string; date: string; message: string }>; staff: Array<{ code: string; displayName: string; assignedClass: AssignedClass; generatorEligible: boolean; experience: string | null; workTime: string | null; capabilities: { early: boolean; regular: boolean; late: boolean; earlyOnly: boolean }; shiftCounts: Record<string, number> }>; unresolvedItems: string[] };
 export type ShiftSetting = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff: number; saturdayOperationEnabled: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing: boolean; directorClassPlacementMode: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number };
 export type ClassRequirement = { id: string; classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean };
 export type ClosedDate = { id: string; closedDate: string; name: string; note: string | null };
@@ -268,4 +269,5 @@ export const api = {
   createStaffingRequirement(token:string,input:ShiftStaffingRequirementInput){return request<ShiftStaffingRequirement>('/staffing-requirements',{method:'POST',body:JSON.stringify(input)},token);},
   updateStaffingRequirement(token:string,id:string,input:ShiftStaffingRequirementInput){return request<ShiftStaffingRequirement>(`/staffing-requirements/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
   deactivateStaffingRequirement(token:string,id:string){return request<ShiftStaffingRequirement>(`/staffing-requirements/${id}`,{method:'DELETE'},token);},
+  musubiProvisionalReport(token:string,month:string){return request<MusubiProvisionalReport>(`/client-packages/musubi-provisional?month=${encodeURIComponent(month)}`,{},token);},
 };

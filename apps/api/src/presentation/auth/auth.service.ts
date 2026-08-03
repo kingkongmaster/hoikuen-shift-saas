@@ -16,7 +16,7 @@ export class AuthService {
     const membership = user.memberships[0];
     if (!membership) throw new UnauthorizedException('有効な園への所属がありません。');
     const payload = { sub: user.id, tenantId: membership.tenantId, role: membership.role, email: user.email, tokenVersion: user.tokenVersion };
-    return { accessToken: await this.jwt.signAsync(payload), user: { id: user.id, email: user.email, displayName: user.displayName }, tenant: { id: membership.tenant.id, name: membership.tenant.name }, role: membership.role, mustChangePassword: user.mustChangePassword };
+    return { accessToken: await this.jwt.signAsync(payload), user: { id: user.id, email: user.email, displayName: user.displayName }, tenant: { id: membership.tenant.id, name: membership.tenant.name, code: membership.tenant.code }, role: membership.role, mustChangePassword: user.mustChangePassword };
   }
 
   async changeInitialPassword(actor: AuthenticatedUser, input: ChangeInitialPasswordDto, requestId?: string) {

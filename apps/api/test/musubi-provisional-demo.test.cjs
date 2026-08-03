@@ -1,0 +1,27 @@
+const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
+
+const root = join(__dirname, '..');
+const fixture = JSON.parse(readFileSync(join(root, 'prisma/fixtures/musubi-nursery-provisional-demo.json'), 'utf8'));
+const codes = fixture.staff.map((row) => row.code);
+assert.equal(fixture.reportedTotalStaffCount, 24);
+assert.equal(fixture.representedStaffCount, 23);
+assert.equal(fixture.unconfirmedStaffCount, 1);
+assert.equal(fixture.productionUseAllowed, false);
+assert.equal(fixture.staff.length, 23);
+assert.equal(new Set(codes).size, 23);
+assert.equal(fixture.staff.filter((row) => row.generatorEligible).length, 20);
+assert.deepEqual(fixture.staff.filter((row) => !row.generatorEligible).map((row) => row.code).sort(), ['MANAGER-01', 'REG-14', 'REG-15']);
+assert.deepEqual(fixture.staff.find((row) => row.code === 'SUPPORT-01'), { code: 'SUPPORT-01', kind: 'CHILDCARE_SUPPORT_EARLY', classType: 'SUPPORT', generatorEligible: true, earlyOnly: true, regular: false, late: false });
+assert.deepEqual(fixture.staff.find((row) => row.code === 'SUPPORT-02').regularTime, ['08:45', '17:15']);
+assert.equal(codes.some((code) => code.includes('24')), false);
+const setup = readFileSync(join(root, 'scripts/setup-musubi-provisional-demo.cjs'), 'utf8');
+assert.match(setup, /if \(!apply\).*process\.exit\(0\)/);
+assert.match(setup, /production環境では実行できません/);
+assert.match(setup, /CONFIRM_PROVISIONAL_TENANT_CODE/);
+const shifts = readFileSync(join(root, 'src/presentation/shifts/shifts.service.ts'), 'utf8');
+assert.match(shifts, /TENANT_CUSTOM_RULES/);
+assert.match(shifts, /GENERATOR_EXCLUDED/);
+assert.doesNotMatch(shifts, /MUSUBI-PROVISIONAL|むすび保育園/);
+console.log('Musubi provisional demo tests: PASS');

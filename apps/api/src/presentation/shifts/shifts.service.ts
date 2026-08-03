@@ -111,9 +111,10 @@ export class ShiftsService {
     const schedule = await this.requireEditable(user, id);
     const range = this.monthRange(schedule.targetMonth);
     await this.workPatterns.ensureSystemPatterns(user.tenantId);
-    let staffingFeatureEnabled = false; let staffingFeatureLookupFailed = false;
+    let staffingFeatureEnabled = false; let staffingFeatureLookupFailed = false; let customRulesEnabled = false;
     try { staffingFeatureEnabled = (await this.features.resolve(user.tenantId, 'ADVANCED_STAFFING_REQUIREMENTS')).enabled; } catch { staffingFeatureLookupFailed = true; }
-    const [staff, requests, setting, requirements, closedDates, managerMemberships, systemPatterns, staffingRequirements, staffAttributeAssignments] = await Promise.all([
+    try { customRulesEnabled = (await this.features.resolve(user.tenantId, 'TENANT_CUSTOM_RULES')).enabled; } catch { customRulesEnabled = false; }
+    const [staff, requests, setting, requirements, closedDates, managerMemberships, systemPatterns, staffingRequirements, staffAttributeAssignments, generatorExclusions] = await Promise.all([
       this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true }, orderBy: { employeeNumber: 'asc' } }),
       this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
       this.settings.ensureSetting(user.tenantId),
@@ -123,9 +124,11 @@ export class ShiftsService {
       this.prisma.workPattern.findMany({ where: { tenantId: user.tenantId, code: { in: ['EARLY', 'NORMAL', 'LATE', 'OFF'] }, isSystem: true } }),
       staffingFeatureEnabled ? this.prisma.shiftStaffingRequirement.findMany({ where: { tenantId: user.tenantId, isActive: true, attributeDefinition: { isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { id: true, code: true, name: true, attributeDefinitionId: true, classType: true, dayOfWeek: true, startDate: true, endDate: true, requiredCount: true, constraintLevel: true } }) : Promise.resolve([]),
       staffingFeatureEnabled ? this.prisma.staffAttributeAssignment.findMany({ where: { tenantId: user.tenantId, isActive: true, staff: { isActive: true }, attributeDefinition: { isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { staffId: true, attributeDefinitionId: true, startDate: true, endDate: true } }) : Promise.resolve([]),
+      customRulesEnabled ? this.prisma.staffAttributeAssignment.findMany({ where: { tenantId: user.tenantId, isActive: true, attributeDefinition: { tenantId: user.tenantId, code: 'GENERATOR_EXCLUDED', isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { staffId: true } }) : Promise.resolve([]),
     ]);
     const managerUserIds = new Set(managerMemberships.map((item) => item.userId));
-    const generationStaff = staff.filter((item) => !item.userId || !managerUserIds.has(item.userId));
+    const excludedStaffIds = new Set(generatorExclusions.map((item) => item.staffId));
+    const generationStaff = staff.filter((item) => (!item.userId || !managerUserIds.has(item.userId)) && !excludedStaffIds.has(item.id));
     const patternByCode = new Map(systemPatterns.map((pattern) => [pattern.code, pattern]));
     const early = patternByCode.get('EARLY'); const normal = patternByCode.get('NORMAL'); const late = patternByCode.get('LATE');
     const effectiveSetting = { ...setting, defaultStartEarly: early?.startTime ?? setting.defaultStartEarly, defaultEndEarly: early?.endTime ?? setting.defaultEndEarly, defaultStartNormal: normal?.startTime ?? setting.defaultStartNormal, defaultEndNormal: normal?.endTime ?? setting.defaultEndNormal, defaultStartLate: late?.startTime ?? setting.defaultStartLate, defaultEndLate: late?.endTime ?? setting.defaultEndLate, defaultBreakMinutes: normal?.breakMinutes ?? setting.defaultBreakMinutes };
