@@ -131,6 +131,7 @@ model Tenant {
   staffWorkRules StaffWorkRule[]
   staffAttributeDefinitions StaffAttributeDefinition[]
   staffAttributeAssignments StaffAttributeAssignment[]
+  shiftStaffingRequirements ShiftStaffingRequirement[]
   displayName String?
   phone String?
   postalCode String?
@@ -391,6 +392,12 @@ enum StaffAttributeCategory {
   SKILL
 }
 
+enum StaffingConstraintLevel {
+  HARD
+  SOFT
+  INFO
+}
+
 model StaffWorkRule {
   id               String            @id @default(uuid()) @db.Uuid
   tenantId         String            @db.Uuid
@@ -434,9 +441,36 @@ model StaffAttributeDefinition {
   updatedAt    DateTime               @updatedAt
   tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignments  StaffAttributeAssignment[]
+  staffingRequirements ShiftStaffingRequirement[]
 
   @@unique([tenantId, code])
   @@index([tenantId, category, isActive, displayOrder])
+}
+
+model ShiftStaffingRequirement {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  tenantId              String                  @db.Uuid
+  code                  String
+  name                  String
+  attributeDefinitionId String                  @db.Uuid
+  classType             AssignedClass?
+  dayOfWeek             Int?
+  startDate             DateTime?               @db.Date
+  endDate               DateTime?               @db.Date
+  requiredCount         Int
+  constraintLevel       StaffingConstraintLevel
+  reason                String?
+  displayOrder          Int                     @default(0)
+  isActive              Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attributeDefinition   StaffAttributeDefinition @relation(fields: [attributeDefinitionId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive, displayOrder])
+  @@index([tenantId, attributeDefinitionId, isActive])
+  @@index([tenantId, classType, dayOfWeek, isActive])
 }
 
 model StaffAttributeAssignment {

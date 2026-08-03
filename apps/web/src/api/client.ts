@@ -138,6 +138,9 @@ export type StaffAttributeDefinition={id:string;tenantId:string;code:string;name
 export type StaffAttributeDefinitionInput=Pick<StaffAttributeDefinition,'code'|'name'|'shortName'|'category'|'description'|'displayOrder'|'color'|'isActive'>;
 export type StaffAttributeAssignment={id:string;tenantId:string;staffId:string;attributeDefinitionId:string;attributeDefinition:StaffAttributeDefinition;startDate:string|null;endDate:string|null;notes:string|null;isPrimary:boolean;isActive:boolean;createdAt:string;updatedAt:string};
 export type StaffAttributeAssignmentInput=Pick<StaffAttributeAssignment,'attributeDefinitionId'|'startDate'|'endDate'|'notes'|'isPrimary'|'isActive'>;
+export type StaffingConstraintLevel='HARD'|'SOFT'|'INFO';
+export type ShiftStaffingRequirement={id:string;tenantId:string;code:string;name:string;attributeDefinitionId:string;attributeDefinition:StaffAttributeDefinition;classType:AssignedClass|null;dayOfWeek:number|null;startDate:string|null;endDate:string|null;requiredCount:number;constraintLevel:StaffingConstraintLevel;reason:string|null;displayOrder:number;isActive:boolean;createdAt:string;updatedAt:string};
+export type ShiftStaffingRequirementInput=Pick<ShiftStaffingRequirement,'code'|'name'|'attributeDefinitionId'|'classType'|'dayOfWeek'|'startDate'|'endDate'|'requiredCount'|'constraintLevel'|'reason'|'displayOrder'|'isActive'>;
 export type SubscriptionInfo = {
   id?: string;
   tenantId: string;
@@ -260,4 +263,8 @@ export const api = {
   createStaffAttributeAssignment(token:string,staffId:string,input:StaffAttributeAssignmentInput){return request<StaffAttributeAssignment>(`/staff/${staffId}/attributes`,{method:'POST',body:JSON.stringify(input)},token);},
   updateStaffAttributeAssignment(token:string,staffId:string,id:string,input:StaffAttributeAssignmentInput){return request<StaffAttributeAssignment>(`/staff/${staffId}/attributes/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
   deactivateStaffAttributeAssignment(token:string,staffId:string,id:string){return request<StaffAttributeAssignment>(`/staff/${staffId}/attributes/${id}`,{method:'DELETE'},token);},
+  staffingRequirements(token:string){return request<ShiftStaffingRequirement[]>('/staffing-requirements',{},token);},
+  createStaffingRequirement(token:string,input:ShiftStaffingRequirementInput){return request<ShiftStaffingRequirement>('/staffing-requirements',{method:'POST',body:JSON.stringify(input)},token);},
+  updateStaffingRequirement(token:string,id:string,input:ShiftStaffingRequirementInput){return request<ShiftStaffingRequirement>(`/staffing-requirements/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
+  deactivateStaffingRequirement(token:string,id:string){return request<ShiftStaffingRequirement>(`/staffing-requirements/${id}`,{method:'DELETE'},token);},
 };
