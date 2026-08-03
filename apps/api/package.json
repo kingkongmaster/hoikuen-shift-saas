@@ -14,6 +14,8 @@
     "db:migrate:deploy": "node scripts/migration.cjs deploy",
     "db:migrate:dry-run": "node scripts/migration.cjs deploy --dry-run",
     "admin:bootstrap": "node scripts/bootstrap-admin.cjs",
+    "setup:musubi-provisional": "node scripts/setup-musubi-provisional-demo.cjs",
+    "test:musubi-provisional": "node test/musubi-provisional-demo.test.cjs",
     "test:sprint2": "node test/staff.e2e.cjs",
     "test:sprint3": "node test/requests.e2e.cjs",
     "test:sprint4": "node test/shifts.e2e.cjs",

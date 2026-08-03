@@ -13,8 +13,9 @@ import { FeedbackManagement } from '../support/FeedbackManagement';
 import { UpdateHistory } from '../support/UpdateHistory';
 import { HomeDashboard } from './HomeDashboard';
 import { WorkPatternManagement } from '../work-patterns/WorkPatternManagement';
+import { MusubiProvisionalDemo } from '../clients/MusubiProvisionalDemo';
 
-type View = 'home' | 'staff' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates';
+type View = 'home' | 'staff' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
 const roleLabels = { ADMIN: '管理者', DIRECTOR: '園長', CHIEF: '主任', STAFF: '一般職員' } as const;
 const viewInfo: Record<View, { title: string; description: string }> = {
   home: { title: 'ホーム', description: '今日の勤務と大切なお知らせを確認できます。' },
@@ -30,6 +31,7 @@ const viewInfo: Record<View, { title: string; description: string }> = {
   subscription: { title: '契約情報', description: '契約プランと利用状態を確認します。' },
   feedback: { title: 'お問い合わせ', description: '不具合・改善要望・ご意見・アプリ評価をこの端末へ保存します。' },
   updates: { title: '更新履歴', description: 'EnShiftの機能追加と改善内容を確認します。' },
+  'musubi-demo': { title: 'むすび保育園 仮運用確認', description: '匿名の仮設定と1か月の生成結果を確認します。正式運用値ではありません。' },
 };
 const everydayMenu: Array<{ view: View; symbol: string; label: string; description: string }> = [
   { view: 'requests', symbol: '休', label: '希望休', description: '休みを申請・確認' },
@@ -87,6 +89,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
             {canManageShifts && <OtherButton symbol="契" label="契約情報" onClick={() => selectView('subscription')} />}
             {canManageShifts && <OtherButton symbol="録" label="監査ログ" onClick={() => selectView('audit')} />}
             {canManageShifts && <OtherButton symbol="出" label="データ出力" onClick={() => selectView('exports')} />}
+            {canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' && <OtherButton symbol="仮" label="仮運用確認" onClick={() => selectView('musubi-demo')} />}
             <OtherButton symbol="問" label="お問い合わせ" onClick={() => selectView('feedback')} />
             <OtherButton symbol="新" label="更新履歴" onClick={() => selectView('updates')} />
           </div></details>
@@ -107,7 +110,8 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
 }
 
 function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange }: { view: View; session: Session; isAdmin: boolean; canManageShifts: boolean; onUnreadChange: (count: number) => void }) {
-  return view === 'staff' && canManageShifts ? <StaffManagement token={session.accessToken} readOnly={!isAdmin} />
+  return view === 'musubi-demo' && canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' ? <MusubiProvisionalDemo session={session} />
+    : view === 'staff' && canManageShifts ? <StaffManagement token={session.accessToken} readOnly={!isAdmin} />
     : view === 'work-patterns' && isAdmin ? <WorkPatternManagement token={session.accessToken} />
     : view === 'requests' ? <RequestManagement session={session} />
       : view === 'settings' && canManageShifts ? <ShiftSettings session={session} />
