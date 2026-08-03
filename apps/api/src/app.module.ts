@@ -23,6 +23,7 @@ import { FeaturesModule } from './presentation/features/features.module';
 import { WorkPatternsModule } from './presentation/work-patterns/work-patterns.module';
 import { StaffWorkRulesModule } from './presentation/staff-work-rules/staff-work-rules.module';
 import { StaffAttributesModule } from './presentation/staff-attributes/staff-attributes.module';
+import { StaffingRequirementsModule } from './presentation/staffing-requirements/staffing-requirements.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { StaffAttributesModule } from './presentation/staff-attributes/staff-att
     WorkPatternsModule,
     StaffWorkRulesModule,
     StaffAttributesModule,
+    StaffingRequirementsModule,
   ],
 })
 export class AppModule implements NestModule {

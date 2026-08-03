@@ -23,7 +23,8 @@
     "test:work-patterns": "node test/work-patterns.test.mjs",
     "test:staff-work-rules": "node test/staff-work-rules.test.mjs",
     "test:staff-attributes": "node test/staff-attributes.test.mjs",
-    "test:regression": "npm run test:month && npm run test:sprint9b2 && npm run test:sprint9c && npm run test:sprint10a && npm run test:sprint10b && npm run test:sprint10c && npm run test:sprint11a && npm run test:shift-display && npm run test:individual-hours && npm run test:monthly-targets && npm run test:initial-password && npm run test:features && npm run test:work-patterns && npm run test:staff-work-rules && npm run test:staff-attributes"
+    "test:staffing-requirements": "node test/staffing-requirements.test.mjs",
+    "test:regression": "npm run test:month && npm run test:sprint9b2 && npm run test:sprint9c && npm run test:sprint10a && npm run test:sprint10b && npm run test:sprint10c && npm run test:sprint11a && npm run test:shift-display && npm run test:individual-hours && npm run test:monthly-targets && npm run test:initial-password && npm run test:features && npm run test:work-patterns && npm run test:staff-work-rules && npm run test:staff-attributes && npm run test:staffing-requirements"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.3",
