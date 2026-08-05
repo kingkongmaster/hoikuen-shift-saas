@@ -234,7 +234,7 @@ export function SetupWizard({
   return <main className="min-h-screen bg-slate-50 text-slate-900">
     <header className="border-b bg-white">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-        <div><p className="text-sm font-semibold text-emerald-700">EnShift</p><p className="font-bold">{session.tenant.name}</p></div>
+        <div><p className="text-sm font-semibold text-emerald-700">AeN Shift</p><p className="font-bold">{session.tenant.name}</p></div>
         <div className="flex items-center gap-3"><p className="hidden text-sm text-slate-600 sm:block">{session.user.displayName}</p><button type="button" onClick={onLogout} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm">ログアウト</button></div>
       </div>
     </header>
@@ -321,7 +321,7 @@ function ClassStep({ rows, setDraft }: { rows: RequirementDraft[]; setDraft: Rea
 }
 function ConsentStep({ accepted, setAccepted, setup }: { accepted: boolean; setAccepted: (value: boolean) => void; setup: SetupState }) {
   return <div><SectionTitle title="利用規約" description="内容をご確認のうえ、同意してください。" /><div className="mt-6 grid gap-4">
-    <article className="max-h-40 overflow-y-auto rounded-xl border bg-slate-50 p-4 text-sm leading-6"><h3 className="font-bold">利用規約（{setup.currentTermsVersion}）</h3><p className="mt-2 text-slate-600">EnShiftを園内のシフト管理目的で適切に利用し、アカウント情報を安全に管理してください。登録内容の正確性は利用者が確認するものとします。</p></article>
+    <article className="max-h-40 overflow-y-auto rounded-xl border bg-slate-50 p-4 text-sm leading-6"><h3 className="font-bold">利用規約（{setup.currentTermsVersion}）</h3><p className="mt-2 text-slate-600">AeN Shiftを園内のシフト管理目的で適切に利用し、アカウント情報を安全に管理してください。登録内容の正確性は利用者が確認するものとします。</p></article>
     <article className="max-h-40 overflow-y-auto rounded-xl border bg-slate-50 p-4 text-sm leading-6"><h3 className="font-bold">プライバシーポリシー（{setup.currentPrivacyVersion}）</h3><p className="mt-2 text-slate-600">サービス提供、本人確認、勤務管理および安全性確保のために必要な情報を取り扱います。園のデータはテナント単位で管理されます。</p></article>
     <label className="flex min-h-14 items-start gap-3 rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4 font-semibold"><input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-emerald-700" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />利用規約およびプライバシーポリシーに同意する</label>
   </div></div>;

@@ -22,7 +22,8 @@ const [manifestText, serviceWorker, html, main, styles, states, status, errorBou
 const manifest = JSON.parse(manifestText);
 assert.equal(manifest.display, 'standalone');
 assert.equal(manifest.start_url, '/');
-assert.equal(manifest.name, 'EnShift 保育園シフト管理');
+assert.equal(manifest.name, 'AeN Shift');
+assert.equal(manifest.short_name, 'AeN Shift');
 assert.ok(manifest.icons.some((icon) => icon.sizes === '192x192'));
 assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512' && icon.purpose.includes('maskable')));
 for (const file of ['../public/icons/icon-192.png', '../public/icons/icon-512.png', '../public/icons/apple-touch-icon.png', '../public/icons/splash-1170x2532.png']) {

@@ -1,7 +1,7 @@
 {
-  "name": "EnShift 保育園シフト管理",
-  "short_name": "EnShift",
-  "description": "保育園向けの職員・希望休・シフト管理アプリ",
+  "name": "AeN Shift",
+  "short_name": "AeN Shift",
+  "description": "保育園・幼稚園・認定こども園向けシフト管理システム。先生にゆとりを、園に安心を。",
   "lang": "ja",
   "start_url": "/",
   "scope": "/",

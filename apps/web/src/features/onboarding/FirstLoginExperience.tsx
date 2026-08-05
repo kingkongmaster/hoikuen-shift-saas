@@ -36,9 +36,9 @@ export function FirstLoginExperience({ session, children }: { session: Session; 
     return <section className="onboarding-screen" aria-labelledby="welcome-title">
       <div className="onboarding-card text-center">
         <img src="/icons/icon-192.png" alt="" className="mx-auto size-20 rounded-[1.4rem] shadow-md" />
-        <p className="eyebrow mt-7">WELCOME TO ENSHIFT</p>
+        <p className="eyebrow mt-7">WELCOME TO AeN Shift</p>
         <h1 id="welcome-title" className="mt-3 text-3xl font-black leading-tight">ようこそ<br /><span className="text-[var(--brand)]">{session.tenant.name}へ</span></h1>
-        <p className="mx-auto mt-6 max-w-sm text-base leading-8 text-[var(--ink-muted)]">EnShiftへようこそ。<br />毎日の勤務を、分かりやすく確認できるアプリです。</p>
+        <p className="mx-auto mt-6 max-w-sm text-base leading-8 text-[var(--ink-muted)]">AeN Shiftへようこそ。<br />先生にゆとりを、園に安心を。</p>
         <button type="button" onClick={() => setStage('tutorial')} className="btn-primary mt-8 w-full">はじめる</button>
       </div>
     </section>;

@@ -30,7 +30,7 @@ const viewInfo: Record<View, { title: string; description: string }> = {
   exports: { title: 'データ出力', description: 'CSV、印刷、バックアップを利用します。' },
   subscription: { title: '契約情報', description: '契約プランと利用状態を確認します。' },
   feedback: { title: 'お問い合わせ', description: '不具合・改善要望・ご意見・アプリ評価をこの端末へ保存します。' },
-  updates: { title: '更新履歴', description: 'EnShiftの機能追加と改善内容を確認します。' },
+  updates: { title: '更新履歴', description: 'AeN Shiftの機能追加と改善内容を確認します。' },
   'musubi-demo': { title: 'むすび保育園 仮運用確認', description: '匿名の仮設定と1か月の生成結果を確認します。正式運用値ではありません。' },
 };
 const everydayMenu: Array<{ view: View; symbol: string; label: string; description: string }> = [
@@ -69,7 +69,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
       <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
         <button type="button" onClick={() => selectView('home')} className="flex min-h-11 min-w-0 items-center gap-3 rounded-xl text-left">
           <img src="/icons/icon-192.png" alt="" className="size-10 rounded-xl" />
-          <span className="min-w-0"><span className="block text-sm font-black tracking-wide text-[var(--brand)]">EnShift</span><span className="block truncate text-sm font-bold sm:text-base">{session.tenant.name}</span></span>
+          <span className="min-w-0"><span className="block text-sm font-black tracking-wide text-[var(--brand)]">AeN Shift</span><span className="block truncate text-sm font-bold sm:text-base">{session.tenant.name}</span></span>
         </button>
         <div className="flex items-center gap-2"><div className="hidden text-right sm:block"><p className="text-sm font-bold">{session.user.displayName}</p><p className="text-xs text-[var(--ink-muted)]">{roleLabels[session.role]}</p></div><button onClick={onLogout} className="btn-quiet text-sm">ログアウト</button></div>
       </div>
@@ -95,7 +95,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
           </div></details>
         </section>
       </> : <>
-        <header className="page-heading"><button type="button" onClick={() => selectView('home')} className="btn-quiet mb-4"><span aria-hidden="true">←</span>ホームへ戻る</button><p className="eyebrow">ENSHIFT</p><h1 className="mt-1 text-2xl font-black sm:text-3xl">{info.title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">{view === 'shifts' && !canManageShifts ? '確定済みの自分の勤務シフトを確認できます。' : info.description}</p></header>
+        <header className="page-heading"><button type="button" onClick={() => selectView('home')} className="btn-quiet mb-4"><span aria-hidden="true">←</span>ホームへ戻る</button><p className="eyebrow">AeN Shift</p><h1 className="mt-1 text-2xl font-black sm:text-3xl">{info.title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">{view === 'shifts' && !canManageShifts ? '確定済みの自分の勤務シフトを確認できます。' : info.description}</p></header>
         <ViewContent view={view} session={session} isAdmin={isAdmin} canManageShifts={canManageShifts} onUnreadChange={refreshUnread} />
       </>}
     </div>

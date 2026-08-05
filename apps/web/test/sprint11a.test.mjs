@@ -21,7 +21,7 @@ const [onboarding, gate, admin, home, dashboard, states, status, requests, swaps
 ]);
 
 // 初回ログインと3画面以内のガイド
-for (const text of ['ようこそ', 'EnShiftへようこそ', 'はじめる', 'ガイドをスキップ', 'ホームを見る']) assert.ok(onboarding.includes(text), `初回体験: ${text}`);
+for (const text of ['ようこそ', 'AeN Shiftへようこそ', 'はじめる', 'ガイドをスキップ', 'ホームを見る']) assert.ok(onboarding.includes(text), `初回体験: ${text}`);
 for (const lesson of ['今日の勤務', '希望休', '通知']) assert.ok(onboarding.includes(`title: '${lesson}'`), `チュートリアル: ${lesson}`);
 assert.equal((onboarding.match(/title: '/g) ?? []).length, 3, 'チュートリアルは3画面');
 assert.ok(onboarding.includes('enshift.onboarding.completed:${session.tenant.id}:${session.user.id}'), '園・利用者単位で完了状態を保存');

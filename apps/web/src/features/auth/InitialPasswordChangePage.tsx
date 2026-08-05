@@ -33,7 +33,7 @@ export function InitialPasswordChangePage({ session, onCompleted }: { session: S
   return <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,_#e7f1ec,_#f6f7f2_48%)] p-4 sm:p-5">
     <form onSubmit={submit} className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl shadow-emerald-950/10 sm:p-8">
       <p className="eyebrow">初回ログイン</p><h1 className="mt-1 text-2xl font-black">本人用パスワードへ変更</h1>
-      <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">仮パスワードのままではEnShiftの機能を利用できません。ご本人だけが知っているパスワードへ変更してください。</p>
+      <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">仮パスワードのままではAeN Shiftの機能を利用できません。ご本人だけが知っているパスワードへ変更してください。</p>
       <PasswordField label="現在の仮パスワード" value={currentPassword} onChange={setCurrentPassword} visible={currentVisible} onVisibilityChange={setCurrentVisible} autoComplete="current-password" />
       <PasswordField label="新しいパスワード" value={newPassword} onChange={setNewPassword} visible={newVisible} onVisibilityChange={setNewVisible} autoComplete="new-password" isNew />
       <PasswordField label="新しいパスワード（確認）" value={confirmPassword} onChange={setConfirmPassword} visible={confirmVisible} onVisibilityChange={setConfirmVisible} autoComplete="new-password" isNew />
