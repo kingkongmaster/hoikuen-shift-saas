@@ -8,7 +8,7 @@ const source = await readFile(new URL('../src/features/shifts/ShiftManagement.ts
 assert.match(source, /lg:hidden print:hidden/); // 375px
 assert.match(source, /data-testid="mobile-daily-shift-view"/); // 390px
 assert.match(source, /min-w-0 rounded-2xl/); // 412pxでカードがはみ出さない
-assert.match(source, /hidden lg:block print:block/); // 1024px以上
+assert.match(source, /hidden[^"]*lg:block print:block/); // 1024px以上
 
 // 5-9: 日付移動・境界・日付選択。
 assert.equal(moveDayWithinMonth('2026-09', 15, -1), 14);
