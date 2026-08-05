@@ -17,8 +17,9 @@ export function LoginPage({ onSuccess }: { onSuccess: (session: Session) => void
 
   return <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,_#e7f1ec,_#f6f7f2_48%)] p-5">
     <form onSubmit={submit} className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl shadow-emerald-950/10 sm:p-8">
-      <div className="flex items-center gap-3"><img src="/icons/icon-192.png" alt="" className="size-12 rounded-xl" /><div><p className="font-black tracking-wide text-[var(--brand)]">EnShift</p><h1 className="text-2xl font-black sm:text-3xl">園シフトにログイン</h1></div></div>
-      <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">今日の勤務と大切なお知らせを、ひとつの分かりやすい場所で確認できます。</p>
+      <div className="flex items-center gap-3"><img src="/icons/icon-192.png" alt="" className="size-12 rounded-xl" /><div><p className="font-black tracking-wide text-[var(--brand)]">AeN Shift</p><h1 className="text-2xl font-black sm:text-3xl">AeN Shiftにログイン</h1></div></div>
+      <p className="mt-3 text-sm font-semibold leading-6 text-[var(--ink-muted)]">保育園・幼稚園・認定こども園向けシフト管理システム</p>
+      <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">先生にゆとりを、園に安心を。</p>
       <label className="mt-7 block text-sm font-bold">メールアドレス<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="username" required className="input mt-2" /></label>
       <label className="mt-4 block text-sm font-bold">パスワード<input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" minLength={8} required className="input mt-2" /></label>
       {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
