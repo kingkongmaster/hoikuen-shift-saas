@@ -24,9 +24,11 @@ export function LoginPage({ onSuccess }: { onSuccess: (session: Session) => void
       <label className="mt-4 block text-sm font-bold">パスワード<input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" minLength={8} required className="input mt-2" /></label>
       {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
       <button disabled={loading} className="btn-primary mt-6 w-full py-3">{loading ? 'ログイン中…' : 'ログイン'}</button>
-      <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />プレゼン・モニター園向け<span className="h-px flex-1 bg-slate-200" /></div>
-      <button type="button" disabled={loading} onClick={() => void login('owner@demo.enshift.local', 'ChangeMe123!')} className="btn-secondary w-full py-3"><span aria-hidden="true">▶</span> デモデータで開始</button>
-      <p className="mt-4 text-xs leading-5 text-slate-500">約20名の職員、希望休、確定シフト、通知、交換申請をすぐに確認できます。</p>
+      <div className="hidden">
+        <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />プレゼン・モニター園向け<span className="h-px flex-1 bg-slate-200" /></div>
+        <button type="button" disabled={loading} onClick={() => void login('owner@demo.enshift.local', 'ChangeMe123!')} className="btn-secondary w-full py-3"><span aria-hidden="true">▶</span> デモデータで開始</button>
+        <p className="mt-4 text-xs leading-5 text-slate-500">約20名の職員、希望休、確定シフト、通知、交換申請をすぐに確認できます。</p>
+      </div>
     </form>
   </main>;
 }
