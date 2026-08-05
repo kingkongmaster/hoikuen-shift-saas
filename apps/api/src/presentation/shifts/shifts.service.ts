@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MembershipRole, MonthlyShiftStatus, NotificationType, Prisma, ShiftRequestStatus, ShiftType } from '@prisma/client';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -17,6 +17,8 @@ type Warning = { code: string; staffId: string; workDate: string; message: strin
 
 @Injectable()
 export class ShiftsService {
+  private readonly logger = new Logger(ShiftsService.name);
+
   constructor(private readonly prisma: PrismaService, private readonly settings: SettingsService, private readonly notifications: NotificationsService, private readonly audit: AuditService, private readonly workPatterns: WorkPatternsService, private readonly features: FeaturesService) {}
 
   async list(user: AuthenticatedUser, month: string, requestedStaffId?: string) {
@@ -111,10 +113,11 @@ export class ShiftsService {
     const schedule = await this.requireEditable(user, id);
     const range = this.monthRange(schedule.targetMonth);
     await this.workPatterns.ensureSystemPatterns(user.tenantId);
-    let staffingFeatureEnabled = false; let staffingFeatureLookupFailed = false; let customRulesEnabled = false;
+    let staffingFeatureEnabled = false; let staffingFeatureLookupFailed = false; let workRuleFeatureEnabled = false; let workRuleFeatureLookupFailed = false; let customRulesEnabled = false;
     try { staffingFeatureEnabled = (await this.features.resolve(user.tenantId, 'ADVANCED_STAFFING_REQUIREMENTS')).enabled; } catch { staffingFeatureLookupFailed = true; }
+    try { workRuleFeatureEnabled = (await this.features.resolve(user.tenantId, 'STAFF_WORK_RULES')).enabled; } catch (error) { workRuleFeatureLookupFailed = true; this.logger.warn('StaffWorkRule feature lookup failed; legacy allocation will be used.', error instanceof Error ? error.name : 'UnknownError'); }
     try { customRulesEnabled = (await this.features.resolve(user.tenantId, 'TENANT_CUSTOM_RULES')).enabled; } catch { customRulesEnabled = false; }
-    const [staff, requests, setting, requirements, closedDates, managerMemberships, systemPatterns, staffingRequirements, staffAttributeAssignments, generatorExclusions] = await Promise.all([
+    const [staff, requests, setting, requirements, closedDates, managerMemberships, systemPatterns, staffingRequirements, staffAttributeAssignments, generatorExclusions, staffWorkRules] = await Promise.all([
       this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true }, orderBy: { employeeNumber: 'asc' } }),
       this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
       this.settings.ensureSetting(user.tenantId),
@@ -125,6 +128,7 @@ export class ShiftsService {
       staffingFeatureEnabled ? this.prisma.shiftStaffingRequirement.findMany({ where: { tenantId: user.tenantId, isActive: true, attributeDefinition: { isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { id: true, code: true, name: true, attributeDefinitionId: true, classType: true, dayOfWeek: true, startDate: true, endDate: true, requiredCount: true, constraintLevel: true } }) : Promise.resolve([]),
       staffingFeatureEnabled ? this.prisma.staffAttributeAssignment.findMany({ where: { tenantId: user.tenantId, isActive: true, staff: { isActive: true }, attributeDefinition: { isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { staffId: true, attributeDefinitionId: true, startDate: true, endDate: true } }) : Promise.resolve([]),
       customRulesEnabled ? this.prisma.staffAttributeAssignment.findMany({ where: { tenantId: user.tenantId, isActive: true, attributeDefinition: { tenantId: user.tenantId, code: 'GENERATOR_EXCLUDED', isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { staffId: true } }) : Promise.resolve([]),
+      workRuleFeatureEnabled ? this.prisma.staffWorkRule.findMany({ where: { tenantId: user.tenantId, isActive: true, staff: { isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { id: true, staffId: true, ruleType: true, dayOfWeek: true, startDate: true, endDate: true, startTime: true, endTime: true, numericValue: true, priority: true, isHardConstraint: true, workPattern: { select: { id: true, code: true, startTime: true, endTime: true, breakMinutes: true, isWorking: true, isActive: true } } } }) : Promise.resolve([]),
     ]);
     const managerUserIds = new Set(managerMemberships.map((item) => item.userId));
     const excludedStaffIds = new Set(generatorExclusions.map((item) => item.staffId));
@@ -133,11 +137,13 @@ export class ShiftsService {
     const early = patternByCode.get('EARLY'); const normal = patternByCode.get('NORMAL'); const late = patternByCode.get('LATE');
     const effectiveSetting = { ...setting, defaultStartEarly: early?.startTime ?? setting.defaultStartEarly, defaultEndEarly: early?.endTime ?? setting.defaultEndEarly, defaultStartNormal: normal?.startTime ?? setting.defaultStartNormal, defaultEndNormal: normal?.endTime ?? setting.defaultEndNormal, defaultStartLate: late?.startTime ?? setting.defaultStartLate, defaultEndLate: late?.endTime ?? setting.defaultEndLate, defaultBreakMinutes: normal?.breakMinutes ?? setting.defaultBreakMinutes };
     const staffingOptions = staffingRequirements.length ? { staffingRequirements, staffAttributeAssignments } : {};
-    const generated = generateRuleBasedSchedule(schedule.targetMonth, generationStaff.map((item) => ({ ...item, isDirector: false })), requests, { ...effectiveSetting, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates, ...staffingOptions });
+    const workRuleOptions = staffWorkRules.length ? { staffWorkRules } : {};
+    const generated = generateRuleBasedSchedule(schedule.targetMonth, generationStaff.map((item) => ({ ...item, isDirector: false })), requests, { ...effectiveSetting, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates, ...staffingOptions, ...workRuleOptions });
     if (staffingFeatureLookupFailed) generated.warnings.push({ code: 'STAFFING_REQUIREMENT_FEATURE_LOOKUP_FAILED', level: 'WARNING', workDate: this.isoDate(schedule.targetMonth), message: '属性別配置条件のFeature状態を確認できなかったため、従来方式で生成しました。' });
+    if (workRuleFeatureLookupFailed) generated.warnings.push({ code: 'STAFF_WORK_RULE_FEATURE_LOOKUP_FAILED', level: 'WARNING', workDate: this.isoDate(schedule.targetMonth), message: '個別勤務ルールのFeature状態を確認できなかったため、従来方式で生成しました。' });
     await this.prisma.$transaction([
       this.prisma.shiftAssignment.deleteMany({ where: { monthlyShiftId: schedule.id } }),
-      this.prisma.shiftAssignment.createMany({ data: generated.assignments.map((assignment) => ({ tenantId: user.tenantId, monthlyShiftId: schedule.id, ...assignment, workPatternId: patternByCode.get(assignment.shiftType)?.id ?? null })) }),
+      this.prisma.shiftAssignment.createMany({ data: generated.assignments.map((assignment) => ({ tenantId: user.tenantId, monthlyShiftId: schedule.id, ...assignment, workPatternId: assignment.workPatternId ?? patternByCode.get(assignment.shiftType)?.id ?? null })) }),
     ]);
     const processingTimeMs = Date.now() - startedAt;
     const workingAssignmentCount = generated.assignments.filter((item) => (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length;
@@ -145,7 +151,8 @@ export class ShiftsService {
     const leaveAssignmentCount = generated.assignments.length - workingAssignmentCount - offAssignmentCount;
     const evaluations = 'staffingRequirementEvaluations' in generated ? generated.staffingRequirementEvaluations : undefined;
     const staffingSummary = { applied: !!evaluations, conditionCount: staffingRequirements.length, hardUnmetCount: evaluations?.filter((item) => item.constraintLevel === 'HARD' && !item.isSatisfied).length ?? 0, softUnmetCount: evaluations?.filter((item) => item.constraintLevel === 'SOFT' && !item.isSatisfied).length ?? 0, infoCount: evaluations?.filter((item) => item.constraintLevel === 'INFO').length ?? 0, featureLookupFailed: staffingFeatureLookupFailed };
-    await this.audit.create(user.tenantId,user.sub,'SHIFT_GENERATED','MonthlyShift',schedule.id,{generatedCount:generated.assignments.length,workingAssignmentCount,offAssignmentCount,leaveAssignmentCount,staffingRequirementSummary:staffingSummary}); await this.notifications.notifyRoles(user.tenantId,['ADMIN','DIRECTOR'],NotificationType.SHIFT_UPDATED,'シフト自動生成','月間シフトを自動生成しました。'); return { generatedCount: generated.assignments.length, workingAssignmentCount, offAssignmentCount, leaveAssignmentCount, warnings: generated.warnings, processingTimeMs, durationMs: processingTimeMs, warningSummary: this.warningSummary(generated.warnings), appliedSettingsSummary: { weekdayEarlyRequired: setting.weekdayEarlyRequired, weekdayLateRequired: setting.weekdayLateRequired, saturdayEarlyRequired: setting.saturdayEarlyRequired, saturdayLateRequired: setting.saturdayLateRequired, saturdayMinimumStaff: setting.saturdayMinimumStaff, saturdayOperationEnabled: setting.saturdayOperationEnabled, sundayOperationEnabled: setting.sundayOperationEnabled, maxConsecutiveWorkDays: setting.maxConsecutiveWorkDays, maxConsecutiveEarlyDays: setting.maxConsecutiveEarlyDays, maxConsecutiveLateDays: setting.maxConsecutiveLateDays }, closedDateCount: closedDates.length, ...(evaluations ? { staffingRequirementEvaluations: evaluations } : {}) };
+    const staffWorkRuleSummary = { applied: staffWorkRules.length > 0, ruleCount: staffWorkRules.length, fixedBlockedCount: generated.warnings.filter((item) => item.code === 'STAFF_WORK_RULE_FIXED_BLOCKED' || item.code === 'STAFF_WORK_RULE_FIXED_PROHIBITED').length, featureLookupFailed: workRuleFeatureLookupFailed };
+    await this.audit.create(user.tenantId,user.sub,'SHIFT_GENERATED','MonthlyShift',schedule.id,{generatedCount:generated.assignments.length,workingAssignmentCount,offAssignmentCount,leaveAssignmentCount,staffingRequirementSummary:staffingSummary,staffWorkRuleSummary}); await this.notifications.notifyRoles(user.tenantId,['ADMIN','DIRECTOR'],NotificationType.SHIFT_UPDATED,'シフト自動生成','月間シフトを自動生成しました。'); return { generatedCount: generated.assignments.length, workingAssignmentCount, offAssignmentCount, leaveAssignmentCount, warnings: generated.warnings, processingTimeMs, durationMs: processingTimeMs, warningSummary: this.warningSummary(generated.warnings), appliedSettingsSummary: { weekdayEarlyRequired: setting.weekdayEarlyRequired, weekdayLateRequired: setting.weekdayLateRequired, saturdayEarlyRequired: setting.saturdayEarlyRequired, saturdayLateRequired: setting.saturdayLateRequired, saturdayMinimumStaff: setting.saturdayMinimumStaff, saturdayOperationEnabled: setting.saturdayOperationEnabled, sundayOperationEnabled: setting.sundayOperationEnabled, maxConsecutiveWorkDays: setting.maxConsecutiveWorkDays, maxConsecutiveEarlyDays: setting.maxConsecutiveEarlyDays, maxConsecutiveLateDays: setting.maxConsecutiveLateDays }, closedDateCount: closedDates.length, ...(evaluations ? { staffingRequirementEvaluations: evaluations } : {}) };
   }
 
   async precheck(user: AuthenticatedUser, id: string) {
