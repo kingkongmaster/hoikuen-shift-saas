@@ -101,7 +101,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
         </section>
       </> : <>
         <header className="page-heading"><button type="button" onClick={() => selectView('home')} className="btn-quiet mb-4"><span aria-hidden="true">←</span>ホームへ戻る</button><p className="eyebrow">AeN Shift</p><h1 className="mt-1 text-2xl font-black sm:text-3xl">{info.title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">{view === 'shifts' && !canManageShifts ? '確定済みの自分の勤務シフトを確認できます。' : info.description}</p></header>
-        <ViewContent view={view} session={session} isAdmin={isAdmin} canManageShifts={canManageShifts} onUnreadChange={refreshUnread} />
+        <ViewContent view={view} session={session} isAdmin={isAdmin} canManageShifts={canManageShifts} onUnreadChange={refreshUnread} onNavigate={selectView} />
       </>}
     </div>
 
@@ -121,7 +121,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
   </main>;
 }
 
-function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange }: { view: View; session: Session; isAdmin: boolean; canManageShifts: boolean; onUnreadChange: (count: number) => void }) {
+function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange, onNavigate }: { view: View; session: Session; isAdmin: boolean; canManageShifts: boolean; onUnreadChange: (count: number) => void; onNavigate: (view: View) => void }) {
   return view === 'calendar' && !canManageShifts ? <PersonalCalendar token={session.accessToken} />
     : view === 'mypage' && !canManageShifts ? <MyPage token={session.accessToken} />
     : view === 'musubi-demo' && canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' ? <MusubiProvisionalDemo session={session} />
@@ -130,7 +130,7 @@ function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange }
     : view === 'requests' ? <RequestManagement session={session} />
       : view === 'settings' && canManageShifts ? <ShiftSettings session={session} />
         : view === 'subscription' && canManageShifts ? <SubscriptionInfo session={session} />
-          : view === 'notifications' ? <NotificationManagement session={session} onUnreadChange={onUnreadChange} />
+          : view === 'notifications' ? <NotificationManagement session={session} onUnreadChange={onUnreadChange} onNavigate={onNavigate} />
             : view === 'swaps' ? <ShiftSwapManagement session={session} />
               : view === 'audit' && canManageShifts ? <AuditLogManagement session={session} />
                 : view === 'exports' && canManageShifts ? <DataExportManagement session={session} />
