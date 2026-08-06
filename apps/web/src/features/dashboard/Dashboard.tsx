@@ -14,11 +14,15 @@ import { UpdateHistory } from '../support/UpdateHistory';
 import { HomeDashboard } from './HomeDashboard';
 import { WorkPatternManagement } from '../work-patterns/WorkPatternManagement';
 import { MusubiProvisionalDemo } from '../clients/MusubiProvisionalDemo';
+import { PersonalCalendar } from '../calendar/PersonalCalendar';
+import { MyPage } from '../profile/MyPage';
 
-type View = 'home' | 'staff' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
+type View = 'home' | 'calendar' | 'mypage' | 'staff' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
 const roleLabels = { ADMIN: '管理者', DIRECTOR: '園長', CHIEF: '主任', STAFF: '一般職員' } as const;
 const viewInfo: Record<View, { title: string; description: string }> = {
   home: { title: 'ホーム', description: '今日の勤務と大切なお知らせを確認できます。' },
+  calendar: { title: '個人カレンダー', description: '自分の勤務予定と希望休の状態を月ごとに確認します。' },
+  mypage: { title: 'マイページ', description: '自分の基本プロフィールを確認します。' },
   staff: { title: '職員マスター管理', description: '園ごとの職員情報を登録・編集・無効化できます。' },
   requests: { title: '希望休管理', description: '希望休の申請と確認を行います。' },
   shifts: { title: '月間シフト管理', description: '月間勤務表を確認・管理します。' },
@@ -43,6 +47,7 @@ const everydayMenu: Array<{ view: View; symbol: string; label: string; descripti
 export function Dashboard({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const isAdmin = session.role === 'ADMIN';
   const canManageShifts = session.role === 'ADMIN' || session.role === 'DIRECTOR';
+  const staffMode = session.role === 'STAFF' || session.role === 'CHIEF';
   const [view, setView] = useState<View>('home');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const unread = notifications.filter((row) => !row.isRead).length;
@@ -81,7 +86,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
         <HomeDashboard session={session} notifications={notifications} onOpen={selectView} />
         <section className="mt-7" aria-labelledby="menu-heading">
           <div className="mb-4"><p className="eyebrow">MENU</p><h2 id="menu-heading" className="mt-1 text-xl font-black">よく使うメニュー</h2></div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{everydayMenu.map((item) => <MenuTile key={item.view} {...item} badge={item.view === 'notifications' ? unread : 0} onClick={() => selectView(item.view)} />)}</div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{everydayMenu.map((item) => <MenuTile key={item.view} {...item} label={item.view === 'shifts' && staffMode ? 'カレンダー' : item.label} description={item.view === 'shifts' && staffMode ? '本人の勤務予定' : item.description} badge={item.view === 'notifications' ? unread : 0} onClick={() => selectView(item.view === 'shifts' && staffMode ? 'calendar' : item.view)} />)}</div>
           <details className="other-menu mt-4"><summary><span className="action-symbol action-symbol-soft" aria-hidden="true">他</span><span><strong>その他のメニュー</strong><small>管理・設定・サポート</small></span></summary><div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
             {canManageShifts && <OtherButton symbol="職" label="職員マスター" onClick={() => selectView('staff')} />}
             {canManageShifts && <OtherButton symbol="園" label="園設定" onClick={() => selectView('settings')} />}
@@ -100,17 +105,26 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
       </>}
     </div>
 
-    <nav className="bottom-nav md:hidden" aria-label="主要メニュー">
+    <nav className={`bottom-nav md:hidden ${staffMode ? 'has-five' : ''}`} aria-label="主要メニュー">
       <BottomButton symbol="今" label="ホーム" active={view === 'home'} onClick={() => selectView('home')} />
-      <BottomButton symbol="休" label="希望休" active={view === 'requests'} onClick={() => selectView('requests')} />
-      <BottomButton symbol="勤" label="シフト" active={view === 'shifts'} onClick={() => selectView('shifts')} />
-      <BottomButton symbol="知" label="通知" badge={unread} active={view === 'notifications'} onClick={() => selectView('notifications')} />
+      {staffMode ? <>
+        <BottomButton symbol="暦" label="カレンダー" active={view === 'calendar'} onClick={() => selectView('calendar')} />
+        <BottomButton symbol="休" label="希望休" active={view === 'requests'} onClick={() => selectView('requests')} />
+        <BottomButton symbol="知" label="通知" badge={unread} active={view === 'notifications'} onClick={() => selectView('notifications')} />
+        <BottomButton symbol="私" label="マイページ" active={view === 'mypage'} onClick={() => selectView('mypage')} />
+      </> : <>
+        <BottomButton symbol="休" label="希望休" active={view === 'requests'} onClick={() => selectView('requests')} />
+        <BottomButton symbol="勤" label="シフト" active={view === 'shifts'} onClick={() => selectView('shifts')} />
+        <BottomButton symbol="知" label="通知" badge={unread} active={view === 'notifications'} onClick={() => selectView('notifications')} />
+      </>}
     </nav>
   </main>;
 }
 
 function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange }: { view: View; session: Session; isAdmin: boolean; canManageShifts: boolean; onUnreadChange: (count: number) => void }) {
-  return view === 'musubi-demo' && canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' ? <MusubiProvisionalDemo session={session} />
+  return view === 'calendar' && !canManageShifts ? <PersonalCalendar token={session.accessToken} />
+    : view === 'mypage' && !canManageShifts ? <MyPage token={session.accessToken} />
+    : view === 'musubi-demo' && canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' ? <MusubiProvisionalDemo session={session} />
     : view === 'staff' && canManageShifts ? <StaffManagement token={session.accessToken} readOnly={!isAdmin} />
     : view === 'work-patterns' && isAdmin ? <WorkPatternManagement token={session.accessToken} />
     : view === 'requests' ? <RequestManagement session={session} />

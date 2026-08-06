@@ -40,7 +40,7 @@ async function main() {
   });
   const user = await prisma.user.upsert({
     where: { email },
-    update: { displayName: 'デモ園長', isActive: true },
+    update: { displayName: 'デモ園長', passwordHash: passwordHash(password), mustChangePassword: false, isActive: true },
     create: { email, displayName: 'デモ園長', passwordHash: passwordHash(password) },
   });
   await prisma.membership.upsert({
@@ -157,7 +157,7 @@ async function main() {
   const staffLoginPassword = process.env.SEED_STAFF_PASSWORD || 'ChangeMe123!';
   const staffUser = await prisma.user.upsert({
     where: { email: staffLoginEmail },
-    update: { displayName: 'デモ一般職員', isActive: true },
+    update: { displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword), mustChangePassword: false, isActive: true },
     create: { email: staffLoginEmail, displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword) },
   });
   await prisma.membership.upsert({
@@ -193,6 +193,9 @@ async function main() {
     { employeeNumber: 'STAFF-001', requestDate: '2026-08-18', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '通院', adminComment: '承認済み' },
     { employeeNumber: 'STAFF-002', requestDate: '2026-08-10', requestType: ShiftRequestType.HALF_DAY_PM, status: ShiftRequestStatus.PENDING, reason: '午後に予定あり' },
     { employeeNumber: 'STAFF-003', requestDate: '2026-08-24', requestType: ShiftRequestType.SUMMER_LEAVE, status: ShiftRequestStatus.REJECTED, reason: '夏季休暇', adminComment: '配置人数の都合により要再調整' },
+    { employeeNumber: 'STAFF-004', requestDate: '2026-08-12', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '一般職員デモ：希望休申請中' },
+    { employeeNumber: 'STAFF-004', requestDate: '2026-08-20', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '一般職員デモ：有給申請', adminComment: '承認済み' },
+    { employeeNumber: 'STAFF-004', requestDate: '2026-08-26', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.REJECTED, reason: '一般職員デモ：希望休却下例', adminComment: '配置調整後に再申請してください' },
   ];
   await prisma.shiftRequest.deleteMany({ where: { tenantId: tenant.id } });
   for (const request of demoRequests) {
@@ -218,16 +221,20 @@ async function main() {
     { employeeNumber: 'STAFF-001', workDate: '2026-08-18', shiftType: ShiftType.NORMAL, note: '承認済み有給との競合確認用' },
     { employeeNumber: 'STAFF-002', workDate: '2026-08-08', shiftType: ShiftType.NORMAL },
     { employeeNumber: 'STAFF-003', workDate: '2026-08-10', shiftType: ShiftType.LATE },
+    { employeeNumber: 'STAFF-004', workDate: '2026-08-04', shiftType: ShiftType.NORMAL },
+    { employeeNumber: 'STAFF-004', workDate: '2026-08-05', shiftType: ShiftType.EARLY },
+    { employeeNumber: 'STAFF-004', workDate: '2026-08-06', shiftType: ShiftType.LATE },
+    { employeeNumber: 'STAFF-004', workDate: '2026-08-07', shiftType: ShiftType.OFF },
   ];
   for (const assignment of seedAssignments) {
     const staffId = staffByNumber.get(assignment.employeeNumber);
     if (!staffId) continue;
-    const defaults = assignment.shiftType === ShiftType.EARLY ? { startTime: '07:00', endTime: '16:00' } : assignment.shiftType === ShiftType.LATE ? { startTime: '11:00', endTime: '19:30' } : { startTime: '08:30', endTime: '17:00' };
-    const assignedClass = staffClassByNumber.get(assignment.employeeNumber);
+    const defaults = assignment.shiftType === ShiftType.EARLY ? { startTime: '07:00', endTime: '16:00' } : assignment.shiftType === ShiftType.LATE ? { startTime: '11:00', endTime: '19:30' } : assignment.shiftType === ShiftType.OFF ? { startTime: null, endTime: null } : { startTime: '08:30', endTime: '17:00' };
+    const assignedClass = assignment.shiftType === ShiftType.OFF ? null : staffClassByNumber.get(assignment.employeeNumber);
     await prisma.shiftAssignment.upsert({
       where: { monthlyShiftId_staffId_workDate: { monthlyShiftId: monthlyShift.id, staffId, workDate: new Date(`${assignment.workDate}T00:00:00.000Z`) } },
-      update: { shiftType: assignment.shiftType, ...defaults, breakMinutes: 60, assignedClass, note: assignment.note ?? null },
-      create: { tenantId: tenant.id, monthlyShiftId: monthlyShift.id, staffId, workDate: new Date(`${assignment.workDate}T00:00:00.000Z`), shiftType: assignment.shiftType, ...defaults, breakMinutes: 60, assignedClass, note: assignment.note ?? null },
+      update: { shiftType: assignment.shiftType, ...defaults, breakMinutes: defaults.startTime ? 60 : null, assignedClass, note: assignment.note ?? null },
+      create: { tenantId: tenant.id, monthlyShiftId: monthlyShift.id, staffId, workDate: new Date(`${assignment.workDate}T00:00:00.000Z`), shiftType: assignment.shiftType, ...defaults, breakMinutes: defaults.startTime ? 60 : null, assignedClass, note: assignment.note ?? null },
     });
   }
 
@@ -272,10 +279,11 @@ async function main() {
         weeklyDays.set(weekKey, (weeklyDays.get(weekKey) ?? 0) + 1);
       }
       const times = shiftType === ShiftType.EARLY ? { startTime: '07:00', endTime: '16:00' } : shiftType === ShiftType.LATE ? { startTime: '11:00', endTime: '19:30' } : shiftType === ShiftType.NORMAL ? { startTime: '08:30', endTime: '17:00' } : { startTime: null, endTime: null };
+      const seededBeforeConfirmationAt = new Date('2026-06-24T09:00:00.000Z');
       await prisma.shiftAssignment.upsert({
         where: { monthlyShiftId_staffId_workDate: { monthlyShiftId: confirmedShift.id, staffId: member.id, workDate } },
-        update: { shiftType, ...times, breakMinutes: times.startTime ? 60 : null, assignedClass: times.startTime ? member.assignedClass : null, note: approvedRequest ? '承認済み休暇' : null },
-        create: { tenantId: tenant.id, monthlyShiftId: confirmedShift.id, staffId: member.id, workDate, shiftType, ...times, breakMinutes: times.startTime ? 60 : null, assignedClass: times.startTime ? member.assignedClass : null, note: approvedRequest ? '承認済み休暇' : null },
+        update: { shiftType, ...times, breakMinutes: times.startTime ? 60 : null, assignedClass: times.startTime ? member.assignedClass : null, note: approvedRequest ? '承認済み休暇' : null, updatedAt: seededBeforeConfirmationAt },
+        create: { tenantId: tenant.id, monthlyShiftId: confirmedShift.id, staffId: member.id, workDate, shiftType, ...times, breakMinutes: times.startTime ? 60 : null, assignedClass: times.startTime ? member.assignedClass : null, note: approvedRequest ? '承認済み休暇' : null, updatedAt: seededBeforeConfirmationAt },
       });
     }
   }

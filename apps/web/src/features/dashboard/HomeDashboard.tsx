@@ -8,7 +8,7 @@ const shiftLabels: Record<ShiftType, string> = {
 };
 const workingTypes = new Set<ShiftType>(['EARLY', 'NORMAL', 'LATE', 'AM_HALF', 'PM_HALF', 'OTHER']);
 
-export function HomeDashboard({ session, notifications, onOpen }: { session: Session; notifications: Notification[]; onOpen: (view: 'shifts' | 'notifications' | 'requests' | 'swaps') => void }) {
+export function HomeDashboard({ session, notifications, onOpen }: { session: Session; notifications: Notification[]; onOpen: (view: 'shifts' | 'calendar' | 'notifications' | 'requests' | 'swaps') => void }) {
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [scheduleConfirmed, setScheduleConfirmed] = useState(false);
@@ -41,7 +41,7 @@ export function HomeDashboard({ session, notifications, onOpen }: { session: Ses
         </div>
         {todayAssignment.assignedClass && <p className="mt-4 text-sm font-semibold text-[var(--ink-muted)]">担当：{classLabel(todayAssignment.assignedClass)}</p>}
       </div> : <div className="mt-6 rounded-2xl bg-white/75 p-5"><p className="text-lg font-bold">{scheduleConfirmed ? '今日は勤務登録がありません' : '今日の勤務はまだ確定していません'}</p><p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">確定後、この場所に出勤・退勤時刻が表示されます。</p></div>}
-      <button type="button" onClick={() => onOpen('shifts')} className="btn-primary mt-6 w-full sm:w-fit"><span className="action-symbol" aria-hidden="true">勤</span>月間シフトを見る</button>
+      <button type="button" onClick={() => onOpen(session.role === 'STAFF' || session.role === 'CHIEF' ? 'calendar' : 'shifts')} className="btn-primary mt-6 w-full sm:w-fit"><span className="action-symbol" aria-hidden="true">勤</span>{session.role === 'STAFF' || session.role === 'CHIEF' ? '個人カレンダーを見る' : '月間シフトを見る'}</button>
     </section>
 
     <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">

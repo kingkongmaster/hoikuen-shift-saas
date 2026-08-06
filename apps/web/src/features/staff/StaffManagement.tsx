@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, type AssignedClass, type EmploymentType, type Staff, type StaffInput } from '../../api/client';
 import { StaffFormModal } from './StaffFormModal';
 import { StaffWorkRuleManagement } from './StaffWorkRuleManagement';
@@ -47,9 +47,9 @@ export function StaffManagement({ token, readOnly = false }: { token: string; re
   </section>;
 }
 
-function workLabels(staff: Staff) { const labels = [staff.canWorkEarly && '早出', staff.canWorkRegular && '通常', staff.canWorkLate && '遅出'].filter(Boolean); return `${labels.join('・')}${staff.earlyShiftOnly ? '（早出専任）' : staff.lateShiftOnly ? '（遅出専任）' : ''}`; }
+function workLabels(staff: Staff) { const labels = [[staff.canWorkEarly, '早出', 'shift-cell-early'], [staff.canWorkRegular, '通常', 'shift-cell-normal'], [staff.canWorkLate, '遅出', 'shift-cell-late']] as const; return <span className="flex flex-wrap gap-1">{labels.filter(([enabled]) => enabled).map(([, label, style]) => <span key={label} className={`rounded border px-2 py-0.5 text-xs font-bold ${style}`}>{label}</span>)}{staff.earlyShiftOnly ? <span className="text-xs">（早出専任）</span> : staff.lateShiftOnly ? <span className="text-xs">（遅出専任）</span> : null}</span>; }
 function regularHoursLabel(staff: Staff) { return staff.regularWorkStartTime && staff.regularWorkEndTime ? `${staff.regularWorkStartTime}〜${staff.regularWorkEndTime}（個別）` : '園共通時間を使用'; }
 function targetLabel(staff: Staff) { return [staff.monthlyTargetWorkDays != null ? `${staff.monthlyTargetWorkDays}日` : null, staff.monthlyTargetWorkHours != null ? `${staff.monthlyTargetWorkHours}時間` : null].filter(Boolean).join('／') || '未設定'; }
 function Status({ active }: { active: boolean }) { return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>{active ? '有効' : '無効'}</span>; }
 function Actions({ member, readOnly, onEdit, onDeactivate, onRules }: { member: Staff; readOnly: boolean; onEdit: () => void; onDeactivate: () => void; onRules?:()=>void }) { return <div className="flex gap-2">{!readOnly&&<button disabled={!member.isActive} onClick={onEdit} className="min-h-10 rounded-lg border border-slate-300 px-3 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-40">編集</button>}{onRules&&<button onClick={onRules} className="min-h-10 rounded-lg border border-emerald-200 px-3 py-2 font-semibold text-emerald-800">勤務条件</button>}{!readOnly&&member.isActive&&<button onClick={onDeactivate} className="min-h-10 rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700">無効化</button>}</div>; }
-function Item({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>; }
+function Item({ label, value }: { label: string; value: ReactNode }) { return <div><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>; }
