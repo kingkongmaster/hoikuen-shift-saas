@@ -2,8 +2,8 @@ import { FormEvent, useState } from 'react';
 import { api, type Session } from '../../api/client';
 
 export function LoginPage({ onSuccess }: { onSuccess: (session: Session) => void }) {
-  const [email, setEmail] = useState('owner@demo.enshift.local');
-  const [password, setPassword] = useState('ChangeMe123!');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'owner@demo.enshift.local' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? 'ChangeMe123!' : '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -24,11 +24,11 @@ export function LoginPage({ onSuccess }: { onSuccess: (session: Session) => void
       <label className="mt-4 block text-sm font-bold">パスワード<input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" minLength={8} required className="input mt-2" /></label>
       {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
       <button disabled={loading} className="btn-primary mt-6 w-full py-3">{loading ? 'ログイン中…' : 'ログイン'}</button>
-      <div className="hidden">
+      {import.meta.env.DEV && <div data-testid="development-demo-login">
         <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />プレゼン・モニター園向け<span className="h-px flex-1 bg-slate-200" /></div>
-        <button type="button" disabled={loading} onClick={() => void login('owner@demo.enshift.local', 'ChangeMe123!')} className="btn-secondary w-full py-3"><span aria-hidden="true">▶</span> デモデータで開始</button>
-        <p className="mt-4 text-xs leading-5 text-slate-500">約20名の職員、希望休、確定シフト、通知、交換申請をすぐに確認できます。</p>
-      </div>
+        <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={loading} onClick={() => void login('owner@demo.enshift.local', 'ChangeMe123!')} className="btn-secondary w-full py-3">デモデータで開始（管理者）</button><button type="button" disabled={loading} onClick={() => void login('staff@demo.enshift.local', 'ChangeMe123!')} className="btn-secondary w-full py-3">一般職員デモ</button></div>
+        <p className="mt-4 text-xs leading-5 text-slate-500">開発環境だけに表示されます。一般職員デモでは本人の勤務・希望休・通知・交換申請を確認できます。</p>
+      </div>}
     </form>
   </main>;
 }

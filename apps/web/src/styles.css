@@ -70,6 +70,7 @@ button:disabled { cursor: not-allowed; }
   .other-menu-button { @apply flex min-h-14 items-center gap-3 rounded-xl px-3 text-left font-bold; }
   .other-menu-button:hover { background: var(--brand-soft); }
   .bottom-nav { @apply fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t bg-white/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(33,78,65,0.08)] backdrop-blur; border-color: var(--border); }
+  .bottom-nav.has-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .bottom-nav-button { @apply flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-bold; color: var(--ink-muted); }
   .bottom-nav-button.is-active { color: var(--brand-deep); background: var(--brand-soft); }
   .bottom-symbol { @apply grid size-7 place-items-center rounded-lg border text-xs font-black; border-color: var(--border); background: #fff; }
@@ -87,13 +88,27 @@ button:disabled { cursor: not-allowed; }
   .connection-banner { @apply fixed inset-x-0 top-0 z-[90] px-4 py-2 text-center text-sm font-bold shadow-sm; background: #fff2c8; color: #5e4509; }
   .shift-cell { transition: opacity 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
   .shift-cell-normal { background: color-mix(in srgb, var(--brand-soft) 82%, white); color: var(--brand-deep); border-color: #9fc3b2; }
-  .shift-cell-early { background: #eaf4f8; color: #174d63; border-color: #a9cad8; }
-  .shift-cell-late { background: #f1edf7; color: #543d70; border-color: #c9badd; }
+  .shift-cell-early { background: #ffedd5; color: #9a3412; border-color: #fdba74; }
+  .shift-cell-late { background: #dbeafe; color: #172554; border-color: #93c5fd; }
   .shift-cell-off { background: #fafbf9; color: var(--ink-muted); border-color: var(--border); }
   .shift-cell-request, .shift-cell-paid { background: #fff7d9; color: #604707; border-color: #dec46d; }
   .shift-cell-summer { background: #eaf6f2; color: #245c4c; border-color: #9fcfc0; }
   .shift-cell-half { background: #fff0e5; color: #713f22; border-color: #dfb491; }
   .shift-cell-other { background: #eaf5f4; color: #245957; border-color: #a7cfcc; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
+  .calendar-day { @apply min-w-0 border-b border-r p-1 text-left align-top; min-height: 5.5rem; border-color: var(--border); background: white; }
+  .calendar-day:nth-child(7n + 1) { border-left-width: 1px; }
+  .calendar-day.is-selected { outline: 3px solid var(--brand); outline-offset: -3px; }
+  .calendar-day-number { @apply block text-xs font-black; }
+  .calendar-shift { @apply mt-1 flex min-w-0 flex-col rounded-md border px-1 py-0.5 text-[10px] leading-tight; }
+  .calendar-shift strong { @apply text-xs; }
+  .calendar-shift span { @apply truncate; }
+  .calendar-request { @apply mt-1 block truncate rounded px-1 py-0.5 text-[10px] font-black; }
+  .calendar-request-detail { @apply rounded-xl border p-4; }
+  .request-pending { background: #fff7d9; color: #604707; border-color: #dec46d; }
+  .request-approved { background: #e7f3ed; color: #174c38; border-color: #9fc3b2; }
+  .request-rejected { background: #fff1f2; color: #9f1239; border-color: #fda4af; }
+  .request-cancelled { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
   .shift-table-mode-emphasize .shift-cell.is-working { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 45%, transparent); font-weight: 800; }
   .shift-table-mode-emphasize .shift-cell.is-off { opacity: 0.72; }
   .shift-table-mode-dim-off .shift-cell.is-off { opacity: 0.42; }

@@ -6,6 +6,12 @@ export type Session = {
   role: Role;
   mustChangePassword: boolean;
 };
+export type MyCalendar = {
+  staff: Pick<Staff, 'id' | 'employeeNumber' | 'displayName' | 'email' | 'jobTitle' | 'employmentType' | 'assignedClass' | 'isActive'>;
+  schedule: { id: string; status: MonthlyShiftStatus; targetMonth: string; confirmedAt: string | null } | null;
+  assignments: Array<Pick<ShiftAssignment, 'id' | 'staffId' | 'workDate' | 'shiftType' | 'startTime' | 'endTime' | 'breakMinutes' | 'assignedClass'> & { updatedAt: string; workPattern: Pick<WorkPattern, 'code' | 'name' | 'shortName' | 'color'> | null }>;
+  requests: Array<Pick<ShiftRequest, 'id' | 'requestDate' | 'requestType' | 'status' | 'reason'> & { updatedAt: string }>;
+};
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'REEMPLOYED';
 export type AssignedClass = 'AGE_0' | 'AGE_1' | 'AGE_2' | 'AGE_3' | 'AGE_4' | 'AGE_5' | 'FREE' | 'SUPPORT';
 export type Staff = {
@@ -78,7 +84,8 @@ export type ShiftSetting = { weekdayEarlyRequired: number; weekdayLateRequired: 
 export type ClassRequirement = { id: string; classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean };
 export type ClosedDate = { id: string; closedDate: string; name: string; note: string | null };
 export type PrecheckResult = { canGenerate: boolean; fatalIssues: string[]; warnings: Array<{ code: string; level: 'INFO' | 'WARNING' | 'ERROR'; message: string }>; warningSummary: { INFO: number; WARNING: number; ERROR: number; byCode: Record<string, number> }; summary: { activeStaffCount: number; earlyCapableCount: number; lateCapableCount: number; saturdayCapableCount: number; classCounts: Record<string, number>; closedDateCount: number; approvedRequestCount: number; settings: ShiftSetting } };
-export type Notification = { id:string; type:string; title:string; message:string; isRead:boolean; createdAt:string };
+export type NotificationType = 'SHIFT_CONFIRMED' | 'SHIFT_UPDATED' | 'REQUEST_APPROVED' | 'REQUEST_REJECTED' | 'SHIFT_SWAP_REQUEST' | 'SHIFT_SWAP_APPROVED' | 'SHIFT_SWAP_REJECTED' | 'SYSTEM' | string;
+export type Notification = { id:string; type:NotificationType; title:string; message:string; isRead:boolean; createdAt:string };
 export type ShiftSwap = { id:string; requesterId:string; targetMemberId:string; requestDate:string; status:'PENDING'|'APPROVED'|'REJECTED'|'CANCELLED'; requestComment:string|null; adminComment:string|null; createdAt:string; requester:{id:string;displayName:string;email:string}; targetMember:{id:string;displayName:string;email:string} };
 export type SwapTarget = { userId:string|null; displayName:string; employeeNumber:string };
 export type AuditLog = { id:string; memberId:string; action:string; targetType:string; targetId:string; detail:unknown; createdAt:string; member:{id:string;displayName:string;email:string} };
@@ -199,6 +206,7 @@ async function download(path:string, token:string, init:RequestInit={}):Promise<
 export const api = {
   login(email: string, password: string) { return request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); },
   me(token: string) { return request<Omit<Session, 'accessToken'>>('/me', {}, token); },
+  myCalendar(token: string, month: string) { return request<MyCalendar>(`/me/calendar?month=${encodeURIComponent(month)}`, {}, token); },
   changeInitialPassword(token: string, input: { currentPassword: string; newPassword: string; confirmPassword: string }) { return request<{ success: true; mustChangePassword: false; requiresReauthentication: true }>('/auth/change-initial-password', { method: 'POST', body: JSON.stringify(input) }, token); },
   staff(token: string, includeInactive = false) { return request<Staff[]>(`/staff${includeInactive ? '?includeInactive=true' : ''}`, {}, token); },
   createStaff(token: string, input: StaffInput) { return request<Staff>('/staff', { method: 'POST', body: JSON.stringify(input) }, token); },

@@ -10,7 +10,7 @@ const runId = randomUUID().slice(0, 8).toUpperCase();
 const monthDate = new Date(Date.UTC(new Date().getUTCFullYear() + 1, 0, 1));
 const month = monthDate.toISOString().slice(0, 7);
 const workDate = `${month}-05`;
-let scheduleId; let otherScheduleId; let staffId; let staffUserId; let otherTenantId; let tenantId; let originalSaturdayOperationEnabled;
+let scheduleId; let otherScheduleId; let staffId; let otherStaffId; let staffUserId; let otherTenantId; let tenantId; let originalSaturdayOperationEnabled;
 
 function hash(password) { const salt = randomUUID().replaceAll('-', ''); return `${salt}:${scryptSync(password, salt, 64).toString('hex')}`; }
 async function request(path, init = {}, token) { const response = await fetch(`${base}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers } }); return { status: response.status, body: await response.json().catch(() => null) }; }
@@ -25,14 +25,15 @@ async function main() {
   const staffUser = await prisma.user.create({ data: { email: `shift-${runId.toLowerCase()}@e2e.local`, displayName: 'シフトテスト職員', passwordHash: hash(staffPassword) } }); staffUserId = staffUser.id;
   await prisma.membership.create({ data: { tenantId, userId: staffUser.id, role: MembershipRole.STAFF } });
   const staff = await prisma.staff.create({ data: { tenantId, userId: staffUser.id, employeeNumber: `SHIFT-${runId}`, displayName: staffUser.displayName, canWorkEarly: false, canWorkLate: false, canWorkSaturdays: false, monthlyWorkHourLimit: 8, weeklyAvailableDays: 1 } }); staffId = staff.id;
+  const otherStaff = await prisma.staff.create({ data: { tenantId, employeeNumber: `OTHER-${runId}`, displayName: '他職員（非公開）', notes: '一般職員には表示しない管理者用備考' } }); otherStaffId = otherStaff.id;
   const staffToken = await login(staffUser.email, staffPassword);
 
   assert.equal((await request(`/shifts?month=${month}`)).status, 401);
   assert.equal((await request('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, staffToken)).status, 403);
   const create = await request('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, adminToken); assert.equal(create.status, 201); scheduleId = create.body.id;
   assert.equal((await request('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, adminToken)).status, 409);
-  assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate, shiftType: 'EARLY' }, { staffId, workDate: `${month}-10`, shiftType: 'NORMAL' }] }) }, adminToken)).status, 200);
-  const listed = await request(`/shifts?month=${month}`, {}, adminToken); assert.equal(listed.status, 200); assert.equal(listed.body.assignments.length, 2); assert.ok(listed.body.warnings.some((warning) => warning.code === 'EARLY_NOT_AVAILABLE'));
+  assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate, shiftType: 'EARLY' }, { staffId, workDate: `${month}-10`, shiftType: 'NORMAL' }, { staffId: otherStaffId, workDate, shiftType: 'NORMAL' }] }) }, adminToken)).status, 200);
+  const listed = await request(`/shifts?month=${month}`, {}, adminToken); assert.equal(listed.status, 200); assert.equal(listed.body.assignments.length, 3); assert.ok(listed.body.warnings.some((warning) => warning.code === 'EARLY_NOT_AVAILABLE'));
   assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate: `${month}-01`, shiftType: 'NORMAL' }, { staffId, workDate: `${month}-01`, shiftType: 'LATE' }] }) }, adminToken)).status, 409);
   assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate: `${month}-99`, shiftType: 'NORMAL' }] }) }, adminToken)).status, 400);
   assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate, shiftType: 'INVALID' }] }) }, adminToken)).status, 400);
@@ -40,6 +41,15 @@ async function main() {
   assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate: `${month}-12`, shiftType: 'NORMAL' }] }) }, adminToken)).status, 409);
   const staffView = await request(`/shifts?month=${month}`, {}, staffToken); assert.equal(staffView.status, 200); assert.equal(staffView.body.assignments.every((assignment) => assignment.staffId === staffId), true);
   assert.equal((await request(`/shifts?month=${month}&staffId=00000000-0000-4000-8000-ffffffffffff`, {}, staffToken)).status, 403);
+  const personalCalendar = await request(`/me/calendar?month=${month}&staffId=${otherStaffId}`, {}, staffToken);
+  assert.equal(personalCalendar.status, 200);
+  assert.equal(personalCalendar.body.staff.id, staffId, 'Staff IDはサーバー側で本人に固定する');
+  assert.equal(personalCalendar.body.assignments.length, 2);
+  assert.equal(personalCalendar.body.assignments.some((assignment) => assignment.staffId === otherStaffId), false);
+  assert.equal('notes' in personalCalendar.body.staff, false, '管理者用備考を返さない');
+  assert.equal('monthlyWorkHourLimit' in personalCalendar.body.staff, false, '個別勤務条件を返さない');
+  assert.equal((await request('/staff', {}, staffToken)).status, 403, '一般職員は管理者用職員APIを利用できない');
+  assert.equal((await request('/staff', {}, adminToken)).status, 200, '管理者機能は従来どおり利用できる');
   const reopened = await request(`/shifts/${scheduleId}/reopen`, { method: 'POST' }, adminToken); assert.equal(reopened.status, 200); assert.equal(reopened.body.status, 'DRAFT');
   await prisma.shiftRequest.create({ data: { tenantId, staffId, requestDate: new Date(`${workDate}T00:00:00.000Z`), requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '競合テスト' } });
   const rejectedSave = await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate, shiftType: 'NORMAL' }] }) }, adminToken);
@@ -58,6 +68,7 @@ main().finally(async () => {
   if (otherScheduleId) await prisma.monthlyShift.deleteMany({ where: { id: otherScheduleId } }).catch(() => undefined);
   if (otherTenantId) await prisma.tenant.deleteMany({ where: { id: otherTenantId } }).catch(() => undefined);
   if (staffId) await prisma.staff.deleteMany({ where: { id: staffId } }).catch(() => undefined);
+  if (otherStaffId) await prisma.staff.deleteMany({ where: { id: otherStaffId } }).catch(() => undefined);
   if (staffUserId) await prisma.user.deleteMany({ where: { id: staffUserId } }).catch(() => undefined);
   await prisma.$disconnect();
 }).catch((error) => { console.error(error); process.exitCode = 1; });
