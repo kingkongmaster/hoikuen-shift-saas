@@ -24,6 +24,10 @@ for (const label of ['出勤', '退勤', '勤務', '確定シフト', '月間シ
 }
 assert.ok(dashboard.includes("useState<View>('home')"), 'ログイン後の初期画面はホーム');
 assert.ok(dashboard.includes('よく使うメニュー') && dashboard.includes('その他のメニュー'), '日常機能と低頻度機能を整理');
+assert.ok(dashboard.includes("title: '希望休'") && dashboard.includes('自分の希望休を申請・確認できます。'), '一般職員には管理者向け用語を避けた希望休案内を表示');
+assert.ok(dashboard.includes('確定済みシフトの交換申請を確認できます。'), '一般職員向けにシフト交換の対象を短く説明');
+assert.ok(dashboard.includes("staffMode ? 'プロフィール・サポート' : '管理・設定・サポート'"), 'その他メニューの説明を役割別に表示');
+assert.ok(dashboard.includes('text-label sm:hidden') && dashboard.includes('roleLabels[session.role]'), 'スマートフォンでも利用者の役割を表示');
 assert.ok(dashboard.includes('bottom-nav md:hidden') && dashboard.includes('aria-label="主要メニュー"'), 'スマホ下部ナビゲーション');
 for (const label of ['ホーム', '希望休', 'シフト', '通知']) assert.ok(dashboard.includes(`label="${label}"`), `スマホ主要メニュー: ${label}`);
 
