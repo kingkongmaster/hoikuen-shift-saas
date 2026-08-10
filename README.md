@@ -4,6 +4,10 @@
 
 開発・レビュー時の判断基準は、[EnShift Developer Philosophy](docs/developer-philosophy.md)を参照してください。
 
+開発知識はNotion「アプリ開発ログ」および[development-memory.md](docs/development-memory.md)を基準として運用します。
+
+ADMはネットフォースマスター全製品共通の開発知識基盤です。
+
 ## Sprint 6: 園設定・生成精度向上
 
 園ごとに `TenantShiftSetting`（必要早出・遅出人数、日曜開園、連続勤務上限、標準時間・休憩）、`ClassStaffingRequirement`（0〜5歳児の曜日別必要人数）、`TenantClosedDate`（手動休園日）を持ちます。すべて `tenantId` を必須とし、同一園の設定／日付／クラスだけに一意制約をかけています。既存テナントは最初の設定取得時に安全に初期値を作成します。
