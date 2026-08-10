@@ -57,7 +57,11 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
     api.notifications(session.accessToken).then((rows) => { if (active) setNotifications(rows); }).catch(() => undefined);
     return () => { active = false; };
   }, [session.accessToken]);
-  const info = viewInfo[view];
+  const info = staffMode && view === 'requests'
+    ? { title: '希望休', description: '自分の希望休を申請・確認できます。' }
+    : staffMode && view === 'swaps'
+      ? { title: 'シフト交換', description: '確定済みシフトの交換申請を確認できます。' }
+      : viewInfo[view];
   const selectView = (next: View) => {
     window.dispatchEvent(new CustomEvent('enshift:view-change', { detail: { from: view, to: next } }));
     setView(next);
@@ -76,7 +80,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
           <img src="/icons/icon-192.png" alt="" className="size-10 rounded-xl" />
           <span className="min-w-0"><span className="block text-sm font-black tracking-wide text-[var(--brand)]">AeN Shift</span><span className="block truncate text-sm font-bold sm:text-base">{session.tenant.name}</span></span>
         </button>
-        <div className="flex items-center gap-2"><div className="hidden text-right sm:block"><p className="text-sm font-bold">{session.user.displayName}</p><p className="text-xs text-[var(--ink-muted)]">{roleLabels[session.role]}</p></div><button onClick={onLogout} className="btn-quiet text-sm">ログアウト</button></div>
+        <div className="flex items-center gap-2"><span className="text-label sm:hidden">{roleLabels[session.role]}</span><div className="hidden text-right sm:block"><p className="text-sm font-bold">{session.user.displayName}</p><p className="text-xs text-[var(--ink-muted)]">{roleLabels[session.role]}</p></div><button onClick={onLogout} className="btn-quiet text-sm">ログアウト</button></div>
       </div>
     </header>
 
@@ -87,7 +91,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
         <section className="mt-7" aria-labelledby="menu-heading">
           <div className="mb-4"><p className="eyebrow">MENU</p><h2 id="menu-heading" className="mt-1 text-xl font-black">よく使うメニュー</h2></div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{everydayMenu.map((item) => <MenuTile key={item.view} {...item} label={item.view === 'shifts' && staffMode ? 'カレンダー' : item.label} description={item.view === 'shifts' && staffMode ? '本人の勤務予定' : item.description} badge={item.view === 'notifications' ? unread : 0} onClick={() => selectView(item.view === 'shifts' && staffMode ? 'calendar' : item.view)} />)}</div>
-          <details className="other-menu mt-4"><summary><span className="action-symbol action-symbol-soft" aria-hidden="true">他</span><span><strong>その他のメニュー</strong><small>管理・設定・サポート</small></span></summary><div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
+          <details className="other-menu mt-4"><summary><span className="action-symbol action-symbol-soft" aria-hidden="true">他</span><span><strong>その他のメニュー</strong><small>{staffMode ? 'プロフィール・サポート' : '管理・設定・サポート'}</small></span></summary><div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
             {canManageShifts && <OtherButton symbol="職" label="職員マスター" onClick={() => selectView('staff')} />}
             {canManageShifts && <OtherButton symbol="園" label="園設定" onClick={() => selectView('settings')} />}
             {isAdmin && <OtherButton symbol="時" label="勤務パターン" onClick={() => selectView('work-patterns')} />}
