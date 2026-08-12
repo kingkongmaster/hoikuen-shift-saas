@@ -14,6 +14,8 @@ const [client, status, boundary, login, dashboard, notifications, shifts] = awai
 
 const contactGuidance = '操作を繰り返さず、画面の内容を記録して管理者へ連絡してください。';
 assert.ok(client.includes(contactGuidance), 'API停止・内部エラー時に次の行動を案内');
+assert.ok(client.includes("status === 401 && path === '/auth/login'"), 'ログイン認証失敗をセッション期限切れと分離');
+assert.ok(client.includes('メールアドレスまたはパスワードが正しくありません。'), '存在有無を区別しない認証失敗文言');
 assert.ok(client.includes('if (status === 401 || status >= 500) return fallbackMessage(status);'), '認証切れ・内部エラーの技術的な本文を画面へ出さない');
 assert.ok(boundary.includes(contactGuidance), '画面例外にも次の行動を案内');
 assert.ok(!boundary.includes('ERROR {code}'), 'HTTPエラーコードを園向け画面へ表示しない');
