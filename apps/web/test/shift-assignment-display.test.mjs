@@ -44,5 +44,7 @@ for (const page of [source, exportsPage]) {
   assert.ok(page.includes('.shift-late{background:#dbeafe;color:#172554}'), '印刷の遅出はネイビー系');
   assert.ok(page.includes('print-color-adjust:exact'), 'PDFでも色を保持');
 }
+assert.ok(source.includes("window.open('', '_blank')") && source.includes('popup.opener = null'), '印刷タブを取得後に呼び出し元との接続を切る');
+assert.ok(!source.includes("window.open('', '_blank', 'noopener,noreferrer')"), '印刷タブの戻り値をnullにする指定を使わない');
 
 console.log('Shift assignment display regression tests: PASS');

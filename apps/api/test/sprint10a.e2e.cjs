@@ -60,6 +60,7 @@ async function main() {
   assert.equal(overall.body.ownOnly, false);
   assert.equal(overall.body.assignments.length, 15 * 31);
   assert.ok(overall.body.assignments.some((row) => row.assignedClass === '0歳児'), 'クラス別印刷の元データ');
+  assert.ok(overall.body.assignments.every((row) => !['EARLY','NORMAL','LATE','OFF','PAID_LEAVE','SUMMER_LEAVE','AM_HALF','PM_HALF','OTHER'].includes(row.shiftType)), '印刷用勤務区分は日本語');
   const personal = await call('/exports/print/my-shift?month=2026-07', {}, staffToken);
   assert.equal(personal.status, 200);
   assert.equal(personal.body.ownOnly, true);
