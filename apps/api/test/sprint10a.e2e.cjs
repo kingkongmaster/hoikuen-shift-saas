@@ -1,9 +1,11 @@
 const assert = require('node:assert/strict');
-const { EmploymentType, PrismaClient } = require('@prisma/client');
+const { EmploymentType, PrismaClient, ShiftRequestStatus, ShiftRequestType } = require('@prisma/client');
+const { installSprint10AFixture, removeSprint10AFixture, TARGET_REQUEST_COUNT } = require('./fixtures/sprint10a-fixture.cjs');
 
 const prisma = new PrismaClient();
 const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
 const tenantId = '00000000-0000-4000-8000-000000000001';
+let fixtureRequestIds = [];
 
 async function call(path, init = {}, token, responseType = 'json') {
   const response = await fetch(base + path, {
@@ -23,6 +25,7 @@ async function login(email) {
 }
 
 async function main() {
+  fixtureRequestIds = await installSprint10AFixture(prisma, tenantId);
   const adminToken = await login('owner@demo.enshift.local');
   const staffToken = await login('staff@demo.enshift.local');
   const [staffCount, partCount, reemployedCount, requestCount, confirmed, notificationCount, swapCount] = await Promise.all([
@@ -37,7 +40,17 @@ async function main() {
   assert.equal(staffCount, 15, `デモ職員 ${staffCount}名`);
   assert.equal(partCount, 3, `パート職員 ${partCount}名`);
   assert.equal(reemployedCount, 1, `再雇用職員 ${reemployedCount}名`);
-  assert.equal(requestCount, 25, `全デモ職員の希望休を含む25件: ${requestCount}件`);
+  assert.equal(requestCount, TARGET_REQUEST_COUNT, `全デモ職員の希望休を含む${TARGET_REQUEST_COUNT}件: ${requestCount}件`);
+  const [statusCoverage, typeCoverage] = await Promise.all([
+    prisma.shiftRequest.groupBy({ by: ['status'], where: { tenantId }, _count: true }),
+    prisma.shiftRequest.groupBy({ by: ['requestType'], where: { tenantId }, _count: true }),
+  ]);
+  for (const status of [ShiftRequestStatus.PENDING, ShiftRequestStatus.APPROVED, ShiftRequestStatus.REJECTED]) {
+    assert.ok(statusCoverage.some((row) => row.status === status && row._count > 0), `希望休の${status}状態を含む`);
+  }
+  for (const requestType of [ShiftRequestType.DAY_OFF, ShiftRequestType.PAID_LEAVE, ShiftRequestType.HALF_DAY_AM]) {
+    assert.ok(typeCoverage.some((row) => row.requestType === requestType && row._count > 0), `希望休種別${requestType}を含む`);
+  }
   assert.equal(confirmed?.status, 'CONFIRMED');
   assert.equal(confirmed?._count.assignments, 15 * 31, '15名×7月31日の確定シフト');
   assert.ok(notificationCount >= 4, 'デモ通知');
@@ -95,4 +108,7 @@ async function main() {
   console.log('Sprint 10-A API integration tests: PASS (デモ15名・希望休・確定シフト・通知・交換・CSV・印刷/PDF・バックアップ)');
 }
 
-main().finally(() => prisma.$disconnect()).catch((error) => { console.error(error); process.exitCode = 1; });
+main().finally(async () => {
+  await removeSprint10AFixture(prisma, fixtureRequestIds).catch(() => undefined);
+  await prisma.$disconnect();
+}).catch((error) => { console.error(error); process.exitCode = 1; });
