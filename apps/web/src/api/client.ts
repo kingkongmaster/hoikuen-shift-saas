@@ -175,7 +175,8 @@ function fallbackMessage(status: number) {
   if (status >= 500) return '現在この操作を完了できません。操作を繰り返さず、画面の内容を記録して管理者へ連絡してください。';
   return '入力内容に確認が必要な項目があります。表示された内容をご確認ください。';
 }
-function responseMessage(data: unknown, status: number) {
+function responseMessage(data: unknown, status: number, path = '') {
+  if (status === 401 && path === '/auth/login') return 'メールアドレスまたはパスワードが正しくありません。';
   if (status === 401 || status >= 500) return fallbackMessage(status);
   if (data && typeof data === 'object') {
     const message = (data as { message?: unknown }).message;
@@ -196,7 +197,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
       emit('enshift:api-error', { message }); throw new Error(message);
     }
     if (!response.ok) {
-      const message = responseMessage(await response.json().catch(() => null), response.status);
+      const message = responseMessage(await response.json().catch(() => null), response.status, path);
       emit('enshift:api-error', { message }); throw new Error(message);
     }
     return response.json() as Promise<T>;
