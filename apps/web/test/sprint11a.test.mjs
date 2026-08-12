@@ -52,9 +52,9 @@ assert.ok(!/console\.(log|warn|error|debug)/.test(`${onboarding}\n${admin}\n${ho
 
 // Philosophy・レスポンシブ・RC1
 for (const phrase of ['システムを管理するのではなく、人を支えるためのシステムを作る', '説明書を読まなくても', '先生', 'Console Error']) assert.ok(philosophy.includes(phrase), `Developer Philosophy: ${phrase}`);
-assert.ok(readme.includes('[EnShift Developer Philosophy](docs/developer-philosophy.md)'), 'READMEから参照可能');
+assert.ok(readme.includes('[AeN Shift Developer Philosophy](docs/developer-philosophy.md)'), 'READMEから参照可能');
 assert.ok(styles.includes('.onboarding-screen') && styles.includes('.summary-grid') && styles.includes('grid-cols-2') && styles.includes('lg:grid-cols-5'), '390px優先レスポンシブ');
 assert.ok(styles.includes('body:has(.onboarding-screen) footer { display: none; }'), '初回体験では他の操作を隠す');
-assert.ok(worker.includes('enshift-shell-v11a-presentation-icon'), 'プレゼン用アイコンのService Workerキャッシュ');
+assert.ok(worker.includes('enshift-shell-v12-print-calendar'), '印刷改善を含むService Workerキャッシュ');
 
 console.log('Sprint 11-A Web tests: PASS (初回体験・3画面ガイド・ロール別ホーム・優しい文言・空状態・オフライン・Philosophy・RC1)');

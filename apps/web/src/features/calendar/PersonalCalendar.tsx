@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, type MyCalendar, type ShiftRequestStatus, type ShiftType } from '../../api/client';
 import { SkeletonState } from '../../components/UiStates';
+import { openPrintWindow, personalCalendarPrintHtml } from '../exports/shift-print-layout';
 
 const shiftInfo: Record<ShiftType, { short: string; label: string; style: string }> = {
   EARLY: { short: '早', label: '早出', style: 'shift-cell-early' },
@@ -43,6 +44,7 @@ export function PersonalCalendar({ token }: { token: string }) {
   const days = calendarDays(month);
   const selectedAssignment = selectedDate ? assignments.get(selectedDate) : undefined;
   const selectedRequests = selectedDate ? requests.get(selectedDate) ?? [] : [];
+  const printCalendar = async () => { try { openPrintWindow(personalCalendarPrintHtml(await api.printShifts(token, month, true))); } catch (reason) { setError(reason instanceof Error ? reason.message : '印刷画面を表示できませんでした。'); } };
 
   if (loading) return <SkeletonState cards={3} label="個人カレンダーを読み込んでいます…" />;
   return <div className="space-y-5" data-testid="personal-calendar">
@@ -56,6 +58,7 @@ export function PersonalCalendar({ token }: { token: string }) {
       <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold" aria-label="シフト公開状態">
         <span className="status-label">{data?.schedule?.status === 'CONFIRMED' ? '✓ 確定済みシフト' : data?.schedule?.status === 'DRAFT' ? '△ 未確定シフト' : '— シフト未作成'}</span>
         <span className="text-label">色＋略号で表示</span>
+        <button type="button" className="btn-secondary" onClick={() => void printCalendar()}>PDF表示・印刷</button>
       </div>
       <div className="calendar-grid mt-5" role="grid" aria-label={`${monthLabel(month)}の本人勤務カレンダー`}>
         {['日','月','火','水','木','金','土'].map((day) => <div key={day} role="columnheader" className="py-2 text-center text-xs font-black text-[var(--ink-muted)]">{day}</div>)}

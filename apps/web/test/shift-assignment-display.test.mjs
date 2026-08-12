@@ -16,6 +16,7 @@ const source = await readFile(new URL('../src/features/shifts/ShiftManagement.ts
 const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 const staff = await readFile(new URL('../src/features/staff/StaffManagement.tsx', import.meta.url), 'utf8');
 const exportsPage = await readFile(new URL('../src/features/exports/DataExportManagement.tsx', import.meta.url), 'utf8');
+const printLayout = await readFile(new URL('../src/features/exports/shift-print-layout.ts', import.meta.url), 'utf8');
 assert.match(source, /await reloadMonthData\(month\)/, '自動生成後に対象月を再取得する');
 assert.match(source, /assignmentKey\(assignment\.staffId, assignment\.workDate\)/, 'APIレスポンスの日付を正規化する');
 assert.match(source, /assignmentKey\(staff\.id, workDate\)/, '表の日付も同じ規則で正規化する');
@@ -39,12 +40,11 @@ assert.match(styles, /\.shift-cell-late \{ background: #dbeafe; color: #172554;/
 assert.match(styles, /\.shift-cell-off \{ background: #fafbf9;/, '休みは既存グレーを維持');
 assert.match(styles, /\.shift-cell-request, \.shift-cell-paid \{ background: #fff7d9;/, '希望休・有給は既存色を維持');
 for (const className of ['shift-cell-early', 'shift-cell-normal', 'shift-cell-late']) assert.ok(staff.includes(className), `職員一覧の勤務区分色: ${className}`);
-for (const page of [source, exportsPage]) {
-  assert.ok(page.includes('.shift-early{background:#ffedd5;color:#9a3412}'), '印刷の早出はオレンジ系');
-  assert.ok(page.includes('.shift-late{background:#dbeafe;color:#172554}'), '印刷の遅出はネイビー系');
-  assert.ok(page.includes('print-color-adjust:exact'), 'PDFでも色を保持');
-}
-assert.ok(source.includes("window.open('', '_blank')") && source.includes('popup.opener = null'), '印刷タブを取得後に呼び出し元との接続を切る');
-assert.ok(!source.includes("window.open('', '_blank', 'noopener,noreferrer')"), '印刷タブの戻り値をnullにする指定を使わない');
+assert.ok(printLayout.includes('.shift-early{background:#ffedd5;color:#7c2d12}'), '印刷の早出はオレンジ系');
+assert.ok(printLayout.includes('.shift-late{background:#dbeafe;color:#172554}'), '印刷の遅出はネイビー系');
+assert.ok(printLayout.includes('print-color-adjust:exact'), 'PDFでも色を保持');
+assert.ok(printLayout.includes("window.open('', '_blank')") && printLayout.includes('popup.opener = null'), '印刷タブを取得後に呼び出し元との接続を切る');
+assert.ok(!printLayout.includes("window.open('', '_blank', 'noopener,noreferrer')"), '印刷タブの戻り値をnullにする指定を使わない');
+assert.ok(source.includes('adminPrintHtml') && exportsPage.includes('personalCalendarPrintHtml'), '画面間で共通の印刷レイアウトを使う');
 
 console.log('Shift assignment display regression tests: PASS');
