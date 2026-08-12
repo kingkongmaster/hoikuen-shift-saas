@@ -21,6 +21,19 @@ type WarningLevel = 'INFO' | 'WARNING' | 'ERROR';
 type WarningLike = { code: string; level: WarningLevel };
 type DisplayWarning = { code: string; level: WarningLevel; workDate: string; staffId?: string; message: string };
 const summarizeWarnings = (warnings: WarningLike[]) => warnings.reduce<{ INFO: number; WARNING: number; ERROR: number; byCode: Record<string, number> }>((summary, warning) => { summary[warning.level] += 1; summary.byCode[warning.code] = (summary.byCode[warning.code] ?? 0) + 1; return summary; }, { INFO: 0, WARNING: 0, ERROR: 0, byCode: {} });
+const warningLevelLabels: Record<WarningLevel, string> = { ERROR: 'エラー（修正が必要）', WARNING: '確認してほしい項目', INFO: 'お知らせ' };
+const warningGuidance: Record<string, { title: string; why: string; check: string }> = {
+  TARGET_WORK_HOURS_SHORTAGE: { title: '契約時間より勤務時間が少ない職員', why: '自動作成した勤務時間の合計が、その職員の契約時間に届いていないため表示しています。', check: '希望休や勤務できる曜日を確認し、必要に応じて勤務日や勤務時間を追加してください。' },
+  TARGET_WORK_DAYS_SHORTAGE: { title: '契約日数より勤務日数が少ない職員', why: '自動作成した勤務日数が、その職員の契約日数に届いていないため表示しています。', check: '希望休や勤務条件を確認し、必要に応じて勤務日を追加してください。' },
+  TARGET_WORK_HOURS_EXCESS: { title: '契約時間を超えて勤務しています', why: '自動作成した勤務時間の合計が、その職員の契約時間を超えているため表示しています。', check: '超過している職員の勤務時間を確認し、必要に応じて勤務を減らしてください。' },
+  TARGET_WORK_DAYS_EXCESS: { title: '契約日数を超えて勤務しています', why: '自動作成した勤務日数が、その職員の契約日数を超えているため表示しています。', check: '超過している職員の勤務日を確認し、必要に応じて休みへ変更してください。' },
+  FREE_SUPPORT_COVERAGE: { title: 'フリー職員が応援しました', why: 'クラスの必要人数を満たすため、フリー職員を応援として配置したため表示しています。', check: '応援先と時間帯に問題がないか、クラス担任との役割分担を確認してください。' },
+  CROSS_CLASS_SUPPORT: { title: '他クラスへ応援しました', why: 'クラスの必要人数を満たすため、所属とは異なるクラスへ職員を配置したため表示しています。', check: '応援先のクラスと職員の経験・資格に問題がないか確認してください。' },
+  SUNDAY_CLOSED: { title: '日曜日のため勤務はありません', why: '園の設定で日曜日を休園日としているため、勤務を割り当てていません。', check: '日曜保育を行う場合は園の設定を確認してください。行わない場合は対応不要です。' },
+  CLOSED_DATE: { title: '休園日です', why: '園が登録した休園日に当たるため、勤務を割り当てていません。', check: '休園日の登録内容を確認してください。正しい場合は対応不要です。' },
+};
+const warningGuidanceFor = (code: string) => warningGuidance[code] ?? { title: '勤務内容の確認項目', why: '自動作成の結果に、確認が必要な勤務条件が見つかったため表示しています。', check: '表示された内容と勤務表を確認し、判断が難しい場合は勤務条件の設定を見直してください。' };
+const staffingLevelLabels: Record<'HARD' | 'SOFT' | 'INFO', string> = { HARD: '必須条件', SOFT: '優先条件', INFO: '確認項目' };
 
 export function ShiftManagement({ session }: { session: Session }) {
   const manager = session.role === 'ADMIN' || session.role === 'DIRECTOR';
@@ -58,16 +71,19 @@ export function ShiftManagement({ session }: { session: Session }) {
       <div className="hidden min-w-0 max-w-full overflow-x-hidden [contain:paint] lg:block print:block print:max-w-none print:overflow-visible print:[contain:none]"><ManagerTable view={view} month={month} disabled={status !== 'DRAFT'} changes={changes} assignmentMap={assignmentMap} requests={requests} closedNames={closedNames} onChange={setType} onClassChange={setAssignedClass} /></div>
       <div className="lg:hidden print:hidden"><ManagerDailyCards view={view} month={month} selectedDay={selectedDay} disabled={status !== 'DRAFT'} changes={changes} assignmentMap={assignmentMap} requests={requests} warnings={displayedWarnings} closedNames={closedNames} onDayChange={setSelectedDay} onChange={setType} onClassChange={setAssignedClass} onCancel={cancelSelectedDayChanges} /></div>
     </> : <PersonalSchedule assignments={view.assignments} month={month} closedNames={closedNames} />}
-    {precheck && precheckSummary && <aside className="mt-5 rounded-xl border border-violet-300 bg-violet-50 p-4"><h3 className="font-bold">生成前チェック：{precheck.canGenerate ? '生成可能' : '要確認'}</h3><p className="mt-2 text-sm">有効職員 {precheck.summary.activeStaffCount}人／早出可能 {precheck.summary.earlyCapableCount}人／遅出可能 {precheck.summary.lateCapableCount}人／土曜可能 {precheck.summary.saturdayCapableCount}人／休園日 {precheck.summary.closedDateCount}件</p><WarningSummary summary={precheckSummary} /><details className="mt-2"><summary>詳細警告を表示</summary><ul className="mt-2 list-disc pl-5 text-sm">{precheck.warnings.map((item,index) => <li key={index}>[{item.level}] {item.code}: {item.message}</li>)}</ul></details></aside>}
-    {generationResult && <aside className="mt-5 rounded-xl border border-violet-300 bg-violet-50 p-4"><h3 className="font-bold">自動生成結果</h3><p className="mt-2 text-sm font-semibold">勤務 {generationResult.workingAssignmentCount}件・休み {generationResult.offAssignmentCount}件・休暇 {generationResult.leaveAssignmentCount}件</p><p className="mt-1 text-xs text-slate-600">全明細 {generationResult.generatedCount}件／{generationResult.durationMs}ms／休園日 {generationResult.closedDateCount}件</p><WarningSummary summary={generationResult.warningSummary} /><details className="mt-2"><summary>詳細警告を表示</summary><ul className="mt-2 list-disc pl-5 text-sm">{generationWarnings.map((warning, index) => <li key={`detail-${warning.code}-${index}`}>[{warning.level}] {warning.workDate} {warning.code}: {warning.message}</li>)}</ul></details>{generationResult.staffingRequirementEvaluations?.length ? <div className="mt-4 border-t border-violet-200 pt-3"><h4 className="font-semibold">属性別配置条件の評価</h4><p className="mt-1 text-xs text-slate-600">HARDは必須条件、SOFTは優先条件、INFOは確認用条件です。</p><ul className="mt-2 space-y-2 text-sm">{generationResult.staffingRequirementEvaluations.map((item) => <li key={`${item.requirementId}-${item.date}`} className={`rounded border p-2 ${item.level==='ERROR'?'border-rose-300 bg-rose-50':item.level==='WARNING'?'border-amber-300 bg-amber-50':'border-sky-300 bg-sky-50'}`}><strong>[{item.constraintLevel}] {item.name}</strong>／{item.date}／{item.classType?`${item.classType.replace('AGE_','')}歳児クラス`:'園全体'}／必要 {item.requiredCount}名・実績 {item.actualCount}名<br/><span>{item.message}</span></li>)}</ul></div>:null}</aside>}
+    {precheck && precheckSummary && <aside className="mt-5 rounded-xl border border-violet-300 bg-violet-50 p-4"><h3 className="font-bold">生成前チェック：{precheck.canGenerate ? '生成可能' : '要確認'}</h3><p className="mt-2 text-sm">有効職員 {precheck.summary.activeStaffCount}人／早出可能 {precheck.summary.earlyCapableCount}人／遅出可能 {precheck.summary.lateCapableCount}人／土曜可能 {precheck.summary.saturdayCapableCount}人／休園日 {precheck.summary.closedDateCount}件</p><WarningSummary summary={precheckSummary} /><WarningList warnings={precheck.warnings} /></aside>}
+    {generationResult && <aside className="mt-5 rounded-xl border border-violet-300 bg-violet-50 p-4"><h3 className="font-bold">自動生成結果</h3><p className="mt-2 text-sm font-semibold">勤務 {generationResult.workingAssignmentCount}件・休み {generationResult.offAssignmentCount}件・休暇 {generationResult.leaveAssignmentCount}件</p><p className="mt-1 text-xs text-slate-600">全明細 {generationResult.generatedCount}件／{generationResult.durationMs}ms／休園日 {generationResult.closedDateCount}件</p><WarningSummary summary={generationResult.warningSummary} /><WarningList warnings={generationWarnings} showDate />{generationResult.staffingRequirementEvaluations?.length ? <div className="mt-4 border-t border-violet-200 pt-3"><h4 className="font-semibold">属性別配置条件の評価</h4><p className="mt-1 text-xs text-slate-600">必須条件・優先条件・確認項目の順に、配置人数を確認します。</p><ul className="mt-2 space-y-2 text-sm">{generationResult.staffingRequirementEvaluations.map((item) => <li key={`${item.requirementId}-${item.date}`} className={`rounded border p-2 ${item.level==='ERROR'?'border-rose-300 bg-rose-50':item.level==='WARNING'?'border-amber-300 bg-amber-50':'border-sky-300 bg-sky-50'}`}><strong>{staffingLevelLabels[item.constraintLevel]}：{item.name}</strong>／{item.date}／{item.classType?`${item.classType.replace('AGE_','')}歳児クラス`:'園全体'}／必要 {item.requiredCount}名・実績 {item.actualCount}名<br/><span>{item.message}</span></li>)}</ul></div>:null}</aside>}
     {manager && displayedWarnings.length ? <WarningPanel warnings={displayedWarnings} /> : null}</section>;
 }
 
-function WarningSummary({ summary }: { summary: { INFO: number; WARNING: number; ERROR: number; byCode: Record<string, number> } }) { return <><p className="mt-2 text-sm font-semibold">ERROR {summary.ERROR}件・WARNING {summary.WARNING}件・INFO {summary.INFO}件</p><details className="mt-2"><summary>警告コード別件数</summary><ul className="mt-2 list-disc pl-5 text-sm">{Object.entries(summary.byCode).map(([code, count]) => <li key={code}>{code}: {count}件</li>)}</ul></details></>; }
+function WarningSummary({ summary }: { summary: { INFO: number; WARNING: number; ERROR: number; byCode: Record<string, number> } }) { return <><p className="mt-2 text-sm font-semibold">{warningLevelLabels.ERROR} {summary.ERROR}件・{warningLevelLabels.WARNING} {summary.WARNING}件・{warningLevelLabels.INFO} {summary.INFO}件</p><details className="mt-2"><summary>項目別の件数を見る</summary><ul className="mt-2 list-disc pl-5 text-sm">{Object.entries(summary.byCode).map(([code, count]) => <li key={code}>{warningGuidanceFor(code).title}：{count}件</li>)}</ul></details></>; }
+
+function WarningList({ warnings, showDate = false }: { warnings: Array<{ code: string; level: WarningLevel; message: string; workDate?: string }>; showDate?: boolean }) { return <details className="mt-2"><summary>確認項目を見る</summary><ul className="mt-2 space-y-2 text-sm">{warnings.map((warning, index) => { const guidance = warningGuidanceFor(warning.code); return <li key={`${warning.code}-${index}`} className="rounded-lg border border-violet-200 bg-white/70 p-3"><strong>{warningLevelLabels[warning.level]}：{guidance.title}</strong>{showDate && warning.workDate ? <span>／{warning.workDate}</span> : null}<p className="mt-1">{warning.message}</p><WarningHelp guidance={guidance} /></li>; })}</ul></details>; }
+
+function WarningHelp({ guidance }: { guidance: { why: string; check: string } }) { return <details className="mt-2 rounded-lg bg-white/80 p-2"><summary className="min-h-11 cursor-pointer py-2 font-bold">ⓘ 詳細</summary><dl className="space-y-2 border-t pt-2"><div><dt className="font-bold">なぜ表示されたのか</dt><dd>{guidance.why}</dd></div><div><dt className="font-bold">何を確認すればよいか</dt><dd>{guidance.check}</dd></div></dl></details>; }
 
 function WarningPanel({ warnings }: { warnings: DisplayWarning[] }) {
   const styles: Record<WarningLevel, string> = { ERROR: 'border-red-300 bg-red-50 text-red-900', WARNING: 'border-amber-300 bg-amber-50 text-amber-900', INFO: 'border-sky-300 bg-sky-50 text-sky-900' };
-  const labels: Record<WarningLevel, string> = { ERROR: 'エラー', WARNING: '確認', INFO: 'お知らせ' };
   return <aside className="mt-5 rounded-xl border border-slate-300 bg-white p-4">
     <details>
       <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-2 font-bold">
@@ -76,8 +92,8 @@ function WarningPanel({ warnings }: { warnings: DisplayWarning[] }) {
       </summary>
       <ul className="mt-3 space-y-2">
         {warnings.map((warning, index) => <li key={`${warning.code}-${warning.workDate}-${index}`} className={`rounded-lg border p-3 text-sm ${styles[warning.level]}`}>
-          <span className="mr-2 inline-block rounded border border-current px-2 py-0.5 text-xs font-bold">{labels[warning.level]}</span>
-          <span>{warning.workDate} {warning.message}</span>
+          <strong className="block">{warningLevelLabels[warning.level]}：{warningGuidanceFor(warning.code).title}</strong>
+          <span>{warning.workDate} {warning.message}</span><WarningHelp guidance={warningGuidanceFor(warning.code)} />
         </li>)}
       </ul>
     </details>
@@ -93,7 +109,6 @@ function ManagerDailyCards({ view, month, selectedDay, disabled, changes, assign
   const selectedWarnings = warnings.filter((warning) => warning.workDate.slice(0, 10) === workDate);
   const hasDayChanges = Object.values(changes).some((change) => change.workDate.slice(0, 10) === workDate);
   const warningStyles: Record<WarningLevel, string> = { ERROR: 'border-rose-300 bg-rose-50 text-rose-900', WARNING: 'border-amber-300 bg-amber-50 text-amber-900', INFO: 'border-sky-300 bg-sky-50 text-sky-900' };
-  const warningLabels: Record<WarningLevel, string> = { ERROR: 'ERROR・重要な問題', WARNING: 'WARNING・要確認', INFO: 'INFO・参考情報' };
 
   return <section className="mt-5" data-testid="mobile-daily-shift-view">
     <div className="rounded-2xl border bg-white p-4 shadow-sm">
@@ -111,7 +126,7 @@ function ManagerDailyCards({ view, month, selectedDay, disabled, changes, assign
       {hasDayChanges && <button type="button" onClick={onCancel} className="mt-3 w-full rounded-xl border border-slate-400 px-4 py-3 font-bold">この日の変更を取り消す</button>}
     </div>
 
-    {selectedWarnings.length > 0 && <aside className="mt-4 space-y-2" aria-label="選択日の注意・警告">{selectedWarnings.map((warning, index) => <div key={`${warning.code}-${index}`} className={`rounded-xl border p-3 text-sm ${warningStyles[warning.level]}`}><strong className="block">{warningLabels[warning.level]}</strong><span>{warning.message}</span></div>)}</aside>}
+    {selectedWarnings.length > 0 && <aside className="mt-4 space-y-2" aria-label="選択日の注意・警告">{selectedWarnings.map((warning, index) => <div key={`${warning.code}-${index}`} className={`rounded-xl border p-3 text-sm ${warningStyles[warning.level]}`}><strong className="block">{warningLevelLabels[warning.level]}：{warningGuidanceFor(warning.code).title}</strong><span>{warning.message}</span><WarningHelp guidance={warningGuidanceFor(warning.code)} /></div>)}</aside>}
 
     <div className="mt-4 grid gap-3 sm:grid-cols-2" aria-label={`${workDate}の職員勤務`}>
       {view.staff.length === 0 ? <p className="rounded-xl border bg-white p-5 text-slate-600">表示できる職員がいません。</p> : view.staff.map((staff) => {
@@ -133,7 +148,7 @@ function ManagerDailyCards({ view, month, selectedDay, disabled, changes, assign
             {selectedClass && <div><dt className="inline font-bold">担当：</dt><dd className="inline">{classes[selectedClass]}</dd></div>}
             {request && <div><dt className="inline font-bold">希望休：</dt><dd className="inline">{request.status === 'APPROVED' ? '承認済み' : '申請中'}</dd></div>}
           </dl>
-          {cardWarnings.map((warning, index) => <p key={`${warning.code}-${index}`} className={`mt-2 rounded-lg border p-2 text-xs font-semibold ${warningStyles[warning.level]}`}><strong>{warningLabels[warning.level]}</strong><br />{warning.message}</p>)}
+          {cardWarnings.map((warning, index) => <div key={`${warning.code}-${index}`} className={`mt-2 rounded-lg border p-2 text-xs ${warningStyles[warning.level]}`}><strong>{warningLevelLabels[warning.level]}：{warningGuidanceFor(warning.code).title}</strong><br />{warning.message}<WarningHelp guidance={warningGuidanceFor(warning.code)} /></div>)}
           <div className="mt-4 grid gap-3">
             <label className="text-sm font-bold">勤務パターン<select aria-label={`${staff.displayName} ${workDate} 勤務パターン`} disabled={disabled} value={value} onChange={(event) => onChange(staff.id, workDate, event.target.value as ShiftType)} className="input mt-1 disabled:opacity-60">{options.map(([type]) => <option key={type} value={type}>{fullLabels[type]}</option>)}</select></label>
             {isWorking && <label className="text-sm font-bold">担当クラス・配置先<select aria-label={`${staff.displayName} ${workDate} 担当クラス`} disabled={disabled} value={selectedClass ?? ''} onChange={(event) => onClassChange(staff.id, workDate, (event.target.value || null) as AssignedClass | null)} className="input mt-1 disabled:opacity-60"><option value="">未設定</option>{Object.entries(classes).map(([classValue, label]) => <option key={classValue} value={classValue}>{label}</option>)}</select></label>}

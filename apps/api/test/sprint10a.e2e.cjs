@@ -37,7 +37,7 @@ async function main() {
   assert.equal(staffCount, 15, `デモ職員 ${staffCount}名`);
   assert.equal(partCount, 3, `パート職員 ${partCount}名`);
   assert.equal(reemployedCount, 1, `再雇用職員 ${reemployedCount}名`);
-  assert.equal(requestCount, 13, `希望休 ${requestCount}件`);
+  assert.equal(requestCount, 25, `全デモ職員の希望休を含む25件: ${requestCount}件`);
   assert.equal(confirmed?.status, 'CONFIRMED');
   assert.equal(confirmed?._count.assignments, 15 * 31, '15名×7月31日の確定シフト');
   assert.ok(notificationCount >= 4, 'デモ通知');

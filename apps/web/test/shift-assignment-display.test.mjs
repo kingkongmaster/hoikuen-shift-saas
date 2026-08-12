@@ -21,7 +21,10 @@ assert.match(source, /assignmentKey\(assignment\.staffId, assignment\.workDate\)
 assert.match(source, /assignmentKey\(staff\.id, workDate\)/, '表の日付も同じ規則で正規化する');
 assert.match(source, /<details>/, '勤務条件の警告を初期状態で折りたたむ');
 assert.match(source, /内容を確認する/, '警告詳細を開く操作を表示する');
-for (const label of ['エラー', '確認', 'お知らせ']) assert.ok(source.includes(label), `重要度ラベル: ${label}`);
+for (const label of ['エラー（修正が必要）', '確認してほしい項目', 'お知らせ']) assert.ok(source.includes(label), `重要度ラベル: ${label}`);
+for (const label of ['契約時間より勤務時間が少ない職員', '契約日数より勤務日数が少ない職員', '契約時間を超えて勤務しています', '契約日数を超えて勤務しています', 'フリー職員が応援しました', '他クラスへ応援しました', '日曜日のため勤務はありません', '休園日です']) assert.ok(source.includes(label), `日本語の確認項目: ${label}`);
+for (const label of ['ⓘ 詳細', 'なぜ表示されたのか', '何を確認すればよいか']) assert.ok(source.includes(label), `説明補助: ${label}`);
+assert.doesNotMatch(source, /\{item\.code\}|\{warning\.code\}:|\[\{item\.level\}\]/, '英語コードを画面へ表示しない');
 assert.match(source, /min-h-11/, '390pxでも押しやすい警告展開操作');
 for (const label of ['全員表示', '出勤者を強調', '休みを薄く表示']) assert.ok(source.includes(label), `表示切替: ${label}`);
 for (const label of ['通常', '早出', '遅出', '希望休', '有給', '夏季', '半休']) assert.ok(source.includes(label), `勤務区分の正式名称: ${label}`);

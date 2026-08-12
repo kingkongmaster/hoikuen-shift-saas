@@ -119,7 +119,7 @@ export class ShiftsService {
     try { customRulesEnabled = (await this.features.resolve(user.tenantId, 'TENANT_CUSTOM_RULES')).enabled; } catch { customRulesEnabled = false; }
     const [staff, requests, setting, requirements, closedDates, managerMemberships, systemPatterns, staffingRequirements, staffAttributeAssignments, generatorExclusions, staffWorkRules] = await Promise.all([
       this.prisma.staff.findMany({ where: { tenantId: user.tenantId, isActive: true }, select: { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true }, orderBy: { employeeNumber: 'asc' } }),
-      this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
+      this.prisma.shiftRequest.findMany({ where: { tenantId: user.tenantId, status: { in: [ShiftRequestStatus.PENDING, ShiftRequestStatus.APPROVED] }, requestDate: { gte: range.start, lt: range.end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
       this.settings.ensureSetting(user.tenantId),
       this.settings.requirements(user),
       this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } }, select: { closedDate: true, name: true } }),

@@ -193,13 +193,25 @@ async function main() {
     { employeeNumber: 'STAFF-009', requestDate: '2026-07-29', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '説明用サンプル（未承認）：家庭の予定' },
     { employeeNumber: 'STAFF-013', requestDate: '2026-07-15', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '私用', adminComment: '承認済み' },
     { employeeNumber: 'STAFF-014', requestDate: '2026-07-31', requestType: ShiftRequestType.HALF_DAY_PM, status: ShiftRequestStatus.REJECTED, reason: '午後に予定あり', adminComment: '配置調整後に再申請してください' },
-    { employeeNumber: 'STAFF-001', requestDate: '2026-08-03', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '家庭の予定' },
+    { employeeNumber: 'ADMIN-001', requestDate: '2026-08-03', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-001', requestDate: '2026-08-04', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '家庭の予定' },
     { employeeNumber: 'STAFF-001', requestDate: '2026-08-18', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '通院', adminComment: '承認済み' },
     { employeeNumber: 'STAFF-002', requestDate: '2026-08-10', requestType: ShiftRequestType.HALF_DAY_PM, status: ShiftRequestStatus.PENDING, reason: '午後に予定あり' },
+    { employeeNumber: 'STAFF-003', requestDate: '2026-08-06', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
     { employeeNumber: 'STAFF-003', requestDate: '2026-08-24', requestType: ShiftRequestType.SUMMER_LEAVE, status: ShiftRequestStatus.REJECTED, reason: '夏季休暇', adminComment: '配置人数の都合により要再調整' },
     { employeeNumber: 'STAFF-004', requestDate: '2026-08-12', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '一般職員デモ：希望休申請中' },
     { employeeNumber: 'STAFF-004', requestDate: '2026-08-20', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '一般職員デモ：有給申請', adminComment: '承認済み' },
     { employeeNumber: 'STAFF-004', requestDate: '2026-08-26', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.REJECTED, reason: '一般職員デモ：希望休却下例', adminComment: '配置調整後に再申請してください' },
+    { employeeNumber: 'STAFF-005', requestDate: '2026-08-13', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-006', requestDate: '2026-08-14', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-007', requestDate: '2026-08-17', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-008', requestDate: '2026-08-19', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-009', requestDate: '2026-08-21', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-010', requestDate: '2026-08-24', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-011', requestDate: '2026-08-25', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-012', requestDate: '2026-08-27', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-013', requestDate: '2026-08-28', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-014', requestDate: '2026-08-31', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
   ];
   await prisma.shiftRequest.deleteMany({ where: { tenantId: tenant.id } });
   for (const request of demoRequests) {
@@ -222,7 +234,7 @@ async function main() {
   await prisma.shiftAssignment.deleteMany({ where: { monthlyShiftId: monthlyShift.id } });
   const seedAssignments = [
     { employeeNumber: 'STAFF-001', workDate: '2026-08-03', shiftType: ShiftType.EARLY },
-    { employeeNumber: 'STAFF-001', workDate: '2026-08-18', shiftType: ShiftType.NORMAL, note: '承認済み有給との競合確認用' },
+    { employeeNumber: 'STAFF-001', workDate: '2026-08-18', shiftType: ShiftType.PAID_LEAVE, note: '承認済み有給を反映' },
     { employeeNumber: 'STAFF-002', workDate: '2026-08-08', shiftType: ShiftType.NORMAL },
     { employeeNumber: 'STAFF-003', workDate: '2026-08-10', shiftType: ShiftType.LATE },
     { employeeNumber: 'STAFF-004', workDate: '2026-08-04', shiftType: ShiftType.NORMAL },
@@ -233,8 +245,9 @@ async function main() {
   for (const assignment of seedAssignments) {
     const staffId = staffByNumber.get(assignment.employeeNumber);
     if (!staffId) continue;
-    const defaults = assignment.shiftType === ShiftType.EARLY ? { startTime: '07:00', endTime: '16:00' } : assignment.shiftType === ShiftType.LATE ? { startTime: '11:00', endTime: '19:30' } : assignment.shiftType === ShiftType.OFF ? { startTime: null, endTime: null } : { startTime: '08:30', endTime: '17:00' };
-    const assignedClass = assignment.shiftType === ShiftType.OFF ? null : staffClassByNumber.get(assignment.employeeNumber);
+    const isWorkingAssignment = [ShiftType.EARLY, ShiftType.NORMAL, ShiftType.LATE].includes(assignment.shiftType);
+    const defaults = assignment.shiftType === ShiftType.EARLY ? { startTime: '07:00', endTime: '16:00' } : assignment.shiftType === ShiftType.LATE ? { startTime: '11:00', endTime: '19:30' } : !isWorkingAssignment ? { startTime: null, endTime: null } : { startTime: '08:30', endTime: '17:00' };
+    const assignedClass = isWorkingAssignment ? staffClassByNumber.get(assignment.employeeNumber) : null;
     await prisma.shiftAssignment.upsert({
       where: { monthlyShiftId_staffId_workDate: { monthlyShiftId: monthlyShift.id, staffId, workDate: new Date(`${assignment.workDate}T00:00:00.000Z`) } },
       update: { shiftType: assignment.shiftType, ...defaults, breakMinutes: defaults.startTime ? 60 : null, assignedClass, note: assignment.note ?? null },
