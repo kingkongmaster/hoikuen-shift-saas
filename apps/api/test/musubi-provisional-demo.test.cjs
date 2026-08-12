@@ -20,6 +20,8 @@ const setup = readFileSync(join(root, 'scripts/setup-musubi-provisional-demo.cjs
 assert.match(setup, /if \(!apply\).*process\.exit\(0\)/);
 assert.match(setup, /production環境では実行できません/);
 assert.match(setup, /CONFIRM_PROVISIONAL_TENANT_CODE/);
+assert.match(setup, /DEMO_USER_PASSWORD \|\| 'ChangeMe123!'/);
+assert.match(setup, /passwordHash: passwordHash\(adminPassword\), mustChangePassword: false/);
 const shifts = readFileSync(join(root, 'src/presentation/shifts/shifts.service.ts'), 'utf8');
 assert.match(shifts, /TENANT_CUSTOM_RULES/);
 assert.match(shifts, /GENERATOR_EXCLUDED/);

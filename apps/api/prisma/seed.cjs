@@ -9,6 +9,7 @@ if (normalizedNodeEnvironment === 'production' || normalizedDeploymentEnvironmen
 }
 
 const prisma = new PrismaClient();
+const STANDARD_DEMO_PASSWORD = 'ChangeMe123!';
 
 function passwordHash(password) {
   const salt = randomBytes(16).toString('hex');
@@ -18,7 +19,10 @@ function passwordHash(password) {
 async function main() {
   if (process.env.SEED_DEMO_DATA !== 'true') return;
   const email = (process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local').toLowerCase();
-  const password = process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!';
+  const password = process.env.DEMO_USER_PASSWORD || STANDARD_DEMO_PASSWORD;
+  for (const [name, value] of [['SEED_OWNER_PASSWORD', process.env.SEED_OWNER_PASSWORD], ['SEED_STAFF_PASSWORD', process.env.SEED_STAFF_PASSWORD]]) {
+    if (value && value !== password) throw new Error(`${name} must match DEMO_USER_PASSWORD so every demo login uses the standard password.`);
+  }
   const tenant = await prisma.tenant.upsert({
     where: { id: '00000000-0000-4000-8000-000000000001' },
     update: { name: 'デモこども園', contactName: '園長 デモ花子', contactEmail: 'director@demo.enshift.local', phone: '03-1234-5678', postalCode: '100-0001', addressLine: '東京都千代田区千代田1-1' },
@@ -154,7 +158,7 @@ async function main() {
   }
 
   const staffLoginEmail = 'staff@demo.enshift.local';
-  const staffLoginPassword = process.env.SEED_STAFF_PASSWORD || 'ChangeMe123!';
+  const staffLoginPassword = password;
   const staffUser = await prisma.user.upsert({
     where: { email: staffLoginEmail },
     update: { displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword), mustChangePassword: false, isActive: true },
