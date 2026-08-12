@@ -1,8 +1,8 @@
-# 園シフト（EnShift）
+# AeN Shift
 
 保育園・認定こども園向け勤務シフト管理SaaSです。マルチテナント認証基盤、職員マスター、希望休、月間シフト管理を提供します。
 
-開発・レビュー時の判断基準は、[EnShift Developer Philosophy](docs/developer-philosophy.md)を参照してください。
+開発・レビュー時の判断基準は、[AeN Shift Developer Philosophy](docs/developer-philosophy.md)を参照してください。
 
 開発知識はNotion「アプリ開発ログ」および[development-memory.md](docs/development-memory.md)を基準として運用します。
 
@@ -145,7 +145,9 @@ Codespaceを作成すると、`.devcontainer/devcontainer.json`によりDocker�
    cp .env.example .env
    ```
 
-2. `.env`の`POSTGRES_PASSWORD`、`DATABASE_URL`、`JWT_SECRET`を開発用の十分に強い値へ変更します。デモ認証は`DEMO_USER_PASSWORD`を使用し、`.env`はGit管理対象外です。
+2. `.env`の`POSTGRES_PASSWORD`、Docker専用の`COMPOSE_POSTGRES_PASSWORD`、ホスト実行専用の`DATABASE_URL`、`JWT_SECRET`を開発用の十分に強い値へ変更します。Docker Compose内のmigrate・API・seed・api-testは、ホスト用`DATABASE_URL`を使わず`COMPOSE_POSTGRES_PASSWORD`で`postgres:5432`へ接続します。デモ認証は`DEMO_USER_PASSWORD`を使用し、`.env`はGit管理対象外です。
+
+通常の`docker compose up -d`はseedを実行しません。seedは既存のデモ園データ（職員、希望休、月間シフト明細など）を上書きするため、初期セットアップまたはデモデータを意図的に再生成するときだけ、影響を確認して`docker compose --profile seed run --rm -e SEED_DEMO_DATA=true seed`を明示実行してください。
 3. コンテナを起動します。
 
    ```bash

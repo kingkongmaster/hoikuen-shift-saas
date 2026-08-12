@@ -1,5 +1,5 @@
 {
-  "name": "EnShift",
+  "name": "AeN Shift",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
@@ -9,7 +9,7 @@
   ],
   "portsAttributes": {
     "8080": {
-      "label": "EnShift Web",
+      "label": "AeN Shift Web",
       "onAutoForward": "notify",
       "visibility": "private"
     }
@@ -20,4 +20,3 @@
   "postCreateCommand": "npm ci --prefix apps/api && npm ci --prefix apps/web",
   "remoteUser": "vscode"
 }
-
