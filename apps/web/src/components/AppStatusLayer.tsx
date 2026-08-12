@@ -8,17 +8,20 @@ export function AppStatusLayer() {
     const start = () => setActive((value) => value + 1);
     const end = () => setActive((value) => Math.max(0, value - 1));
     const showError = (event: Event) => setToast((event as CustomEvent<{ message: string }>).detail.message);
+    const clearError = () => setToast('');
     const onOnline = () => { setOnline(true); setToast('通信が回復しました。いつもどおりご利用いただけます。'); };
     const onOffline = () => setOnline(false);
     window.addEventListener('enshift:api-start', start);
     window.addEventListener('enshift:api-end', end);
     window.addEventListener('enshift:api-error', showError);
+    window.addEventListener('enshift:clear-error', clearError);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     return () => {
       window.removeEventListener('enshift:api-start', start);
       window.removeEventListener('enshift:api-end', end);
       window.removeEventListener('enshift:api-error', showError);
+      window.removeEventListener('enshift:clear-error', clearError);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };

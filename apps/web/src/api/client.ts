@@ -172,10 +172,11 @@ function fallbackMessage(status: number) {
   if (status === 401) return 'ログインの有効時間が終了しました。お手数ですが、もう一度ログインしてください。';
   if (status === 403) return 'この操作はご利用いただけません。必要な場合は園長または管理者へご相談ください。';
   if (status === 404) return 'お探しの情報が見つかりませんでした。画面を戻って、もう一度ご確認ください。';
-  if (status >= 500) return '処理を完了できませんでした。時間をおいてもう一度お試しください。';
+  if (status >= 500) return '現在この操作を完了できません。操作を繰り返さず、画面の内容を記録して管理者へ連絡してください。';
   return '入力内容に確認が必要な項目があります。表示された内容をご確認ください。';
 }
 function responseMessage(data: unknown, status: number) {
+  if (status === 401 || status >= 500) return fallbackMessage(status);
   if (data && typeof data === 'object') {
     const message = (data as { message?: unknown }).message;
     if (typeof message === 'string') return message;
@@ -191,7 +192,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
     let response: Response;
     try { response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers } }); }
     catch {
-      const message = navigator.onLine ? '処理を完了できませんでした。時間をおいてもう一度お試しください。' : '現在オフラインです。通信が回復してから、もう一度お試しください。';
+      const message = navigator.onLine ? '処理を完了できませんでした。少し時間をおいてもう一度お試しください。繰り返し表示される場合は操作を止め、画面の内容を記録して管理者へ連絡してください。' : '現在オフラインです。通信が回復してから、もう一度お試しください。';
       emit('enshift:api-error', { message }); throw new Error(message);
     }
     if (!response.ok) {

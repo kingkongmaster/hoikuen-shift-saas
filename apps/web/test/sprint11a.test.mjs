@@ -44,7 +44,7 @@ assert.ok(status.includes('現在オフラインです') && status.includes('通
 assert.ok(status.includes("window.addEventListener('offline'") && status.includes("window.addEventListener('online'"), 'オンライン状態イベント');
 
 // 先生に優しい日本語と品質
-assert.ok(client.includes('処理を完了できませんでした。時間をおいてもう一度お試しください。'), '共通エラー文');
+assert.ok(client.includes('処理を完了できませんでした。少し時間をおいてもう一度お試しください。'), '共通エラー文');
 assert.ok(requests.includes('申請を残す') && requests.includes('希望休を取り消す'), '結果が分かる確認操作');
 assert.ok(swaps.includes('相手の先生と園からの確認をお待ちください'), '安心できる保存完了文');
 assert.ok(!errorBoundary.includes('console.error') && !errorBoundary.includes('console.warn'), '不要なConsole出力なし');
