@@ -78,11 +78,9 @@ export function NotificationManagement({
   const read = async (id: string) => {
     try {
       await api.readNotification(session.accessToken, id);
-      setRows((prev) => {
-        const updated = prev.map((row) => (row.id === id ? { ...row, isRead: true } : row));
-        onUnreadChange(updated.filter((r) => !r.isRead).length);
-        return updated;
-      });
+      const updated = rows.map((row) => (row.id === id ? { ...row, isRead: true } : row));
+      setRows(updated);
+      onUnreadChange(updated.filter((row) => !row.isRead).length);
     } catch (error) {
       setMessageError(true);
       setMessage(error instanceof Error ? error.message : 'お知らせを確認済みにできませんでした。もう一度お試しください。');

@@ -9,7 +9,12 @@ export function LoginPage({ onSuccess }: { onSuccess: (session: Session) => void
 
   async function login(nextEmail: string, nextPassword: string) {
     setLoading(true); setError('');
-    try { onSuccess(await api.login(nextEmail, nextPassword)); }
+    try {
+      const session = await api.login(nextEmail, nextPassword);
+      setError('');
+      window.dispatchEvent(new CustomEvent('enshift:clear-error'));
+      onSuccess(session);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'ログインできませんでした。メールアドレスとパスワードをご確認ください。'); }
     finally { setLoading(false); }
   }

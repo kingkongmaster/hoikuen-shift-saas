@@ -68,11 +68,13 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   };
-  const refreshUnread = (count: number) => setNotifications((rows) => {
-    if (count === 0) return rows.map((row) => ({ ...row, isRead: true }));
+  const refreshUnread = (count: number) => {
+    if (count === 0) {
+      setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
+      return;
+    }
     void api.notifications(session.accessToken).then(setNotifications).catch(() => undefined);
-    return rows;
-  });
+  };
   return <main className="min-h-screen bg-[var(--canvas)] pb-24 text-[var(--ink)] md:pb-0">
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur">
       <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
