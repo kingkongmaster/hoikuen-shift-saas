@@ -52,6 +52,6 @@ for (const symbol of ['今', '休', '勤', '知']) assert.ok(dashboard.includes(
 assert.ok(dashboard.includes('>他</span>'), '独自の一文字バッジ: 他');
 assert.ok(!/from ['"](?:lucide|@mui|material-icons|@heroicons)/.test(`${home}\n${dashboard}\n${login}`), '外部アイコンライブラリを不使用');
 assert.ok(!styles.includes('@font-face') && !styles.includes('fonts.googleapis.com'), '外部フォントを不使用');
-assert.ok(serviceWorker.includes('enshift-shell-v11a-rc1'), 'Sprint10-C以降のPWAキャッシュ');
+assert.ok(serviceWorker.includes('enshift-shell-v11a-presentation-icon'), 'Sprint10-C以降のPWAキャッシュ');
 
 console.log('Sprint 10-C Web tests: PASS (ホーム優先順位・UI統一・390px・アクセシビリティ・独自ブランド・知的財産配慮)');

@@ -33,7 +33,7 @@ assert.ok((pages.match(/^\s*\['/gm) ?? []).length >= 10, 'FAQ 10項目以上');
 for (const hash of ['#contact', '#support', '#help', '#updates']) assert.ok(footer.includes(hash), `${hash}フッターリンク`);
 assert.ok(app.includes("'support'") && app.includes("'updates'"), '公開ルート');
 assert.ok(appInfo.includes("APP_BUILD") && !appInfo.includes("?? 'local'") && appInfo.includes('APP_LAST_UPDATED') && appInfo.includes('APP_DEVELOPER'), '製品Build・更新日・開発者');
-assert.ok(serviceWorker.includes('enshift-shell-v11a-rc1'), 'PWAキャッシュ更新');
+assert.ok(serviceWorker.includes('enshift-shell-v11a-presentation-icon'), 'PWAキャッシュ更新');
 assert.ok(feedback.includes('sm:grid-cols-2') && pages.includes('sm:grid-cols-2') && dashboard.includes('basis-[calc(50%-0.25rem)]'), '390/768/1024/1280レスポンシブ');
 
 console.log('Sprint 10-B Web tests: PASS (お問い合わせ・要望・不具合・意見・評価・更新履歴・端末情報・FAQ・レスポンシブ)');

@@ -55,6 +55,6 @@ for (const phrase of ['システムを管理するのではなく、人を支え
 assert.ok(readme.includes('[EnShift Developer Philosophy](docs/developer-philosophy.md)'), 'READMEから参照可能');
 assert.ok(styles.includes('.onboarding-screen') && styles.includes('.summary-grid') && styles.includes('grid-cols-2') && styles.includes('lg:grid-cols-5'), '390px優先レスポンシブ');
 assert.ok(styles.includes('body:has(.onboarding-screen) footer { display: none; }'), '初回体験では他の操作を隠す');
-assert.ok(worker.includes('enshift-shell-v11a-rc1'), 'RC1 Service Workerキャッシュ');
+assert.ok(worker.includes('enshift-shell-v11a-presentation-icon'), 'プレゼン用アイコンのService Workerキャッシュ');
 
 console.log('Sprint 11-A Web tests: PASS (初回体験・3画面ガイド・ロール別ホーム・優しい文言・空状態・オフライン・Philosophy・RC1)');
