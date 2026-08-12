@@ -1,4 +1,4 @@
-const CACHE = 'enshift-shell-v11a-rc1';
+const CACHE = 'enshift-shell-v11a-presentation-icon';
 const SHELL = ['/', '/manifest.json', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
