@@ -27,7 +27,7 @@ assert.match(source, /onChange\(staff\.id, workDate/);
 assert.match(source, /onClassChange\(staff\.id, workDate/);
 assert.match(source, /await api\.saveAssignments/);
 assert.match(source, /const reloadMonthData/);
-for (const level of ['ERROR・重要な問題', 'WARNING・要確認', 'INFO・参考情報']) assert.ok(source.includes(level), `診断 ${level}`);
+for (const level of ['エラー（修正が必要）', '確認してほしい項目', 'お知らせ']) assert.ok(source.includes(level), `診断 ${level}`);
 assert.match(source, /function ManagerTable/);
 
 // 16-17: 2月・30日月・31日月、日曜日。

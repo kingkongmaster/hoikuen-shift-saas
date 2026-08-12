@@ -1,10 +1,14 @@
 const assert = require('node:assert/strict');
-const { ShiftType } = require('@prisma/client');
+const { PrismaClient, ShiftType } = require('@prisma/client');
 
+const prisma = new PrismaClient();
 const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
 const ownerEmail = process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local';
 const ownerPassword = process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!';
-const workingTypes = new Set([ShiftType.EARLY, ShiftType.NORMAL, ShiftType.LATE, ShiftType.AM_HALF, ShiftType.PM_HALF, ShiftType.OTHER]);
+const testMonth = '2030-01';
+const workingTypes = new Set([ShiftType.EARLY, ShiftType.NORMAL, ShiftType.LATE]);
+const testStartedAt = new Date();
+let createdScheduleId = null;
 
 async function call(path, init = {}, token) {
   const response = await fetch(base + path, {
@@ -21,7 +25,10 @@ async function main() {
   const login = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email: ownerEmail, password: ownerPassword }) });
   assert.equal(login.status, 200);
   const token = login.body.accessToken;
-  const before = await call('/shifts?month=2026-08', {}, token);
+  const created = await call('/shifts', { method: 'POST', body: JSON.stringify({ month: testMonth }) }, token);
+  assert.equal(created.status, 201);
+  createdScheduleId = created.body.id;
+  const before = await call(`/shifts?month=${testMonth}`, {}, token);
   assert.equal(before.status, 200);
   assert.ok(before.body.schedule?.id);
 
@@ -31,7 +38,7 @@ async function main() {
   assert.equal(generated.body.workingAssignmentCount + generated.body.offAssignmentCount + generated.body.leaveAssignmentCount, generated.body.generatedCount);
   assert.ok(generated.body.workingAssignmentCount >= 200, '必要人数を満たす現実的なデモ配置');
 
-  const after = await call('/shifts?month=2026-08', {}, token);
+  const after = await call(`/shifts?month=${testMonth}`, {}, token);
   assert.equal(after.status, 200);
   assert.equal(after.body.assignments.length, generated.body.generatedCount);
   const working = after.body.assignments.filter((item) => workingTypes.has(item.shiftType));
@@ -56,7 +63,14 @@ async function main() {
   console.log(`RC1 shift display integration test: PASS (勤務${generated.body.workingAssignmentCount}・休み${generated.body.offAssignmentCount}・休暇${generated.body.leaveAssignmentCount})`);
 }
 
-main().catch((error) => {
+main().finally(async () => {
+  if (createdScheduleId) {
+    await prisma.auditLog.deleteMany({ where: { targetId: createdScheduleId } });
+    await prisma.monthlyShift.delete({ where: { id: createdScheduleId } });
+    await prisma.notification.deleteMany({ where: { tenantId: '00000000-0000-4000-8000-000000000001', type: 'SHIFT_UPDATED', title: 'シフト自動生成', createdAt: { gte: testStartedAt } } });
+  }
+  await prisma.$disconnect();
+}).catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });

@@ -37,7 +37,7 @@ async function main() {
   assert.equal(staffCount, 15, `デモ職員 ${staffCount}名`);
   assert.equal(partCount, 3, `パート職員 ${partCount}名`);
   assert.equal(reemployedCount, 1, `再雇用職員 ${reemployedCount}名`);
-  assert.equal(requestCount, 13, `希望休 ${requestCount}件`);
+  assert.equal(requestCount, 25, `全デモ職員の希望休を含む25件: ${requestCount}件`);
   assert.equal(confirmed?.status, 'CONFIRMED');
   assert.equal(confirmed?._count.assignments, 15 * 31, '15名×7月31日の確定シフト');
   assert.ok(notificationCount >= 4, 'デモ通知');
@@ -60,6 +60,7 @@ async function main() {
   assert.equal(overall.body.ownOnly, false);
   assert.equal(overall.body.assignments.length, 15 * 31);
   assert.ok(overall.body.assignments.some((row) => row.assignedClass === '0歳児'), 'クラス別印刷の元データ');
+  assert.ok(overall.body.assignments.every((row) => !['EARLY','NORMAL','LATE','OFF','PAID_LEAVE','SUMMER_LEAVE','AM_HALF','PM_HALF','OTHER'].includes(row.shiftType)), '印刷用勤務区分は日本語');
   const personal = await call('/exports/print/my-shift?month=2026-07', {}, staffToken);
   assert.equal(personal.status, 200);
   assert.equal(personal.body.ownOnly, true);

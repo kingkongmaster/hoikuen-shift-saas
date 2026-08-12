@@ -7,6 +7,7 @@ import { AuditService } from '../audit/audit.service';
 const BOM = '\ufeff';
 const classLabels: Record<string, string> = { AGE_0: '0歳児', AGE_1: '1歳児', AGE_2: '2歳児', AGE_3: '3歳児', AGE_4: '4歳児', AGE_5: '5歳児', FREE: 'フリー', SUPPORT: '補助' };
 const employmentLabels: Record<string, string> = { FULL_TIME: '正職員', PART_TIME: 'パート', REEMPLOYED: '再雇用' };
+const shiftTypeLabels: Record<string, string> = { EARLY: '早出', NORMAL: '通常', LATE: '遅出', OFF: '休み', PAID_LEAVE: '有給', SUMMER_LEAVE: '夏季休暇', AM_HALF: '午前半休', PM_HALF: '午後半休', OTHER: 'その他勤務' };
 
 @Injectable()
 export class ExportsService {
@@ -62,7 +63,7 @@ export class ExportsService {
       this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } } }),
     ]);
     await this.audit.create(user.tenantId, user.sub, 'SHIFT_PRINT_VIEWED', 'MonthlyShift', schedule.id, { month, ownOnly });
-    return { tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.workPattern?.name ?? item.shiftType, assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
+    return { tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.workPattern?.name ?? shiftTypeLabels[item.shiftType] ?? 'その他勤務', assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
   }
 
   private csv(headers: string[], rows: unknown[][]) { return BOM + [headers, ...rows].map((row) => row.map((value) => this.cell(value)).join(',')).join('\r\n') + '\r\n'; }

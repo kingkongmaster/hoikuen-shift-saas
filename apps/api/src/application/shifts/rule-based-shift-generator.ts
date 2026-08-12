@@ -29,7 +29,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     const workDate = new Date(current); const key = iso(workDate); const saturday = workDate.getUTCDay() === 6; const sunday = workDate.getUTCDay() === 0; const closedName = closed.get(key);
     const day = new Map<string, GeneratedAssignment>();
     const fixedStaffIds = new Set<string>();
-    for (const member of staff) { const request = fixed.get(`${member.id}:${key}`); day.set(member.id, request ? assignment(member, workDate, requestTypeToShiftType(request.requestType), options, '承認済み希望休') : assignment(member, workDate, ShiftType.OFF, options)); }
+    for (const member of staff) { const request = fixed.get(`${member.id}:${key}`); day.set(member.id, request ? assignment(member, workDate, requestTypeToShiftType(request.requestType), options, '希望休を優先') : assignment(member, workDate, ShiftType.OFF, options)); }
     for (const member of staff) {
       const rule = fixedRule(options.staffWorkRules ?? [], member.id, workDate); if (!rule?.workPattern) continue;
       const request = fixed.get(`${member.id}:${key}`);
@@ -61,7 +61,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       const normal = staff.filter((member) => day.get(member.id)?.shiftType === ShiftType.OFF && eligible(member, ShiftType.NORMAL));
       normal.sort(compare(ShiftType.NORMAL)); for (const member of normal.slice(0, normalNeeded)) day.set(member.id, assignment(member, workDate, ShiftType.NORMAL, options, null, member.isDirector ? null : member.assignedClass));
       const assignedWorking = [...day.values()].filter((item) => isWorking(item.shiftType)).length;
-      if ((saturday || sunday) && assignedWorking < saturdayMinimumStaff) add({ code: 'SATURDAY_MINIMUM_SHORTAGE', level: 'ERROR', workDate: key, required: saturdayMinimumStaff, assigned: assignedWorking, message: `${key}（${weekdays[workDate.getUTCDay()]}）の最低勤務人数が${saturdayMinimumStaff - assignedWorking}人不足しています。` });
+      if ((saturday || sunday) && assignedWorking < saturdayMinimumStaff) { addRequestConstraintWarning(); add({ code: 'SATURDAY_MINIMUM_SHORTAGE', level: 'ERROR', workDate: key, required: saturdayMinimumStaff, assigned: assignedWorking, message: `${key}（${weekdays[workDate.getUTCDay()]}）の最低勤務人数が${saturdayMinimumStaff - assignedWorking}人不足しています。` }); }
       assignClasses(targets);
     }
     for (const member of staff) {
@@ -152,10 +152,15 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
         count += 1;
       }
       if (count < required) {
+        addRequestConstraintWarning();
         if (rejectedByClass) add({ code: type === ShiftType.EARLY ? 'EARLY_CLASS_DUPLICATE_SHORTAGE' : 'LATE_CLASS_DUPLICATE_SHORTAGE', level: 'ERROR', workDate: key, required, assigned: count, message: `${key}：同じ担当クラスの職員を同じ${type === ShiftType.EARLY ? '早出' : '遅出'}に配置できないため、必要人数を満たせません。` });
         add({ code: type === ShiftType.EARLY ? 'EARLY_SHORTAGE' : 'LATE_SHORTAGE', level: 'ERROR', workDate: key, required, assigned: count, message: `${key}（${weekdays[workDate.getUTCDay()]}）の${type === ShiftType.EARLY ? '早出' : '遅出'}が${required - count}人不足しています。` });
       }
       if (saturday && count < required) add({ code: 'SATURDAY_SHORTAGE', level: 'WARNING', workDate: key, required, assigned: count, message: `${key}の土曜勤務可能職員が不足しています。` });
+    }
+    function addRequestConstraintWarning() {
+      if (!staff.some((member) => fixed.has(`${member.id}:${key}`))) return;
+      add({ code: 'REQUEST_CONSTRAINT_UNRESOLVED', level: 'WARNING', workDate: key, message: '希望休の条件により、この日は自動生成では解決できません。管理者による確認をお願いします。' });
     }
     function classTargets() {
       const requirements = (options.classRequirements ?? []).filter((r) => r.isActive && r.classType.startsWith('AGE_'));
@@ -186,7 +191,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
           const helper = directors.find((member) => !used.has(member.id));
           if (helper) { day.get(helper.id)!.assignedClass = requirement.classType; used.add(helper.id); add({ code: 'DIRECTOR_HELP', level: 'INFO', workDate: key, staffId: helper.id, classType: requirement.classType, message: `${helper.displayName}さんを${classLabel(requirement.classType)}応援へ配置しました。` }); if (options.directorCountsTowardStaffing) count += 1; }
         }
-        if (count < target) add({ code: 'CLASS_SHORTAGE', level: 'WARNING', workDate: key, classType: requirement.classType, required: target, assigned: count, message: `${key}の${classLabel(requirement.classType)}配置が${target - count}人不足しています。` });
+        if (count < target) { addRequestConstraintWarning(); add({ code: 'CLASS_SHORTAGE', level: 'WARNING', workDate: key, classType: requirement.classType, required: target, assigned: count, message: `${key}の${classLabel(requirement.classType)}配置が${target - count}人不足しています。` }); }
       }
     }
   }

@@ -9,6 +9,7 @@ if (normalizedNodeEnvironment === 'production' || normalizedDeploymentEnvironmen
 }
 
 const prisma = new PrismaClient();
+const STANDARD_DEMO_PASSWORD = 'ChangeMe123!';
 
 function passwordHash(password) {
   const salt = randomBytes(16).toString('hex');
@@ -18,7 +19,10 @@ function passwordHash(password) {
 async function main() {
   if (process.env.SEED_DEMO_DATA !== 'true') return;
   const email = (process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local').toLowerCase();
-  const password = process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!';
+  const password = process.env.DEMO_USER_PASSWORD || STANDARD_DEMO_PASSWORD;
+  for (const [name, value] of [['SEED_OWNER_PASSWORD', process.env.SEED_OWNER_PASSWORD], ['SEED_STAFF_PASSWORD', process.env.SEED_STAFF_PASSWORD]]) {
+    if (value && value !== password) throw new Error(`${name} must match DEMO_USER_PASSWORD so every demo login uses the standard password.`);
+  }
   const tenant = await prisma.tenant.upsert({
     where: { id: '00000000-0000-4000-8000-000000000001' },
     update: { name: 'デモこども園', contactName: '園長 デモ花子', contactEmail: 'director@demo.enshift.local', phone: '03-1234-5678', postalCode: '100-0001', addressLine: '東京都千代田区千代田1-1' },
@@ -154,7 +158,7 @@ async function main() {
   }
 
   const staffLoginEmail = 'staff@demo.enshift.local';
-  const staffLoginPassword = process.env.SEED_STAFF_PASSWORD || 'ChangeMe123!';
+  const staffLoginPassword = password;
   const staffUser = await prisma.user.upsert({
     where: { email: staffLoginEmail },
     update: { displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword), mustChangePassword: false, isActive: true },
@@ -189,13 +193,25 @@ async function main() {
     { employeeNumber: 'STAFF-009', requestDate: '2026-07-29', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '説明用サンプル（未承認）：家庭の予定' },
     { employeeNumber: 'STAFF-013', requestDate: '2026-07-15', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '私用', adminComment: '承認済み' },
     { employeeNumber: 'STAFF-014', requestDate: '2026-07-31', requestType: ShiftRequestType.HALF_DAY_PM, status: ShiftRequestStatus.REJECTED, reason: '午後に予定あり', adminComment: '配置調整後に再申請してください' },
-    { employeeNumber: 'STAFF-001', requestDate: '2026-08-03', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '家庭の予定' },
+    { employeeNumber: 'ADMIN-001', requestDate: '2026-08-03', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-001', requestDate: '2026-08-04', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '家庭の予定' },
     { employeeNumber: 'STAFF-001', requestDate: '2026-08-18', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '通院', adminComment: '承認済み' },
     { employeeNumber: 'STAFF-002', requestDate: '2026-08-10', requestType: ShiftRequestType.HALF_DAY_PM, status: ShiftRequestStatus.PENDING, reason: '午後に予定あり' },
+    { employeeNumber: 'STAFF-003', requestDate: '2026-08-06', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
     { employeeNumber: 'STAFF-003', requestDate: '2026-08-24', requestType: ShiftRequestType.SUMMER_LEAVE, status: ShiftRequestStatus.REJECTED, reason: '夏季休暇', adminComment: '配置人数の都合により要再調整' },
     { employeeNumber: 'STAFF-004', requestDate: '2026-08-12', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: '一般職員デモ：希望休申請中' },
     { employeeNumber: 'STAFF-004', requestDate: '2026-08-20', requestType: ShiftRequestType.PAID_LEAVE, status: ShiftRequestStatus.APPROVED, reason: '一般職員デモ：有給申請', adminComment: '承認済み' },
     { employeeNumber: 'STAFF-004', requestDate: '2026-08-26', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.REJECTED, reason: '一般職員デモ：希望休却下例', adminComment: '配置調整後に再申請してください' },
+    { employeeNumber: 'STAFF-005', requestDate: '2026-08-13', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-006', requestDate: '2026-08-14', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-007', requestDate: '2026-08-17', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-008', requestDate: '2026-08-19', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-009', requestDate: '2026-08-21', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-010', requestDate: '2026-08-24', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-011', requestDate: '2026-08-25', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-012', requestDate: '2026-08-27', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-013', requestDate: '2026-08-28', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
+    { employeeNumber: 'STAFF-014', requestDate: '2026-08-31', requestType: ShiftRequestType.DAY_OFF, status: ShiftRequestStatus.PENDING, reason: 'プレゼン用希望休' },
   ];
   await prisma.shiftRequest.deleteMany({ where: { tenantId: tenant.id } });
   for (const request of demoRequests) {
@@ -218,7 +234,7 @@ async function main() {
   await prisma.shiftAssignment.deleteMany({ where: { monthlyShiftId: monthlyShift.id } });
   const seedAssignments = [
     { employeeNumber: 'STAFF-001', workDate: '2026-08-03', shiftType: ShiftType.EARLY },
-    { employeeNumber: 'STAFF-001', workDate: '2026-08-18', shiftType: ShiftType.NORMAL, note: '承認済み有給との競合確認用' },
+    { employeeNumber: 'STAFF-001', workDate: '2026-08-18', shiftType: ShiftType.PAID_LEAVE, note: '承認済み有給を反映' },
     { employeeNumber: 'STAFF-002', workDate: '2026-08-08', shiftType: ShiftType.NORMAL },
     { employeeNumber: 'STAFF-003', workDate: '2026-08-10', shiftType: ShiftType.LATE },
     { employeeNumber: 'STAFF-004', workDate: '2026-08-04', shiftType: ShiftType.NORMAL },
@@ -229,8 +245,9 @@ async function main() {
   for (const assignment of seedAssignments) {
     const staffId = staffByNumber.get(assignment.employeeNumber);
     if (!staffId) continue;
-    const defaults = assignment.shiftType === ShiftType.EARLY ? { startTime: '07:00', endTime: '16:00' } : assignment.shiftType === ShiftType.LATE ? { startTime: '11:00', endTime: '19:30' } : assignment.shiftType === ShiftType.OFF ? { startTime: null, endTime: null } : { startTime: '08:30', endTime: '17:00' };
-    const assignedClass = assignment.shiftType === ShiftType.OFF ? null : staffClassByNumber.get(assignment.employeeNumber);
+    const isWorkingAssignment = [ShiftType.EARLY, ShiftType.NORMAL, ShiftType.LATE].includes(assignment.shiftType);
+    const defaults = assignment.shiftType === ShiftType.EARLY ? { startTime: '07:00', endTime: '16:00' } : assignment.shiftType === ShiftType.LATE ? { startTime: '11:00', endTime: '19:30' } : !isWorkingAssignment ? { startTime: null, endTime: null } : { startTime: '08:30', endTime: '17:00' };
+    const assignedClass = isWorkingAssignment ? staffClassByNumber.get(assignment.employeeNumber) : null;
     await prisma.shiftAssignment.upsert({
       where: { monthlyShiftId_staffId_workDate: { monthlyShiftId: monthlyShift.id, staffId, workDate: new Date(`${assignment.workDate}T00:00:00.000Z`) } },
       update: { shiftType: assignment.shiftType, ...defaults, breakMinutes: defaults.startTime ? 60 : null, assignedClass, note: assignment.note ?? null },

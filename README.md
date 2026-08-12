@@ -145,7 +145,7 @@ Codespaceを作成すると、`.devcontainer/devcontainer.json`によりDocker�
    cp .env.example .env
    ```
 
-2. `.env`の`POSTGRES_PASSWORD`、`DATABASE_URL`、`JWT_SECRET`、`SEED_OWNER_PASSWORD`を開発用の十分に強い値へ変更します。`.env`はGit管理対象外です。
+2. `.env`の`POSTGRES_PASSWORD`、`DATABASE_URL`、`JWT_SECRET`を開発用の十分に強い値へ変更します。デモ認証は`DEMO_USER_PASSWORD`を使用し、`.env`はGit管理対象外です。
 3. コンテナを起動します。
 
    ```bash
@@ -178,6 +178,8 @@ npm run dev
 ```
 
 PostgreSQLがない場合はAPI側の`.env`で`DATABASE_CONNECT_ON_STARTUP=false`にすると、画面・APIの起動のみ確認できます。
+
+プレゼン前は、[Preflight Check](docs/presentation-preflight.md)に従って空DB、Migration、Demo Seed、管理者・一般職員ログイン、API応答、Git状態を確認します。
 
 ## API統合テスト
 

@@ -14,7 +14,7 @@ const before = {
 async function main() {
   const [staff, requests, setting, requirements, closedDates, managers] = await Promise.all([
     prisma.staff.findMany({ where: { tenantId, isActive: true }, orderBy: { employeeNumber: 'asc' } }),
-    prisma.shiftRequest.findMany({ where: { tenantId, status: ShiftRequestStatus.APPROVED, requestDate: { gte: start, lt: end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
+    prisma.shiftRequest.findMany({ where: { tenantId, status: { in: [ShiftRequestStatus.PENDING, ShiftRequestStatus.APPROVED] }, requestDate: { gte: start, lt: end } }, select: { staffId: true, requestDate: true, requestType: true, reason: true } }),
     prisma.tenantShiftSetting.findUniqueOrThrow({ where: { tenantId } }),
     prisma.classStaffingRequirement.findMany({ where: { tenantId } }),
     prisma.tenantClosedDate.findMany({ where: { tenantId, closedDate: { gte: start, lt: end } }, select: { closedDate: true, name: true } }),
@@ -25,7 +25,8 @@ async function main() {
   const result = generateRuleBasedSchedule(start, generationStaff.map((row) => ({ ...row, isDirector: false })), requests, { ...setting, directorClassPlacementMode: setting.directorClassPlacementMode, requirements, classRequirements: requirements, closedDates });
   const staffById = new Map(generationStaff.map((row) => [row.id, row]));
   const working = new Set(['EARLY', 'NORMAL', 'LATE']);
-  const approvedRequestKeys = new Set(requests.map((row) => `${row.staffId}:${row.requestDate.toISOString().slice(0, 10)}`));
+  const requestKeys = new Set(requests.map((row) => `${row.staffId}:${row.requestDate.toISOString().slice(0, 10)}`));
+  const staffWithoutRequest = staff.filter((row) => !requests.some((request) => request.staffId === row.id));
   const violations = [];
   const actualMinutesByStaff = new Map();
   for (const assignment of result.assignments) {
@@ -34,7 +35,7 @@ async function main() {
     if (assignment.shiftType === 'LATE' && !member.canWorkLate) violations.push(`LATE:${member.employeeNumber}:${assignment.workDate.toISOString()}`);
     if (assignment.shiftType === 'NORMAL' && !member.canWorkRegular) violations.push(`NORMAL:${member.employeeNumber}:${assignment.workDate.toISOString()}`);
     if (day === 6 && working.has(assignment.shiftType) && !member.canWorkSaturdays) violations.push(`SATURDAY:${member.employeeNumber}:${assignment.workDate.toISOString()}`);
-    if (working.has(assignment.shiftType) && approvedRequestKeys.has(`${assignment.staffId}:${assignment.workDate.toISOString().slice(0, 10)}`)) violations.push(`APPROVED_REQUEST:${member.employeeNumber}:${assignment.workDate.toISOString()}`);
+    if (working.has(assignment.shiftType) && requestKeys.has(`${assignment.staffId}:${assignment.workDate.toISOString().slice(0, 10)}`)) violations.push(`REQUEST_CONFLICT:${member.employeeNumber}:${assignment.workDate.toISOString()}`);
   }
   for (const member of generationStaff) {
     const list = result.assignments.filter((row) => row.staffId === member.id).sort((a, b) => a.workDate - b.workDate);
@@ -67,8 +68,8 @@ async function main() {
   const spread = (field, category) => { const values = table.filter((row) => row[category] === 'GENERAL').map((row) => row[field]); return { max: Math.max(...values), min: Math.min(...values), difference: Math.max(...values) - Math.min(...values) }; };
   console.table(table);
   const targetCounts = { daysMet: table.filter((row) => row.dayDifference === 0).length, daysShort: table.filter((row) => row.dayDifference < 0).length, daysExcess: table.filter((row) => row.dayDifference > 0).length, hoursMet: table.filter((row) => row.hourDifference === 0).length, hoursShort: table.filter((row) => row.hourDifference < 0).length, hoursExcess: table.filter((row) => row.hourDifference > 0).length, limitExcess: table.filter((row) => row.limitHours && row.actualHours > row.limitHours).length };
-  console.log(JSON.stringify({ generatedStaff: generationStaff.length, totalAssignments: result.assignments.length, targetCounts, generalEarlySpread: spread('early', 'earlyGroup'), generalLateSpread: spread('late', 'lateGroup'), dedicated: table.filter((row) => row.earlyGroup === 'DEDICATED' || row.lateGroup === 'DEDICATED'), placementShortageWarnings: result.warnings.filter((row) => row.code === 'CLASS_SHORTAGE').length, warningCounts: result.warnings.reduce((acc, row) => ({ ...acc, [row.code]: (acc[row.code] || 0) + 1 }), {}), conditionViolations: violations.length }, null, 2));
-  if (generationStaff.length !== 14 || result.assignments.length !== 434 || violations.length) process.exitCode = 1;
+  console.log(JSON.stringify({ activeDemoStaff: staff.length, staffWithRequest: staff.length - staffWithoutRequest.length, staffWithoutRequest: staffWithoutRequest.map((row) => row.employeeNumber), generatedStaff: generationStaff.length, totalAssignments: result.assignments.length, targetCounts, generalEarlySpread: spread('early', 'earlyGroup'), generalLateSpread: spread('late', 'lateGroup'), dedicated: table.filter((row) => row.earlyGroup === 'DEDICATED' || row.lateGroup === 'DEDICATED'), placementShortageWarnings: result.warnings.filter((row) => row.code === 'CLASS_SHORTAGE').length, requestConflictCount: violations.filter((row) => row.startsWith('REQUEST_CONFLICT:')).length, warningCounts: result.warnings.reduce((acc, row) => ({ ...acc, [row.code]: (acc[row.code] || 0) + 1 }), {}), conditionViolations: violations.length }, null, 2));
+  if (staffWithoutRequest.length || generationStaff.length !== 14 || result.assignments.length !== 434 || violations.length) process.exitCode = 1;
 }
 
 main().finally(() => prisma.$disconnect());

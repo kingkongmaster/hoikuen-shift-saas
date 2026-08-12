@@ -13,6 +13,7 @@
     "db:migrate:status": "node scripts/migration.cjs status",
     "db:migrate:deploy": "node scripts/migration.cjs deploy",
     "db:migrate:dry-run": "node scripts/migration.cjs deploy --dry-run",
+    "demo:preflight": "node scripts/demo-preflight.cjs",
     "admin:bootstrap": "node scripts/bootstrap-admin.cjs",
     "setup:musubi-provisional": "node scripts/setup-musubi-provisional-demo.cjs",
     "test:musubi-provisional": "node test/musubi-provisional-demo.test.cjs",
