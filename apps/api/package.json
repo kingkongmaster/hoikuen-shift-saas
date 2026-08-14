@@ -39,6 +39,7 @@
     "test:fixed-class": "node test/fixed-class-special-shift.test.cjs",
     "test:individual-hours": "node test/individual-working-hours.test.cjs",
     "test:fair-special-shifts": "node test/fair-special-shift-allocation.test.cjs",
+    "test:shift-transition-burden": "node test/shift-transition-burden.test.cjs",
     "audit:fair-special-shifts": "node test/fair-special-shift-august-audit.cjs",
     "test:monthly-targets": "node test/monthly-work-targets.test.cjs",
     "test:production-hardening": "node test/production-hardening.test.cjs",

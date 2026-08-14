@@ -82,7 +82,7 @@ export function FeedbackManagement({ session }: { session: Session }) {
     localStorage.setItem(storageKey, JSON.stringify(next));
     setRows(next);
     setDraft(emptyDraft());
-    setMessage('報告をこの端末へ保存しました。管理者へ共有する場合はJSON書き出しをご利用ください。');
+    setMessage('報告をこの端末へ保存しました。管理者へ共有する場合は「報告ファイルを保存」をご利用ください。');
   };
   const remove = (id: string) => {
     if (!window.confirm('この保存済み報告を削除しますか？')) return;
@@ -123,7 +123,7 @@ export function FeedbackManagement({ session }: { session: Session }) {
     </div>
     {message && <MessageBanner kind={message.startsWith('必須') ? 'error' : 'success'}>{message}</MessageBanner>}
     <div className="card">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">この端末に保存した報告</h3><p className="mt-1 text-sm text-slate-500">{rows.length}件</p></div><button type="button" onClick={exportJson} disabled={!rows.length} className="btn-secondary">JSON書き出し</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">この端末に保存した報告</h3><p className="mt-1 text-sm text-slate-500">{rows.length}件</p></div><button type="button" onClick={exportJson} disabled={!rows.length} className="btn-secondary">報告ファイルを保存</button></div>
       {rows.length ? <ul className="mt-4 space-y-3">{rows.map((row) => <li key={row.id} className="rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">{typeLabels[row.type]}</span><h4 className="mt-2 font-bold">{row.subject}</h4><p className="mt-1 text-sm text-slate-600">{row.content || row.actual}</p><p className="mt-2 text-xs text-slate-500">{new Date(row.createdAt).toLocaleString('ja-JP')}／{row.browser}</p></div><button type="button" onClick={() => remove(row.id)} className="btn-secondary text-sm">削除</button></div></li>)}</ul> : <div className="mt-4"><EmptyState title="保存済みの報告はありません" description="お問い合わせや改善要望を保存すると、ここで確認できます。" /></div>}
     </div>
   </section>;

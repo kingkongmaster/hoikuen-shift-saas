@@ -20,7 +20,7 @@ for (const label of ['発生日時', '操作内容', '期待した結果', '実�
 for (const metadata of ['screenName', 'appVersion', 'buildNumber', 'browser', 'operatingSystem', 'viewport']) assert.ok(feedback.includes(metadata), `${metadata}自動付加`);
 assert.ok(feedback.includes('window.confirm') && feedback.includes('localStorage.setItem') && feedback.includes('localStorage.getItem'), '確認ダイアログとローカル保存');
 assert.ok(feedback.includes('enshift.monitorFeedback.v1:${session.tenant.id}:${session.user.id}'), '園・利用者単位の保存');
-assert.ok(feedback.includes('JSON書き出し') && feedback.includes('application/json'), 'ローカル報告JSON出力');
+assert.ok(feedback.includes('報告ファイルを保存') && feedback.includes('application/json'), 'ローカル報告ファイル出力');
 assert.ok(feedback.includes('パスワード、園児の氏名、健康情報'), '秘密・個人情報の注意');
 for (const browser of ['Microsoft Edge', 'Google Chrome', 'Firefox', 'Safari']) assert.ok(device.includes(browser), `${browser}判別`);
 

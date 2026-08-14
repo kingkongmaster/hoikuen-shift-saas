@@ -41,8 +41,8 @@ for (const code of ['404', '500', '403']) assert.ok(errorBoundary.includes(code)
 assert.ok(login.includes('デモデータで開始') && login.includes('owner@demo.enshift.local'), 'demo launch');
 assert.ok(dashboard.includes('basis-[calc(50%-0.25rem)]') && dashboard.includes('api.notifications'), '390px menu and unread badge');
 assert.ok(notifications.includes('未読 {unread}件') && notifications.includes('EmptyState') && notifications.includes('LoadingState'), 'notification states/count');
-for (const label of ['全職員シフト表 印刷／PDF', 'わたしの勤務カレンダー 印刷／PDF', 'クラス別 印刷／PDF', '職員一覧CSV', '希望休CSV', '月間シフトCSV', '監査ログCSV', 'JSON Export', 'JSON Import']) assert.ok(exportsPage.includes(label), label);
-assert.ok(exportsPage.includes('classLabels[classFilter]'), 'class print filter label conversion');
+for (const label of ['全職員シフト表 印刷／PDF', 'わたしの勤務カレンダー 印刷／PDF', 'クラス別 印刷／PDF', '職員一覧CSV', '希望休CSV', '月間シフトCSV', '監査ログCSV', 'バックアップを保存', 'バックアップを読み込む']) assert.ok(exportsPage.includes(label), label);
+assert.ok(exportsPage.includes('adminPrintHtml(data, classFilter, options)') && printLayout.includes('classLabels[classFilter]'), 'class print filter keeps code and converts label in layout');
 assert.ok(printLayout.includes("window.open('', '_blank')") && printLayout.includes('popup.opener = null'), 'print popup handle and opener isolation');
 assert.ok(footer.includes('InstallPrompt') && installPrompt.includes('beforeinstallprompt') && installPrompt.includes('ホーム画面に追加'), 'install UI');
 for (const breakpoint of ['sm:', 'md:', 'lg:']) assert.ok(styles.includes('@tailwind') && (dashboard.includes(breakpoint) || footer.includes(breakpoint) || subscription.includes(breakpoint)), `${breakpoint} responsive`);

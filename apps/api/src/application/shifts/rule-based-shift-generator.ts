@@ -112,11 +112,13 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
         }
         const preferred = preferenceRank(options.staffWorkRules ?? [], a.id, workDate, type) - preferenceRank(options.staffWorkRules ?? [], b.id, workDate, type);
         if (preferred) return preferred;
-        if (softDifference) return softDifference;
+        const transitionBurden = specialShiftBurden(a, type) - specialShiftBurden(b, type);
+        if (transitionBurden) return transitionBurden;
         const dedicated = dedicatedRank(a, type) - dedicatedRank(b, type);
         if (dedicated) return dedicated;
         const specialCount = countFor(a, type) - countFor(b, type);
         if (specialCount) return specialCount;
+        if (softDifference) return softDifference;
         // Monthly targets guide NORMAL assignments only. Special shifts keep their
         // type-specific fairness ahead of every soft target consideration.
         if (type === ShiftType.NORMAL) {
@@ -138,6 +140,16 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       };
     }
     function dedicatedRank(member: GeneratorStaff, type: ShiftType) { return type === ShiftType.EARLY ? (member.earlyShiftOnly ? 0 : 1) : type === ShiftType.LATE ? (member.lateShiftOnly ? 0 : 1) : 0; }
+    function specialShiftBurden(member: GeneratorStaff, type: ShiftType) {
+      if (type !== ShiftType.EARLY && type !== ShiftType.LATE) return 0;
+      if ((type === ShiftType.EARLY && member.earlyShiftOnly) || (type === ShiftType.LATE && member.lateShiftOnly)) return 0;
+      if (preferenceRank(options.staffWorkRules ?? [], member.id, workDate, type) !== Number.MAX_SAFE_INTEGER) return 0;
+      const previousDate = new Date(workDate); previousDate.setUTCDate(previousDate.getUTCDate() - 1);
+      const previous = assignments.find((item) => item.staffId === member.id && iso(item.workDate) === iso(previousDate))?.shiftType;
+      if (type === ShiftType.EARLY && previous === ShiftType.LATE) return 2;
+      if (type === ShiftType.LATE && previous === ShiftType.EARLY) return 1;
+      return previous === type ? 1 : 0;
+    }
     function countFor(member: GeneratorStaff, type: ShiftType) { return type === ShiftType.EARLY ? (earlyCountByStaff.get(member.id) ?? 0) : type === ShiftType.LATE ? (lateCountByStaff.get(member.id) ?? 0) : 0; }
     function normalSpecialReserveRank(member: GeneratorStaff) { const counts: number[] = []; if (member.canWorkEarly && !member.lateShiftOnly) counts.push(earlyCountByStaff.get(member.id) ?? 0); if (member.canWorkLate && !member.earlyShiftOnly) counts.push(lateCountByStaff.get(member.id) ?? 0); return counts.length ? -counts.reduce((sum, value) => sum + value, 0) / counts.length : -1000; }
     function placementNeed(member: GeneratorStaff) { if (!isFixedClass(member.assignedClass)) return 0; const requirement = classTargets().find((item) => item.classType === member.assignedClass); if (!requirement) return 0; const target = saturday || sunday ? requirement.saturdayRequired : requirement.weekdayRequired; const assigned = staff.filter((item) => item.assignedClass === member.assignedClass && isWorking(day.get(item.id)!.shiftType)).length; return Math.max(0, target - assigned); }
