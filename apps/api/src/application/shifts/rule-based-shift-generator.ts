@@ -2,13 +2,15 @@ import { AssignedClass, EmploymentType, ShiftRequestType, ShiftType, StaffWorkRu
 import { shiftTypeDefaults, workingShiftTypes } from '../../domain/shifts/monthly-shift';
 import { evaluateStaffingRequirements, evaluationWarnings, staffingPriority, type GeneratorAttributeAssignment, type GeneratorStaffingRequirement } from './staffing-requirement-evaluator';
 import { applicableRules, fixedRule, patternType, preferenceRank, prohibitionConflict, ruleEligibility, ruleLabel, type GeneratorWorkRule } from './staff-work-rule-evaluator';
+import { futureHardReservationPlan, type FutureCandidateCapacity, type FutureHardReservation, type FutureHardSlot } from './future-hard-capacity-evaluator';
+import { activeRequirements, hasAttribute } from './staffing-requirement-evaluator';
 
 export type GeneratorStaff = { id: string; employeeNumber: string; displayName: string; assignedClass: AssignedClass; employmentType: EmploymentType; isDirector?: boolean; canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean; canWorkSaturdays: boolean; monthlyWorkHourLimit: number | null; monthlyTargetWorkDays?: number | null; monthlyTargetWorkHours?: number | null; weeklyAvailableDays: number | null; regularWorkStartTime?: string | null; regularWorkEndTime?: string | null };
 export type GeneratorRequest = { staffId: string; requestDate: Date; requestType: ShiftRequestType; reason: string | null };
 export type GenerationWarning = { code: string; level: 'INFO' | 'WARNING' | 'ERROR'; workDate: string; staffId?: string; classType?: AssignedClass; required?: number; assigned?: number; message: string };
 export type GeneratedAssignment = { staffId: string; workDate: Date; shiftType: ShiftType; workPatternId?: string | null; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null };
 export type SpecialShiftSummary = { staffId: string; employeeNumber: string; displayName: string; earlyCount: number; lateCount: number; totalSpecialShiftCount: number; saturdayCount: number; workCount: number; earlyCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE'; lateCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE' };
-export type GeneratorOptions = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff?: number; saturdayOperationEnabled?: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing?: boolean; directorClassPlacementMode?: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number; closedDates?: Array<{ closedDate: Date; name: string }>; classRequirements?: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean }>; staffingRequirements?: GeneratorStaffingRequirement[]; staffAttributeAssignments?: GeneratorAttributeAssignment[]; staffWorkRules?: GeneratorWorkRule[] };
+export type GeneratorOptions = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff?: number; saturdayOperationEnabled?: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing?: boolean; directorClassPlacementMode?: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number; closedDates?: Array<{ closedDate: Date; name: string }>; classRequirements?: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean }>; staffingRequirements?: GeneratorStaffingRequirement[]; staffAttributeAssignments?: GeneratorAttributeAssignment[]; staffWorkRules?: GeneratorWorkRule[]; futureHardCapacityReservation?: boolean };
 
 const defaultTargets: Partial<Record<AssignedClass, number>> = { AGE_0: 3, AGE_1: 2, AGE_2: 2, AGE_3: 2, AGE_4: 2, AGE_5: 2 };
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -22,6 +24,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
   const earlyCountByStaff = new Map<string, number>(); const lateCountByStaff = new Map<string, number>();
   const workStreak = new Map<string, number>(); const earlyStreak = new Map<string, number>(); const lateStreak = new Map<string, number>();
   const warned = new Set<string>();
+  const futureHardCapacitySummary = { evaluations: 0, cacheHits: 0, planBuilds: 0, maxFlowCalls: 0, incrementalUpdates: 0, maxFlowCallsByDate: {} as Record<string, number> };
   const add = (warning: GenerationWarning) => { const key = `${warning.code}:${warning.workDate}:${warning.staffId ?? ''}:${warning.classType ?? ''}`; if (!warned.has(key)) { warned.add(key); warnings.push(warning); } };
   const start = new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth(), 1)); const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
 
@@ -29,6 +32,8 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     const workDate = new Date(current); const key = iso(workDate); const saturday = workDate.getUTCDay() === 6; const sunday = workDate.getUTCDay() === 0; const closedName = closed.get(key);
     const day = new Map<string, GeneratedAssignment>();
     const fixedStaffIds = new Set<string>();
+    const futureCapacityCache = new Map<string, number>();
+    let futurePlan: { slots: FutureHardSlot[]; capacities: FutureCandidateCapacity[]; futureDates: Date[]; reservations: FutureHardReservation[] } | null = null;
     for (const member of staff) { const request = fixed.get(`${member.id}:${key}`); day.set(member.id, request ? assignment(member, workDate, requestTypeToShiftType(request.requestType), options, '希望休を優先') : assignment(member, workDate, ShiftType.OFF, options)); }
     for (const member of staff) {
       const rule = fixedRule(options.staffWorkRules ?? [], member.id, workDate); if (!rule?.workPattern) continue;
@@ -58,8 +63,12 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       const saturdayMinimumStaff = options.saturdayMinimumStaff ?? 3;
       const minimumWorking = saturday || sunday ? Math.max(requiredWorking, saturdayMinimumStaff) : requiredWorking + staffingBuffer;
       const normalNeeded = Math.max(0, minimumWorking - alreadyWorking);
-      const normal = staff.filter((member) => day.get(member.id)?.shiftType === ShiftType.OFF && eligible(member, ShiftType.NORMAL));
-      normal.sort(compare(ShiftType.NORMAL)); for (const member of normal.slice(0, normalNeeded)) day.set(member.id, assignment(member, workDate, ShiftType.NORMAL, options, null, member.isDirector ? null : member.assignedClass));
+      for (let index = 0; index < normalNeeded; index += 1) {
+        const normal = staff.filter((member) => day.get(member.id)?.shiftType === ShiftType.OFF && eligible(member, ShiftType.NORMAL));
+        const member = normal.sort(compare(ShiftType.NORMAL, normal.length))[0]; if (!member) break;
+        day.set(member.id, assignment(member, workDate, ShiftType.NORMAL, options, null, member.isDirector ? null : member.assignedClass));
+        consumeFutureCapacity(member, ShiftType.NORMAL);
+      }
       const assignedWorking = [...day.values()].filter((item) => isWorking(item.shiftType)).length;
       if ((saturday || sunday) && assignedWorking < saturdayMinimumStaff) { addRequestConstraintWarning(); add({ code: 'SATURDAY_MINIMUM_SHORTAGE', level: 'ERROR', workDate: key, required: saturdayMinimumStaff, assigned: assignedWorking, message: `${key}（${weekdays[workDate.getUTCDay()]}）の最低勤務人数が${saturdayMinimumStaff - assignedWorking}人不足しています。` }); }
       assignClasses(targets);
@@ -96,7 +105,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       if (member.weeklyAvailableDays && nextDays > member.weeklyAvailableDays) return false;
       return true;
     }
-    function compare(type: ShiftType) {
+    function compare(type: ShiftType, currentCandidateCount: number) {
       return (a: GeneratorStaff, b: GeneratorStaff) => {
         let softDifference = 0;
         if (options.staffingRequirements?.length) {
@@ -110,6 +119,8 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
           if (ap.hard !== bp.hard) return bp.hard - ap.hard;
           softDifference = bp.soft - ap.soft;
         }
+        const futureHard = futureHardPenalty(a, type, currentCandidateCount) - futureHardPenalty(b, type, currentCandidateCount);
+        if (futureHard) return futureHard;
         const preferred = preferenceRank(options.staffWorkRules ?? [], a.id, workDate, type) - preferenceRank(options.staffWorkRules ?? [], b.id, workDate, type);
         if (preferred) return preferred;
         const transitionBurden = specialShiftBurden(a, type) - specialShiftBurden(b, type);
@@ -122,6 +133,14 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
         // Monthly targets guide NORMAL assignments only. Special shifts keep their
         // type-specific fairness ahead of every soft target consideration.
         if (type === ShiftType.NORMAL) {
+          // On Saturdays, use the existing Saturday count only as a tie-break
+          // after HARD/future-HARD/preference priorities, before NORMAL-specific
+          // soft reservation. This prevents one regular-only worker from being
+          // selected every Saturday while equally safe alternatives are available.
+          if (saturday) {
+            const saturdayFairness = (saturdayCount.get(a.id) ?? 0) - (saturdayCount.get(b.id) ?? 0);
+            if (saturdayFairness) return saturdayFairness;
+          }
           // Prefer staff who cannot cover special shifts, then staff who have already
           // received more of their eligible special shifts. This preserves future
           // weekly capacity for under-allocated early/late candidates.
@@ -156,10 +175,15 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     function normalizedTargetDeficit(member: GeneratorStaff) { const ratios: number[] = []; if (member.monthlyTargetWorkDays) ratios.push(Math.max(0, member.monthlyTargetWorkDays - (workCount.get(member.id) ?? 0)) / member.monthlyTargetWorkDays); if (member.monthlyTargetWorkHours) { const targetMinutes = member.monthlyTargetWorkHours * 60; ratios.push(Math.max(0, targetMinutes - (minutes.get(member.id) ?? 0)) / targetMinutes); } return ratios.length ? ratios.reduce((sum, value) => sum + value, 0) / ratios.length : 0; }
     function allocate(type: ShiftType, required: number) {
       const existing = staff.filter((member) => day.get(member.id)?.shiftType === type); let count = existing.length; const usedFixedClasses = new Set(existing.map((member) => member.assignedClass).filter(isFixedClass)); let rejectedByClass = false;
-      for (const member of staff.filter((m) => day.get(m.id)?.shiftType === ShiftType.OFF && eligible(m, type)).sort(compare(type))) {
+      const candidates = staff.filter((m) => day.get(m.id)?.shiftType === ShiftType.OFF && eligible(m, type));
+      const remaining = [...candidates];
+      while (remaining.length && count < required) {
+        remaining.sort(compare(type, remaining.length));
+        const member = remaining.shift()!;
         if (count >= required) break;
         if (isFixedClass(member.assignedClass) && usedFixedClasses.has(member.assignedClass)) { rejectedByClass = true; continue; }
         day.set(member.id, assignment(member, workDate, type, options, null, member.isDirector ? null : member.assignedClass));
+        consumeFutureCapacity(member, type);
         if (isFixedClass(member.assignedClass)) usedFixedClasses.add(member.assignedClass);
         count += 1;
       }
@@ -169,6 +193,158 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
         add({ code: type === ShiftType.EARLY ? 'EARLY_SHORTAGE' : 'LATE_SHORTAGE', level: 'ERROR', workDate: key, required, assigned: count, message: `${key}（${weekdays[workDate.getUTCDay()]}）の${type === ShiftType.EARLY ? '早出' : '遅出'}が${required - count}人不足しています。` });
       }
       if (saturday && count < required) add({ code: 'SATURDAY_SHORTAGE', level: 'WARNING', workDate: key, required, assigned: count, message: `${key}の土曜勤務可能職員が不足しています。` });
+    }
+    function futureHardPenalty(member: GeneratorStaff, type: ShiftType, currentCandidateCount: number) {
+      if (options.futureHardCapacityReservation === false || currentCandidateCount <= 1) return 0;
+      const cacheKey = `${type}:${member.id}:${currentCandidateCount}`;
+      const cached = futureCapacityCache.get(cacheKey); if (cached != null) { futureHardCapacitySummary.cacheHits += 1; return cached; }
+      futurePlan ??= buildFuturePlan();
+      futureHardCapacitySummary.evaluations += 1;
+      const reserved = futurePlan.reservations.filter((item) => item.staffId === member.id);
+      const remainingDays = futurePlan.capacities.find((item) => item.staffId === member.id)?.remainingDays ?? 0;
+      const unavailable = new Set(unavailableAfterCurrent(member, type, futurePlan.slots));
+      const base = reserved.length && (remainingDays <= reserved.length || reserved.some((item) => unavailable.has(item.slotId))) ? 1 : 0;
+      const attribute = futureAttributeHardLoss(member, futurePlan);
+      const penalty = Math.max(base, attribute);
+      futureCapacityCache.set(cacheKey, penalty);
+      return penalty;
+    }
+    function buildFuturePlan() {
+      futureHardCapacitySummary.planBuilds += 1;
+      futureHardCapacitySummary.maxFlowCalls += 1;
+      futureHardCapacitySummary.maxFlowCallsByDate[key] = (futureHardCapacitySummary.maxFlowCallsByDate[key] ?? 0) + 1;
+      const futureDates: Date[] = [];
+      const weekEnd = new Date(workDate); weekEnd.setUTCDate(weekEnd.getUTCDate() + (7 - weekEnd.getUTCDay()) % 7);
+      for (let date = new Date(workDate.getTime() + 86400000); date <= weekEnd && date < end; date = new Date(date.getTime() + 86400000)) {
+        if (isOpenFutureDate(date)) futureDates.push(date);
+      }
+      const fixedFutureDays = new Map<string, number>();
+      const slots: FutureHardSlot[] = [];
+      for (const date of futureDates) {
+        const futureKey = iso(date); const weekend = date.getUTCDay() === 6 || date.getUTCDay() === 0;
+        const earlyRequired = weekend ? options.saturdayEarlyRequired : options.weekdayEarlyRequired;
+        const lateRequired = weekend ? options.saturdayLateRequired : options.weekdayLateRequired;
+        const targets = classTargets();
+        const requiredWorking = targets.reduce((sum, requirement) => sum + (weekend ? requirement.saturdayRequired : requirement.weekdayRequired), 0);
+        const staffingBuffer = requiredWorking > 0 && !weekend ? 2 : 0;
+        const minimumWorking = weekend ? Math.max(requiredWorking, options.saturdayMinimumStaff ?? 3) : requiredWorking + staffingBuffer;
+        const requirements = [
+          { type: ShiftType.EARLY, required: earlyRequired },
+          { type: ShiftType.LATE, required: lateRequired },
+          { type: ShiftType.NORMAL, required: Math.max(0, minimumWorking - earlyRequired - lateRequired) },
+        ];
+        const fixedTypes = new Map<ShiftType, number>();
+        for (const candidate of staff) {
+          const rule = validFutureFixed(candidate, date); if (!rule) continue;
+          fixedFutureDays.set(candidate.id, (fixedFutureDays.get(candidate.id) ?? 0) + 1);
+          fixedTypes.set(rule, (fixedTypes.get(rule) ?? 0) + 1);
+        }
+        for (const requirement of requirements) {
+          const required = Math.max(0, requirement.required - (fixedTypes.get(requirement.type) ?? 0));
+          if (!required) continue;
+          slots.push({ id: `${futureKey}:${requirement.type}`, date: futureKey, required, candidateIds: staff.filter((candidate) => futureEligible(candidate, date, requirement.type)).map((candidate) => candidate.id) });
+        }
+      }
+      const capacities = staff.map((member) => ({
+        staffId: member.id,
+        remainingDays: Math.max(0, weeklyLimit(member, futureDates) - (days.get(`${member.id}:${weekKey(key)}`) ?? 0) - (isWorking(day.get(member.id)!.shiftType) ? 1 : 0) - (fixedFutureDays.get(member.id) ?? 0)),
+      }));
+      const reservations = futureHardReservationPlan(slots, capacities).reservations;
+      return { slots, capacities, futureDates, reservations };
+    }
+    function unavailableAfterCurrent(member: GeneratorStaff, type: ShiftType, slots: FutureHardSlot[]) {
+      const tomorrow = iso(new Date(workDate.getTime() + 86400000));
+      let blockEveryType = (workStreak.get(member.id) ?? 0) + 1 >= options.maxConsecutiveWorkDays;
+      for (const rule of applicableRules(options.staffWorkRules ?? [], member.id, workDate)) {
+        if (rule.ruleType === StaffWorkRuleType.MAX_CONSECUTIVE_WORK_DAYS && rule.numericValue != null && (workStreak.get(member.id) ?? 0) + 1 >= rule.numericValue) blockEveryType = true;
+      }
+      return slots.filter((slot) => {
+        if (slot.date !== tomorrow) return false;
+        if (blockEveryType) return true;
+        if (type === ShiftType.EARLY && slot.id.endsWith(`:${ShiftType.EARLY}`) && (earlyStreak.get(member.id) ?? 0) + 1 >= options.maxConsecutiveEarlyDays) return true;
+        return type === ShiftType.LATE && slot.id.endsWith(`:${ShiftType.LATE}`) && (lateStreak.get(member.id) ?? 0) + 1 >= options.maxConsecutiveLateDays;
+      }).map((slot) => slot.id);
+    }
+    function consumeFutureCapacity(member: GeneratorStaff, type: ShiftType) {
+      futureCapacityCache.clear();
+      if (!futurePlan) return;
+      const capacity = futurePlan.capacities.find((item) => item.staffId === member.id);
+      if (!capacity) return;
+      const nextRemainingDays = Math.max(0, capacity.remainingDays - 1);
+      const unavailable = new Set(unavailableAfterCurrent(member, type, futurePlan.slots));
+      const reserved = futurePlan.reservations.filter((item) => item.staffId === member.id);
+      if (reserved.length > nextRemainingDays || reserved.some((item) => unavailable.has(item.slotId))) {
+        futurePlan = null;
+        return;
+      }
+      futurePlan = {
+        ...futurePlan,
+        capacities: futurePlan.capacities.map((item) => item.staffId === member.id ? { ...item, remainingDays: nextRemainingDays } : item),
+        slots: unavailable.size ? futurePlan.slots.map((slot) => unavailable.has(slot.id)
+          ? { ...slot, candidateIds: slot.candidateIds.filter((staffId) => staffId !== member.id) }
+          : slot) : futurePlan.slots,
+      };
+      futureHardCapacitySummary.incrementalUpdates += 1;
+    }
+    function isOpenFutureDate(date: Date) {
+      const futureKey = iso(date); const futureSaturday = date.getUTCDay() === 6; const futureSunday = date.getUTCDay() === 0;
+      return !closed.has(futureKey) && !(futureSaturday && options.saturdayOperationEnabled === false) && !(futureSunday && !options.sundayOperationEnabled);
+    }
+    function validFutureFixed(member: GeneratorStaff, date: Date) {
+      const futureKey = iso(date); if (fixed.has(`${member.id}:${futureKey}`)) return null;
+      const rule = fixedRule(options.staffWorkRules ?? [], member.id, date); if (!rule?.workPattern?.isActive) return null;
+      const type = patternType(rule); if (!type || !isWorking(type)) return null;
+      const times = rule.workPattern.startTime && rule.workPattern.endTime ? { startTime: rule.workPattern.startTime, endTime: rule.workPattern.endTime } : null;
+      return prohibitionConflict(options.staffWorkRules ?? [], member.id, date, type, times) ? null : type;
+    }
+    function futureEligible(member: GeneratorStaff, date: Date, type: ShiftType) {
+      const futureKey = iso(date); if (fixed.has(`${member.id}:${futureKey}`) || validFutureFixed(member, date)) return false;
+      if (blockedByCurrentDay(member, date, type)) return false;
+      if (date.getUTCDay() === 6 && !member.canWorkSaturdays) return false;
+      if (type === ShiftType.EARLY && (!member.canWorkEarly || member.lateShiftOnly)) return false;
+      if (type === ShiftType.LATE && (!member.canWorkLate || member.earlyShiftOnly)) return false;
+      if (type === ShiftType.NORMAL && (!member.canWorkRegular || member.earlyShiftOnly || member.lateShiftOnly)) return false;
+      if (!ruleEligibility(options.staffWorkRules ?? [], member.id, date, type, timesForMember(type, options, member) ?? null).eligible) return false;
+      const nextMinutes = (minutes.get(member.id) ?? 0) + minutesForType(type, options, member);
+      if (member.monthlyWorkHourLimit && nextMinutes > member.monthlyWorkHourLimit * 60) return false;
+      return true;
+    }
+    function blockedByCurrentDay(member: GeneratorStaff, date: Date, type: ShiftType) {
+      if (iso(date) !== iso(new Date(workDate.getTime() + 86400000))) return false;
+      const currentType = day.get(member.id)?.shiftType; if (!currentType || !isWorking(currentType)) return false;
+      if ((workStreak.get(member.id) ?? 0) + 1 >= options.maxConsecutiveWorkDays) return true;
+      for (const rule of applicableRules(options.staffWorkRules ?? [], member.id, workDate)) {
+        if (rule.ruleType === StaffWorkRuleType.MAX_CONSECUTIVE_WORK_DAYS && rule.numericValue != null && (workStreak.get(member.id) ?? 0) + 1 >= rule.numericValue) return true;
+      }
+      if (currentType === ShiftType.EARLY && type === ShiftType.EARLY && (earlyStreak.get(member.id) ?? 0) + 1 >= options.maxConsecutiveEarlyDays) return true;
+      return currentType === ShiftType.LATE && type === ShiftType.LATE && (lateStreak.get(member.id) ?? 0) + 1 >= options.maxConsecutiveLateDays;
+    }
+    function weeklyLimit(member: GeneratorStaff, futureDates: Date[]) {
+      let limit = member.weeklyAvailableDays ?? 7;
+      for (const date of [workDate, ...futureDates]) {
+        for (const rule of applicableRules(options.staffWorkRules ?? [], member.id, date)) {
+          if (rule.ruleType === StaffWorkRuleType.MAX_WORK_DAYS_PER_WEEK && rule.numericValue != null) limit = Math.min(limit, rule.numericValue);
+        }
+      }
+      return limit;
+    }
+    function futureAttributeHardLoss(member: GeneratorStaff, plan: { capacities: FutureCandidateCapacity[]; futureDates: Date[] }) {
+      if (!options.staffingRequirements?.length) return 0;
+      const remaining = plan.capacities.find((item) => item.staffId === member.id)?.remainingDays ?? 0;
+      if (remaining !== 1) return 0;
+      for (const date of plan.futureDates) {
+        for (const requirement of activeRequirements(options.staffingRequirements, date).filter((item) => item.constraintLevel === 'HARD')) {
+          if (!hasAttribute(options.staffAttributeAssignments ?? [], member.id, requirement.attributeDefinitionId, date)) continue;
+          if (requirement.classType && member.assignedClass !== requirement.classType && member.assignedClass !== AssignedClass.FREE && member.assignedClass !== AssignedClass.SUPPORT) continue;
+          const candidates = staff.filter((candidate) =>
+            hasAttribute(options.staffAttributeAssignments ?? [], candidate.id, requirement.attributeDefinitionId, date)
+            && (!requirement.classType || candidate.assignedClass === requirement.classType || candidate.assignedClass === AssignedClass.FREE || candidate.assignedClass === AssignedClass.SUPPORT)
+            && [ShiftType.EARLY, ShiftType.LATE, ShiftType.NORMAL].some((shiftType) => futureEligible(candidate, date, shiftType))
+            && (plan.capacities.find((item) => item.staffId === candidate.id)?.remainingDays ?? 0) > 0);
+          if (candidates.length <= requirement.requiredCount) return 1;
+        }
+      }
+      return 0;
     }
     function addRequestConstraintWarning() {
       if (!staff.some((member) => fixed.has(`${member.id}:${key}`))) return;
@@ -222,10 +398,10 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     const actual = rule.ruleType === StaffWorkRuleType.MIN_WORK_DAYS_PER_MONTH ? scoped.length : scoped.reduce((sum, item) => sum + minutesFor(item), 0);
     if (actual < rule.numericValue) add({ code: rule.ruleType === StaffWorkRuleType.MIN_WORK_DAYS_PER_MONTH ? 'STAFF_WORK_RULE_MIN_DAYS_UNMET' : 'STAFF_WORK_RULE_MIN_MINUTES_UNMET', level: rule.isHardConstraint ? 'ERROR' : 'WARNING', workDate: iso(new Date(end.getTime() - 86400000)), staffId: rule.staffId, required: rule.numericValue, assigned: actual, message: `個別勤務ルールの最低${rule.ruleType === StaffWorkRuleType.MIN_WORK_DAYS_PER_MONTH ? '勤務日数' : '勤務時間（分）'}を満たしていません（必要${rule.numericValue}、実績${actual}）。` });
   }
-  if (!options.staffingRequirements?.length) return { assignments, warnings, specialShiftSummary };
+  if (!options.staffingRequirements?.length) return { assignments, warnings, specialShiftSummary, futureHardCapacitySummary };
   const staffingRequirementEvaluations = evaluateStaffingRequirements(options.staffingRequirements, options.staffAttributeAssignments ?? [], assignments.filter((item) => isWorking(item.shiftType)));
   warnings.push(...evaluationWarnings(staffingRequirementEvaluations));
-  return { assignments, warnings, specialShiftSummary, staffingRequirementEvaluations };
+  return { assignments, warnings, specialShiftSummary, staffingRequirementEvaluations, futureHardCapacitySummary };
 }
 
 function classPriority(member: GeneratorStaff, target: AssignedClass) { if (member.assignedClass === target) return 0; if (member.assignedClass === AssignedClass.FREE) return 1; if (member.assignedClass === AssignedClass.SUPPORT) return 2; return 3; }
