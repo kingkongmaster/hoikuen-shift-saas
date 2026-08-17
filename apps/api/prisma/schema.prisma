@@ -276,6 +276,7 @@ model Staff {
 
   @@unique([tenantId, employeeNumber])
   @@unique([tenantId, userId])
+  @@unique([tenantId, id], map: "Staff_tenantId_id_key")
   @@index([tenantId, isActive])
 }
 
@@ -291,7 +292,7 @@ model ShiftRequest {
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  staff        Staff              @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staff        Staff              @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Cascade, onUpdate: Cascade, map: "ShiftRequest_tenantId_staffId_tenant_guard_fkey")
 
   @@unique([tenantId, staffId, requestDate, requestType])
   @@index([tenantId, requestDate, status])
@@ -312,6 +313,7 @@ model MonthlyShift {
   assignments       ShiftAssignment[]
 
   @@unique([tenantId, targetMonth])
+  @@unique([tenantId, id], map: "MonthlyShift_tenantId_id_key")
   @@index([tenantId, status, targetMonth])
 }
 
@@ -331,11 +333,12 @@ model ShiftAssignment {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  monthlyShift   MonthlyShift @relation(fields: [monthlyShiftId], references: [id], onDelete: Cascade)
-  staff          Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
-  workPattern    WorkPattern? @relation(fields: [workPatternId], references: [id], onDelete: SetNull)
+  monthlyShift   MonthlyShift @relation(fields: [tenantId, monthlyShiftId], references: [tenantId, id], onDelete: Cascade, onUpdate: Cascade, map: "ShiftAssignment_tenantId_monthlyShiftId_tenant_guard_fkey")
+  staff          Staff        @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "ShiftAssignment_tenantId_staffId_tenant_guard_fkey")
+  workPattern    WorkPattern? @relation(fields: [tenantId, workPatternId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "ShiftAssignment_tenantId_workPatternId_tenant_guard_fkey")
 
   @@unique([monthlyShiftId, staffId, workDate])
+  @@index([tenantId, monthlyShiftId], map: "ShiftAssignment_tenantId_monthlyShiftId_idx")
   @@index([tenantId, staffId, workDate])
   @@index([monthlyShiftId, workDate])
   @@index([tenantId, workPatternId])
@@ -364,6 +367,7 @@ model WorkPattern {
   staffWorkRules StaffWorkRule[]
 
   @@unique([tenantId, code])
+  @@unique([tenantId, id], map: "WorkPattern_tenantId_id_key")
   @@index([tenantId, isActive, displayOrder])
 }
 
@@ -418,10 +422,11 @@ model StaffWorkRule {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  staff            Staff             @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  workPattern      WorkPattern?      @relation(fields: [workPatternId], references: [id], onDelete: Restrict)
+  staff            Staff             @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Cascade, onUpdate: Cascade, map: "StaffWorkRule_tenantId_staffId_tenant_guard_fkey")
+  workPattern      WorkPattern?      @relation(fields: [tenantId, workPatternId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "StaffWorkRule_tenantId_workPatternId_tenant_guard_fkey")
 
   @@index([tenantId, staffId, isActive])
+  @@index([tenantId, workPatternId], map: "StaffWorkRule_tenantId_workPatternId_idx")
   @@index([tenantId, ruleType])
 }
 
