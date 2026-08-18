@@ -26,6 +26,7 @@ import { StaffAttributesModule } from './presentation/staff-attributes/staff-att
 import { StaffingRequirementsModule } from './presentation/staffing-requirements/staffing-requirements.module';
 import { MusubiProvisionalModule } from './presentation/client-packages/musubi-provisional/musubi-provisional.module';
 import { AnnualWorkSummariesModule } from './presentation/annual-work-summaries/annual-work-summaries.module';
+import { StaffWorkContractsModule } from './presentation/staff-work-contracts/staff-work-contracts.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { AnnualWorkSummariesModule } from './presentation/annual-work-summaries/
     StaffingRequirementsModule,
     MusubiProvisionalModule,
     AnnualWorkSummariesModule,
+    StaffWorkContractsModule,
   ],
 })
 export class AppModule implements NestModule {

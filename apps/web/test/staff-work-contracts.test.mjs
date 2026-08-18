@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const client=await readFile(new URL('../src/api/client.ts',import.meta.url),'utf8');
+const page=await readFile(new URL('../src/features/staff/StaffWorkContractManagement.tsx',import.meta.url),'utf8');
+const staff=await readFile(new URL('../src/features/staff/StaffManagement.tsx',import.meta.url),'utf8');
+assert.match(client,/export type StaffWorkContract=/);
+assert.match(client,/\/staff\/\$\{staffId\}\/work-contracts/);
+assert.match(client,/\/void/);
+assert.doesNotMatch(client,/deleteStaffWorkContract/);
+for(const label of ['適用開始日','適用終了日','年間目標時間','所定1日勤務時間','要確認','履歴保持して無効化'])assert.match(page,new RegExp(label));
+assert.match(page,/type="number"/);
+assert.match(page,/annualizedTargetMinutes:annual/);
+assert.match(page,/prescribedDailyMinutes:daily/);
+assert.doesNotMatch(page,/dangerouslySetInnerHTML/);
+assert.match(staff,/StaffWorkContractManagement/);
+assert.match(staff,/勤務契約/);
+console.log('StaffWorkContract Web tests: PASS');

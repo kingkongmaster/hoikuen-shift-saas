@@ -132,6 +132,7 @@ model Tenant {
   staffAttributeDefinitions StaffAttributeDefinition[]
   staffAttributeAssignments StaffAttributeAssignment[]
   shiftStaffingRequirements ShiftStaffingRequirement[]
+  staffWorkContracts StaffWorkContract[]
   displayName String?
   phone String?
   postalCode String?
@@ -273,11 +274,30 @@ model Staff {
   assignments          ShiftAssignment[]
   workRules            StaffWorkRule[]
   attributeAssignments StaffAttributeAssignment[]
+  workContracts        StaffWorkContract[]
 
   @@unique([tenantId, employeeNumber])
   @@unique([tenantId, userId])
   @@unique([tenantId, id], map: "Staff_tenantId_id_key")
   @@index([tenantId, isActive])
+}
+
+model StaffWorkContract {
+  id                      String    @id @default(uuid()) @db.Uuid
+  tenantId                String    @db.Uuid
+  staffId                 String    @db.Uuid
+  effectiveFrom           DateTime  @db.Date
+  effectiveTo             DateTime? @db.Date
+  annualizedTargetMinutes Int
+  prescribedDailyMinutes  Int
+  voidedAt                DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  tenant                   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff                    Staff     @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "StaffWorkContract_tenantId_staffId_tenant_guard_fkey")
+
+  @@index([tenantId, staffId, effectiveFrom])
+  @@index([tenantId, voidedAt])
 }
 
 model ShiftRequest {

@@ -25,6 +25,7 @@
     "test:features": "node test/feature-entitlements.test.mjs",
     "test:work-patterns": "node test/work-patterns.test.mjs",
     "test:staff-work-rules": "node test/staff-work-rules.test.mjs",
+    "test:staff-work-contracts": "node test/staff-work-contracts.test.mjs",
     "test:staff-attributes": "node test/staff-attributes.test.mjs",
     "test:staffing-requirements": "node test/staffing-requirements.test.mjs",
     "test:staffing-requirement-generator": "node test/staffing-requirement-generator.test.mjs",
@@ -34,7 +35,7 @@
     "test:unread-interlocking": "node test/unread-count-interlocking.test.mjs",
     "test:mobile-390px-notifications": "node test/mobile-390px-notifications.test.mjs",
     "test:trial-error-guidance": "node test/trial-error-guidance.test.mjs",
-    "test:regression": "npm run test:month && npm run test:sprint9b2 && npm run test:sprint9c && npm run test:sprint10a && npm run test:sprint10b && npm run test:sprint10c && npm run test:sprint11a && npm run test:shift-display && npm run test:mobile-daily-shift && npm run test:desktop-monthly-overflow && npm run test:individual-hours && npm run test:monthly-targets && npm run test:initial-password && npm run test:pilot-demo-login && npm run test:features && npm run test:work-patterns && npm run test:staff-work-rules && npm run test:staff-attributes && npm run test:staffing-requirements && npm run test:personal-calendar && npm run test:shift-print-layout && npm run test:sprint5-1 && npm run test:unread-interlocking && npm run test:mobile-390px-notifications && npm run test:trial-error-guidance"
+    "test:regression": "npm run test:month && npm run test:sprint9b2 && npm run test:sprint9c && npm run test:sprint10a && npm run test:sprint10b && npm run test:sprint10c && npm run test:sprint11a && npm run test:shift-display && npm run test:mobile-daily-shift && npm run test:desktop-monthly-overflow && npm run test:individual-hours && npm run test:monthly-targets && npm run test:initial-password && npm run test:pilot-demo-login && npm run test:features && npm run test:work-patterns && npm run test:staff-work-rules && npm run test:staff-work-contracts && npm run test:staff-attributes && npm run test:staffing-requirements && npm run test:personal-calendar && npm run test:shift-print-layout && npm run test:sprint5-1 && npm run test:unread-interlocking && npm run test:mobile-390px-notifications && npm run test:trial-error-guidance"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.3",
