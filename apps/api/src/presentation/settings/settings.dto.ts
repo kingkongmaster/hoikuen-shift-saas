@@ -3,6 +3,7 @@ import { ArrayNotEmpty, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, Mat
 import { AssignedClass } from '@prisma/client';
 
 export class UpdateShiftSettingDto {
+  @IsOptional() @IsInt() @Min(1) @Max(12) fiscalYearStartMonth?: number;
   @IsOptional() @IsInt() @Min(0) @Max(100) weekdayEarlyRequired?: number;
   @IsOptional() @IsInt() @Min(0) @Max(100) weekdayLateRequired?: number;
   @IsOptional() @IsInt() @Min(0) @Max(100) saturdayEarlyRequired?: number;

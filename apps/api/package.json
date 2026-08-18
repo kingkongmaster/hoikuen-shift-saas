@@ -57,8 +57,10 @@
     "test:future-hard-capacity:regression": "node test/future-hard-capacity-generator-regression.test.cjs",
     "test:future-hard-capacity:performance": "node test/future-hard-capacity-performance.test.cjs",
     "test:tenant-phase1-db": "node test/tenant-phase1-db-constraints.e2e.cjs",
+    "test:annual-fairness": "node test/annual-fairness-phase1.test.cjs",
+    "test:annual-fairness:e2e": "node test/annual-work-summaries.e2e.cjs",
     "test:all": "npm run test:sprint2 && npm run test:sprint3 && npm run test:sprint4 && npm run test:sprint5 && npm run test:sprint6 && npm run test:sprint7 && npm run test:sprint8",
-    "test:regression": "npm run test:all && npm run test:sprint9a1 && npm run test:sprint9a2 && npm run test:sprint9b1a && npm run test:sprint9b1b && npm run test:sprint9b1b:final && npm run test:sprint9c && npm run test:sprint10a && npm run test:rc1-shift && npm run test:rc1-director && npm run test:individual-hours && npm run test:monthly-targets && npm run test:fair-special-shifts && npm run test:fixed-class && npm run test:production-hardening && npm run test:initial-password && npm run test:features && npm run test:work-patterns && npm run test:staff-work-rules && npm run test:staff-attributes && npm run test:staffing-requirements"
+    "test:regression": "npm run test:all && npm run test:sprint9a1 && npm run test:sprint9a2 && npm run test:sprint9b1a && npm run test:sprint9b1b && npm run test:sprint9b1b:final && npm run test:sprint9c && npm run test:sprint10a && npm run test:rc1-shift && npm run test:rc1-director && npm run test:individual-hours && npm run test:monthly-targets && npm run test:fair-special-shifts && npm run test:fixed-class && npm run test:production-hardening && npm run test:initial-password && npm run test:features && npm run test:work-patterns && npm run test:staff-work-rules && npm run test:staff-attributes && npm run test:staffing-requirements && npm run test:annual-fairness && npm run test:annual-fairness:e2e"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",

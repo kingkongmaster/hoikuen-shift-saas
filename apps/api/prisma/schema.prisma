@@ -501,6 +501,7 @@ model StaffAttributeAssignment {
 model TenantShiftSetting {
   id                      String   @id @default(uuid()) @db.Uuid
   tenantId                String   @unique @db.Uuid
+  fiscalYearStartMonth    Int      @default(4)
   weekdayEarlyRequired    Int      @default(2)
   weekdayLateRequired     Int      @default(2)
   saturdayEarlyRequired   Int      @default(2)

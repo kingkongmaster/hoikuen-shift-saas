@@ -20,6 +20,7 @@ const classes: Array<{ classType: AssignedClass; label: string }> = [
   { classType: 'FREE', label: 'フリー' },
 ];
 const defaultSettings: ShiftSetting = {
+  fiscalYearStartMonth: 4,
   weekdayEarlyRequired: 2,
   weekdayLateRequired: 2,
   saturdayEarlyRequired: 2,
@@ -61,6 +62,7 @@ function createDraft(setup: SetupState): Draft {
   const requirementMap = new Map(setup.classRequirements.map((row) => [row.classType, row]));
   const settings = setup.shiftSettings
     ? {
+        fiscalYearStartMonth: setup.shiftSettings.fiscalYearStartMonth,
         weekdayEarlyRequired: setup.shiftSettings.weekdayEarlyRequired,
         weekdayLateRequired: setup.shiftSettings.weekdayLateRequired,
         saturdayEarlyRequired: setup.shiftSettings.saturdayEarlyRequired,
@@ -147,6 +149,7 @@ export function SetupWizard({
     if (step === 2) {
       const settings = draft.workSettings;
       return api.updateSetupWorkSettings(session.accessToken, {
+        fiscalYearStartMonth: settings.fiscalYearStartMonth,
         defaultStartNormal: settings.defaultStartNormal,
         defaultEndNormal: settings.defaultEndNormal,
         defaultStartEarly: settings.defaultStartEarly,
@@ -299,6 +302,7 @@ function TimeRange({ label, start, end, onStart, onEnd }: { label: string; start
 function WorkStep({ draft, setDraft, setSetting }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; setSetting: (key: keyof ShiftSetting, value: string | number | boolean) => void }) {
   const settings = draft.workSettings;
   return <div><SectionTitle title="勤務設定" description="標準の勤務時間と配置ルールを設定してください。" /><div className="mt-6 grid gap-4">
+    <Field label="年度開始月"><select className="input" value={settings.fiscalYearStartMonth} onChange={(event) => setSetting('fiscalYearStartMonth', Number(event.target.value))}>{Array.from({ length: 12 }, (_, index) => index + 1).map((month) => <option key={month} value={month}>{month}月</option>)}</select></Field>
     <TimeRange label="通常勤務時間" start={settings.defaultStartNormal} end={settings.defaultEndNormal} onStart={(value) => setSetting('defaultStartNormal', value)} onEnd={(value) => setSetting('defaultEndNormal', value)} />
     <TimeRange label="早出時間" start={settings.defaultStartEarly} end={settings.defaultEndEarly} onStart={(value) => setSetting('defaultStartEarly', value)} onEnd={(value) => setSetting('defaultEndEarly', value)} />
     <TimeRange label="遅出時間" start={settings.defaultStartLate} end={settings.defaultEndLate} onStart={(value) => setSetting('defaultStartLate', value)} onEnd={(value) => setSetting('defaultEndLate', value)} />
