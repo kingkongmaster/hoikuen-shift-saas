@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const client=await readFile(new URL('../src/api/client.ts',import.meta.url),'utf8');
+const page=await readFile(new URL('../src/features/staff/AnnualWorkSummaryManagement.tsx',import.meta.url),'utf8');
+const dashboard=await readFile(new URL('../src/features/dashboard/Dashboard.tsx',import.meta.url),'utf8');
+for(const field of ['annualTargetMinutes','leaveEquivalentMinutes','fairnessActualMinutes','achievementRate','differenceMinutes','calculationStatus'])assert.match(client,new RegExp(field));
+for(const label of ['年間目標','実働','有給等勤務相当','公平性実績','達成率','参考差分','契約未設定','契約期間を確認してください','勤務時間を安全に算出できないため要確認'])assert.match(page,new RegExp(label));
+assert.doesNotMatch(page,/勤務不足|もっと働かせる|必ず.*勤務させる/);
+assert.match(dashboard,/annual-work/);
+console.log('Annual work summary Web tests: PASS');

@@ -1,0 +1,15 @@
+import { useEffect, useState } from 'react';
+import { api, type AnnualWorkSummaryResponse, type Staff } from '../../api/client';
+
+export function AnnualWorkSummaryManagement({token}:{token:string}){
+  const [year,setYear]=useState(new Date().getFullYear());const [data,setData]=useState<AnnualWorkSummaryResponse|null>(null);const [staff,setStaff]=useState<Staff[]>([]);const [message,setMessage]=useState('');
+  useEffect(()=>{let active=true;Promise.all([api.annualWorkSummaries(token,year),api.staff(token,true)]).then(([summary,members])=>{if(active){setData(summary);setStaff(members);setMessage('');}}).catch(error=>{if(active)setMessage(error instanceof Error?error.message:'年間勤務を確認できませんでした。');});return()=>{active=false;};},[token,year]);
+  const names=new Map(staff.map(row=>[row.id,row.displayName]));
+  return <section className="card mt-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-black">年間勤務</h2><p className="mt-1 text-sm text-slate-600">勤務契約上の目標に対する現在の状況を、判断材料として確認できます。</p></div><label className="grid gap-1 text-sm">年度<input aria-label="年度" type="number" min="2000" max="2200" value={year} onChange={event=>setYear(Number(event.target.value))} className="rounded border p-2"/></label></div>
+  {message&&<p role="alert" className="mt-4 rounded bg-rose-50 p-3 text-sm text-rose-700">{message}</p>}
+  {data&&<div className="mt-5 overflow-x-auto"><p className="mb-3 text-sm text-slate-600">{data.fiscalYearStart}〜{previousDay(data.fiscalYearEndExclusive)}</p><table className="w-full min-w-[980px] text-left text-sm"><thead className="bg-slate-50"><tr>{['職員','年間目標','実働','有給等勤務相当','公平性実績','達成率','参考差分','状態'].map(label=><th key={label} className="px-3 py-2">{label}</th>)}</tr></thead><tbody className="divide-y">{data.summaries.map(row=><tr key={row.staffId}><td className="px-3 py-3 font-semibold">{names.get(row.staffId)??row.staffId}</td><td className="px-3 py-3">{minutes(row.annualTargetMinutes)}</td><td className="px-3 py-3">{minutes(row.actualWorkedMinutes)}</td><td className="px-3 py-3">{minutes(row.leaveEquivalentMinutes)}</td><td className="px-3 py-3">{minutes(row.fairnessActualMinutes)}</td><td className="px-3 py-3">{row.achievementRate==null?'—':`年間目標に対して現在${(row.achievementRate*100).toFixed(1)}%です`}</td><td className="px-3 py-3">{signedMinutes(row.differenceMinutes)}</td><td className="px-3 py-3">{status(row.calculationStatus,row.unavailableReason)}</td></tr>)}</tbody></table></div>}</section>;
+}
+function minutes(value:number|null){return value==null?'—':`${Math.floor(value/60)}時間${value%60?`${value%60}分`:''}`;}
+function signedMinutes(value:number|null){if(value==null)return '—';return `参考差分 ${value>0?'+':''}${minutes(value)}`;}
+function status(value:string,reason:string|null){if(value==='NOT_CONFIGURED')return '契約未設定';if(value==='REVIEW_REQUIRED')return '契約期間を確認してください';if(value==='UNAVAILABLE')return `勤務時間を安全に算出できないため要確認（${reason??'理由不明'}）`;return '集計済み';}
+function previousDay(value:string){const date=new Date(`${value}T00:00:00.000Z`);date.setUTCDate(date.getUTCDate()-1);return date.toISOString().slice(0,10);}

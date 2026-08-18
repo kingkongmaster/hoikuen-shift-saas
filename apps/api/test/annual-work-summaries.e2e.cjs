@@ -7,6 +7,7 @@ const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
 const run = randomUUID().slice(0, 8).toUpperCase();
 const ownerEmail = `annual-admin-${run.toLowerCase()}@e2e.invalid`;
 const staffEmail = `annual-staff-${run.toLowerCase()}@e2e.invalid`;
+const directorEmail = `annual-director-${run.toLowerCase()}@e2e.invalid`;
 const password = `Annual-${run}!`;
 const created = { tenantId: null, userIds: [], otherTenantId: null };
 
@@ -29,14 +30,16 @@ async function login(email, password) {
 async function main() {
   const tenant = await prisma.tenant.create({ data: { name: `Annual tenant ${run}` } });
   created.tenantId = tenant.id;
-  const [ownerUser, staffUser] = await Promise.all([
+  const [ownerUser, staffUser, directorUser] = await Promise.all([
     prisma.user.create({ data: { email: ownerEmail, displayName: 'Annual Admin', passwordHash: hash(password) } }),
     prisma.user.create({ data: { email: staffEmail, displayName: 'Annual Staff', passwordHash: hash(password) } }),
+    prisma.user.create({ data: { email: directorEmail, displayName: 'Annual Director', passwordHash: hash(password) } }),
   ]);
-  created.userIds.push(ownerUser.id, staffUser.id);
+  created.userIds.push(ownerUser.id, staffUser.id, directorUser.id);
   await prisma.membership.createMany({ data: [
     { tenantId: tenant.id, userId: ownerUser.id, role: MembershipRole.ADMIN },
     { tenantId: tenant.id, userId: staffUser.id, role: MembershipRole.STAFF },
+    { tenantId: tenant.id, userId: directorUser.id, role: MembershipRole.DIRECTOR },
   ] });
   await prisma.tenantShiftSetting.create({ data: { tenantId: tenant.id, fiscalYearStartMonth: 4, defaultBreakMinutes: 60 } });
   const owner = await login(ownerEmail, password);
@@ -61,6 +64,10 @@ async function main() {
     prisma.monthlyShift.create({ data: { tenantId, targetMonth: new Date('2036-04-01T00:00:00Z'), status: MonthlyShiftStatus.CONFIRMED, createdByUserId: owner.user.id, confirmedByUserId: owner.user.id, confirmedAt: new Date() } }),
     prisma.monthlyShift.create({ data: { tenantId, targetMonth: new Date('2036-05-01T00:00:00Z'), status: MonthlyShiftStatus.DRAFT, createdByUserId: owner.user.id } }),
   ]);
+  await prisma.staffWorkContract.createMany({ data: [
+    { tenantId, staffId: staff.id, effectiveFrom: new Date('2036-04-01T00:00:00Z'), effectiveTo: new Date('2036-04-02T00:00:00Z'), annualizedTargetMinutes: 115200, prescribedDailyMinutes: 450 },
+    { tenantId, staffId: staff.id, effectiveFrom: new Date('2036-04-03T00:00:00Z'), effectiveTo: new Date('2037-03-31T00:00:00Z'), annualizedTargetMinutes: 72000, prescribedDailyMinutes: 360 },
+  ] });
   await prisma.shiftAssignment.createMany({ data: [
     { tenantId, monthlyShiftId: confirmed.id, staffId: staff.id, workDate: new Date('2036-04-01T00:00:00Z'), shiftType: ShiftType.NORMAL, startTime: '09:00', endTime: '18:00', breakMinutes: 60 },
     { tenantId, monthlyShiftId: confirmed.id, staffId: staff.id, workDate: new Date('2036-04-02T00:00:00Z'), shiftType: ShiftType.PAID_LEAVE },
@@ -81,10 +88,23 @@ async function main() {
   assert.equal(summary.body.fiscalYearEndExclusive, '2037-04-01');
   assert.equal(summary.body.summaries.some((row) => row.staffId === otherStaff.id), false, 'other tenant staff must never be returned');
   const row = summary.body.summaries.find((item) => item.staffId === staff.id);
-  assert.deepEqual(row, { staffId: staff.id, actualWorkedMinutes: 480, paidLeaveEquivalentMinutes: 480, halfLeaveEquivalentMinutes: 240, fairnessActualMinutes: 1200, calculationStatus: 'COMPLETE', unavailableReason: null });
+  assert.equal(row.annualTargetMinutes,72237);
+  assert.equal(row.actualWorkedMinutes,480);
+  assert.equal(row.paidLeaveEquivalentMinutes,450);
+  assert.equal(row.halfLeaveEquivalentMinutes,180);
+  assert.equal(row.leaveEquivalentMinutes,630);
+  assert.equal(row.fairnessActualMinutes,1110);
+  assert.equal(row.achievementRate,1110/72237);
+  assert.equal(row.differenceMinutes,1110-72237);
+  assert.equal(row.calculationStatus,'COMPLETE');
   const unavailable = summary.body.summaries.find((item) => item.staffId === unavailableStaff.id);
-  assert.equal(unavailable.calculationStatus, 'UNAVAILABLE');
-  assert.equal(unavailable.fairnessActualMinutes, null);
+  assert.equal(unavailable.calculationStatus, 'NOT_CONFIGURED');
+  assert.equal(unavailable.annualTargetMinutes, null);
+  assert.equal(unavailable.achievementRate, null);
+  assert.equal(unavailable.fairnessActualMinutes, 450);
+
+  const directorLogin = await login(directorEmail, password);
+  assert.equal((await call('/annual-work-summaries?fiscalYear=2036', {}, directorLogin.accessToken)).status, 200);
 
   await prisma.monthlyShift.update({ where: { id: confirmed.id }, data: { status: MonthlyShiftStatus.DRAFT, confirmedAt: null, confirmedByUserId: null } });
   const reopened = await call('/annual-work-summaries?fiscalYear=2036', {}, owner.accessToken);

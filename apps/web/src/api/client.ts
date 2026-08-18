@@ -149,6 +149,8 @@ export type StaffAttributeAssignment={id:string;tenantId:string;staffId:string;a
 export type StaffAttributeAssignmentInput=Pick<StaffAttributeAssignment,'attributeDefinitionId'|'startDate'|'endDate'|'notes'|'isPrimary'|'isActive'>;
 export type StaffWorkContract={id:string;tenantId:string;staffId:string;effectiveFrom:string;effectiveTo:string|null;annualizedTargetMinutes:number;prescribedDailyMinutes:number;voidedAt:string|null;createdAt:string;updatedAt:string};
 export type StaffWorkContractInput=Pick<StaffWorkContract,'effectiveFrom'|'effectiveTo'|'annualizedTargetMinutes'|'prescribedDailyMinutes'>;
+export type AnnualWorkSummary={staffId:string;annualTargetMinutes:number|null;actualWorkedMinutes:number|null;paidLeaveEquivalentMinutes:number|null;halfLeaveEquivalentMinutes:number|null;leaveEquivalentMinutes:number|null;fairnessActualMinutes:number|null;achievementRate:number|null;differenceMinutes:number|null;calculationStatus:'COMPLETE'|'NOT_CONFIGURED'|'REVIEW_REQUIRED'|'UNAVAILABLE';unavailableReason:string|null;coverageStatus:'COMPLETE'|'NOT_CONFIGURED'|'REVIEW_REQUIRED';coveredDays:number;fiscalYearDays:number};
+export type AnnualWorkSummaryResponse={fiscalYear:number;fiscalYearStartMonth:number;fiscalYearStart:string;fiscalYearEndExclusive:string;summaries:AnnualWorkSummary[]};
 export type StaffingConstraintLevel='HARD'|'SOFT'|'INFO';
 export type ShiftStaffingRequirement={id:string;tenantId:string;code:string;name:string;attributeDefinitionId:string;attributeDefinition:StaffAttributeDefinition;classType:AssignedClass|null;dayOfWeek:number|null;startDate:string|null;endDate:string|null;requiredCount:number;constraintLevel:StaffingConstraintLevel;reason:string|null;displayOrder:number;isActive:boolean;createdAt:string;updatedAt:string};
 export type ShiftStaffingRequirementInput=Pick<ShiftStaffingRequirement,'code'|'name'|'attributeDefinitionId'|'classType'|'dayOfWeek'|'startDate'|'endDate'|'requiredCount'|'constraintLevel'|'reason'|'displayOrder'|'isActive'>;
@@ -281,6 +283,7 @@ export const api = {
   createStaffWorkContract(token:string,staffId:string,input:StaffWorkContractInput){return request<StaffWorkContract>(`/staff/${staffId}/work-contracts`,{method:'POST',body:JSON.stringify(input)},token);},
   updateStaffWorkContract(token:string,staffId:string,id:string,input:StaffWorkContractInput){return request<StaffWorkContract>(`/staff/${staffId}/work-contracts/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
   voidStaffWorkContract(token:string,staffId:string,id:string){return request<StaffWorkContract>(`/staff/${staffId}/work-contracts/${id}/void`,{method:'POST'},token);},
+  annualWorkSummaries(token:string,fiscalYear:number){return request<AnnualWorkSummaryResponse>(`/annual-work-summaries?fiscalYear=${fiscalYear}`,{},token);},
   staffingRequirements(token:string){return request<ShiftStaffingRequirement[]>('/staffing-requirements',{},token);},
   createStaffingRequirement(token:string,input:ShiftStaffingRequirementInput){return request<ShiftStaffingRequirement>('/staffing-requirements',{method:'POST',body:JSON.stringify(input)},token);},
   updateStaffingRequirement(token:string,id:string,input:ShiftStaffingRequirementInput){return request<ShiftStaffingRequirement>(`/staffing-requirements/${id}`,{method:'PUT',body:JSON.stringify(input)},token);},
