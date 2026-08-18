@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const { PrismaClient, ShiftType } = require('@prisma/client');
 
-const prisma = new PrismaClient();
 const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
 const ownerEmail = process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local';
 const ownerPassword = process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!';
@@ -9,6 +8,16 @@ const testMonth = '2030-01';
 const workingTypes = new Set([ShiftType.EARLY, ShiftType.NORMAL, ShiftType.LATE]);
 const testStartedAt = new Date();
 let createdScheduleId = null;
+let createdNotificationIds = [];
+
+function resolveIsolatedDatabaseUrl(env = process.env) {
+  const value = env.TEST_DATABASE_URL || env.DATABASE_URL;
+  if (env.TEST_DATABASE_ISOLATED !== 'true' || !value) throw new Error('RC1 cleanup safety stop: an explicit isolated test database URL is required.');
+  const parsed = new URL(value);
+  const localHosts = new Set(['localhost', '127.0.0.1', '::1', 'postgres']);
+  if (!localHosts.has(parsed.hostname)) throw new Error('RC1 cleanup safety stop: only a verified local/isolated database is allowed.');
+  return value;
+}
 
 async function call(path, init = {}, token) {
   const response = await fetch(base + path, {
@@ -21,7 +30,9 @@ async function call(path, init = {}, token) {
   return { status: response.status, body: await response.json().catch(() => null) };
 }
 
-async function main() {
+async function main(databaseUrl = resolveIsolatedDatabaseUrl()) {
+  const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
+  try {
   const login = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email: ownerEmail, password: ownerPassword }) });
   assert.equal(login.status, 200);
   const token = login.body.accessToken;
@@ -37,6 +48,7 @@ async function main() {
   assert.equal(generated.body.generatedCount, 14 * 31, '自動生成対象14名の8月31日分を生成');
   assert.equal(generated.body.workingAssignmentCount + generated.body.offAssignmentCount + generated.body.leaveAssignmentCount, generated.body.generatedCount);
   assert.ok(generated.body.workingAssignmentCount >= 200, '必要人数を満たす現実的なデモ配置');
+  createdNotificationIds = (await prisma.notification.findMany({ where: { tenantId: '00000000-0000-4000-8000-000000000001', type: 'SHIFT_UPDATED', title: 'シフト自動生成', createdAt: { gte: testStartedAt } }, select: { id: true } })).map((item) => item.id);
 
   const after = await call(`/shifts?month=${testMonth}`, {}, token);
   assert.equal(after.status, 200);
@@ -61,16 +73,23 @@ async function main() {
   const sample = working[0];
   assert.equal(uiKeys.get(`${sample.staffId}:${sample.workDate.slice(0, 10)}`)?.shiftType, sample.shiftType, '画面とAPIで同じ日付キー');
   console.log(`RC1 shift display integration test: PASS (勤務${generated.body.workingAssignmentCount}・休み${generated.body.offAssignmentCount}・休暇${generated.body.leaveAssignmentCount})`);
+  } finally {
+    try {
+      if (createdScheduleId) {
+        await prisma.auditLog.deleteMany({ where: { targetId: createdScheduleId } });
+        await prisma.monthlyShift.deleteMany({ where: { id: createdScheduleId } });
+      }
+      if (createdNotificationIds.length) await prisma.notification.deleteMany({ where: { id: { in: createdNotificationIds } } });
+      if (createdScheduleId && await prisma.monthlyShift.count({ where: { id: createdScheduleId } })) throw new Error(`RC1 cleanup failure: schedule fixture remains (${createdScheduleId}).`);
+      if (createdNotificationIds.length && await prisma.notification.count({ where: { id: { in: createdNotificationIds } } })) throw new Error(`RC1 cleanup failure: notification fixtures remain (${createdNotificationIds.join(',')}).`);
+    } catch (error) {
+      console.error(`RC1 cleanup failure for anonymous fixture schedule=${createdScheduleId ?? 'not-created'}. No database fallback was attempted.`);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
 }
 
-main().finally(async () => {
-  if (createdScheduleId) {
-    await prisma.auditLog.deleteMany({ where: { targetId: createdScheduleId } });
-    await prisma.monthlyShift.delete({ where: { id: createdScheduleId } });
-    await prisma.notification.deleteMany({ where: { tenantId: '00000000-0000-4000-8000-000000000001', type: 'SHIFT_UPDATED', title: 'シフト自動生成', createdAt: { gte: testStartedAt } } });
-  }
-  await prisma.$disconnect();
-}).catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+module.exports = { resolveIsolatedDatabaseUrl };
+if (require.main === module) main().catch((error) => { console.error(error); process.exitCode = 1; });

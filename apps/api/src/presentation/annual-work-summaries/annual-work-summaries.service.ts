@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { annualWorkSummary, prescribedMinutes } from '../../application/annual-fairness/annual-work-summary-calculator';
 import { fiscalYearRange } from '../../application/annual-fairness/fiscal-year-range';
-import { prorateAnnualTarget } from '../../application/annual-fairness/annual-target-proration';
-import { resolveDailyPrescribedMinutes } from '../../application/annual-fairness/daily-prescribed-minutes';
+import { calculateAnnualFairnessProgress } from '../../application/annual-fairness/annual-fairness-progress';
 
 @Injectable()
 export class AnnualWorkSummariesService {
@@ -39,18 +37,13 @@ export class AnnualWorkSummariesService {
       orderBy: { employeeNumber: 'asc' },
     });
     const summaries = staff.map((member) => {
-      const target = prorateAnnualTarget(range.start, range.endExclusive, member.workContracts);
-      const actual = annualWorkSummary(member.assignments, (assignment) => assignment.workDate
-        ? resolveDailyPrescribedMinutes(assignment.workDate, member.workContracts, member, {
-          defaultStartNormal: setting?.defaultStartNormal ?? null,
-          defaultEndNormal: setting?.defaultEndNormal ?? null,
-          defaultBreakMinutes: setting?.defaultBreakMinutes ?? 60,
-        }).minutes
-        : prescribedMinutes(member.regularWorkStartTime, member.regularWorkEndTime, setting?.defaultBreakMinutes ?? 60));
+      const { target, actual, calculationStatus, unavailableReason } = calculateAnnualFairnessProgress(member, range, {
+        defaultStartNormal: setting?.defaultStartNormal ?? null,
+        defaultEndNormal: setting?.defaultEndNormal ?? null,
+        defaultBreakMinutes: setting?.defaultBreakMinutes ?? 60,
+      });
       const leaveEquivalentMinutes = actual.paidLeaveEquivalentMinutes == null || actual.halfLeaveEquivalentMinutes == null
         ? null : actual.paidLeaveEquivalentMinutes + actual.halfLeaveEquivalentMinutes;
-      const calculationStatus = actual.calculationStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : target.calculationStatus;
-      const unavailableReason = actual.calculationStatus === 'UNAVAILABLE' ? actual.unavailableReason : target.unavailableReason;
       const achievementRate = target.annualTargetMinutes && actual.fairnessActualMinutes != null
         ? actual.fairnessActualMinutes / target.annualTargetMinutes : null;
       const differenceMinutes = target.annualTargetMinutes != null && actual.fairnessActualMinutes != null

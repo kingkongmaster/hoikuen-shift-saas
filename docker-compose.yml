@@ -86,6 +86,7 @@ services:
     command: npm run test:all
     environment:
       DATABASE_URL: *compose-database-url
+      TEST_DATABASE_ISOLATED: "true"
       API_BASE_URL: http://web/api
       SEED_OWNER_EMAIL: ${SEED_OWNER_EMAIL:-owner@demo.enshift.local}
       SEED_OWNER_PASSWORD: ${SEED_OWNER_PASSWORD:-ChangeMe123!}
