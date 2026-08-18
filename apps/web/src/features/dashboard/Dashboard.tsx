@@ -16,14 +16,16 @@ import { WorkPatternManagement } from '../work-patterns/WorkPatternManagement';
 import { MusubiProvisionalDemo } from '../clients/MusubiProvisionalDemo';
 import { PersonalCalendar } from '../calendar/PersonalCalendar';
 import { MyPage } from '../profile/MyPage';
+import { AnnualWorkSummaryManagement } from '../staff/AnnualWorkSummaryManagement';
 
-type View = 'home' | 'calendar' | 'mypage' | 'staff' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
+type View = 'home' | 'calendar' | 'mypage' | 'staff' | 'annual-work' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
 const roleLabels = { ADMIN: '管理者', DIRECTOR: '園長', CHIEF: '主任', STAFF: '一般職員' } as const;
 const viewInfo: Record<View, { title: string; description: string }> = {
   home: { title: 'ホーム', description: '今日の勤務と大切なお知らせを確認できます。' },
   calendar: { title: '個人カレンダー', description: '自分の勤務予定と希望休の状態を月ごとに確認します。' },
   mypage: { title: 'マイページ', description: '自分の基本プロフィールを確認します。' },
   staff: { title: '職員マスター管理', description: '園ごとの職員情報を登録・編集・無効化できます。' },
+  'annual-work': { title: '年間勤務', description: '年間目標と確定済み勤務実績を確認します。' },
   requests: { title: '希望休管理', description: '希望休の申請と確認を行います。' },
   shifts: { title: '月間シフト管理', description: '月間勤務表を確認・管理します。' },
   settings: { title: '園設定', description: '必要人数、勤務ルール、クラス配置、休園日を管理します。' },
@@ -95,6 +97,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{everydayMenu.map((item) => <MenuTile key={item.view} {...item} label={item.view === 'shifts' && staffMode ? 'カレンダー' : item.label} description={item.view === 'shifts' && staffMode ? '本人の勤務予定' : item.description} badge={item.view === 'notifications' ? unread : 0} onClick={() => selectView(item.view === 'shifts' && staffMode ? 'calendar' : item.view)} />)}</div>
           <details className="other-menu mt-4"><summary><span className="action-symbol action-symbol-soft" aria-hidden="true">他</span><span><strong>その他のメニュー</strong><small>{staffMode ? 'プロフィール・サポート' : '管理・設定・サポート'}</small></span></summary><div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
             {canManageShifts && <OtherButton symbol="職" label="職員マスター" onClick={() => selectView('staff')} />}
+            {canManageShifts && <OtherButton symbol="年" label="年間勤務" onClick={() => selectView('annual-work')} />}
             {canManageShifts && <OtherButton symbol="園" label="園設定" onClick={() => selectView('settings')} />}
             {isAdmin && <OtherButton symbol="時" label="勤務パターン" onClick={() => selectView('work-patterns')} />}
             {canManageShifts && <OtherButton symbol="契" label="契約情報" onClick={() => selectView('subscription')} />}
@@ -132,6 +135,7 @@ function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange, 
     : view === 'mypage' && !canManageShifts ? <MyPage token={session.accessToken} />
     : view === 'musubi-demo' && canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' ? <MusubiProvisionalDemo session={session} />
     : view === 'staff' && canManageShifts ? <StaffManagement token={session.accessToken} readOnly={!isAdmin} />
+    : view === 'annual-work' && canManageShifts ? <AnnualWorkSummaryManagement token={session.accessToken} />
     : view === 'work-patterns' && isAdmin ? <WorkPatternManagement token={session.accessToken} />
     : view === 'requests' ? <RequestManagement session={session} />
       : view === 'settings' && canManageShifts ? <ShiftSettings session={session} />

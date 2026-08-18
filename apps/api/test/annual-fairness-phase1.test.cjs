@@ -2,6 +2,8 @@ const assert = require('node:assert/strict');
 const { ShiftType } = require('@prisma/client');
 const { fiscalYearForDate, fiscalYearRange } = require('../dist/application/annual-fairness/fiscal-year-range');
 const { annualWorkSummary, prescribedMinutes } = require('../dist/application/annual-fairness/annual-work-summary-calculator');
+const { resolveDailyPrescribedMinutes } = require('../dist/application/annual-fairness/daily-prescribed-minutes');
+const { prorateAnnualTarget } = require('../dist/application/annual-fairness/annual-target-proration');
 
 for (const month of [1, 4, 12]) {
   const range = fiscalYearRange(2032, month);
@@ -45,4 +47,25 @@ assert.deepEqual(annualWorkSummary([assignment(ShiftType.NORMAL)], 480), {
   unavailableReason: 'WORKED_ASSIGNMENT_MINUTES_UNAVAILABLE',
 });
 
-console.log('Annual fairness Phase 1 unit tests: PASS');
+const utc=(value)=>new Date(`${value}T00:00:00.000Z`);
+const contracts=[
+  {effectiveFrom:utc('2032-04-01'),effectiveTo:utc('2032-09-30'),annualizedTargetMinutes:120000,prescribedDailyMinutes:480,voidedAt:null},
+  {effectiveFrom:utc('2032-10-01'),effectiveTo:null,annualizedTargetMinutes:60000,prescribedDailyMinutes:360,voidedAt:null},
+];
+assert.deepEqual(resolveDailyPrescribedMinutes(utc('2032-09-30'),contracts,{regularWorkStartTime:'09:00',regularWorkEndTime:'17:00'},{defaultStartNormal:'08:30',defaultEndNormal:'17:00',defaultBreakMinutes:60}),{minutes:480,source:'CONTRACT'});
+assert.deepEqual(resolveDailyPrescribedMinutes(utc('2032-10-01'),contracts,{regularWorkStartTime:'09:00',regularWorkEndTime:'17:00'},{defaultStartNormal:'08:30',defaultEndNormal:'17:00',defaultBreakMinutes:60}),{minutes:360,source:'CONTRACT'});
+assert.deepEqual(resolveDailyPrescribedMinutes(utc('2031-01-01'),[],{regularWorkStartTime:'09:00',regularWorkEndTime:'17:00'},{defaultStartNormal:'08:30',defaultEndNormal:'17:00',defaultBreakMinutes:60}),{minutes:420,source:'STAFF'});
+assert.deepEqual(resolveDailyPrescribedMinutes(utc('2031-01-01'),[],{regularWorkStartTime:null,regularWorkEndTime:null},{defaultStartNormal:'08:30',defaultEndNormal:'17:00',defaultBreakMinutes:60}),{minutes:450,source:'TENANT'});
+assert.deepEqual(resolveDailyPrescribedMinutes(utc('2031-01-01'),[],{regularWorkStartTime:null,regularWorkEndTime:null},{defaultStartNormal:null,defaultEndNormal:null,defaultBreakMinutes:60}),{minutes:null,source:'UNAVAILABLE'});
+assert.deepEqual(resolveDailyPrescribedMinutes(utc('2032-06-01'),[{...contracts[0],voidedAt:new Date()}],{regularWorkStartTime:'09:00',regularWorkEndTime:'17:00'},{defaultStartNormal:'08:30',defaultEndNormal:'17:00',defaultBreakMinutes:60}),{minutes:420,source:'STAFF'});
+assert.equal(prorateAnnualTarget(utc('2032-04-01'),utc('2033-04-01'),contracts).calculationStatus,'COMPLETE');
+const performanceStartedAt=performance.now();
+for(let index=0;index<100;index+=1){
+  const target=prorateAnnualTarget(utc('2032-04-01'),utc('2033-04-01'),contracts);
+  const actual=annualWorkSummary([{...assignment(ShiftType.PAID_LEAVE),workDate:utc('2032-10-01')}],item=>resolveDailyPrescribedMinutes(item.workDate,contracts,{regularWorkStartTime:null,regularWorkEndTime:null},{defaultStartNormal:'08:30',defaultEndNormal:'17:00',defaultBreakMinutes:60}).minutes);
+  assert.ok(target.annualTargetMinutes>0);assert.equal(actual.fairnessActualMinutes,360);
+}
+const annualPerformanceMs=performance.now()-performanceStartedAt;
+assert.ok(annualPerformanceMs<1000);
+
+console.log(`Annual fairness Phase 1/2B unit tests: PASS (100 staff ${annualPerformanceMs.toFixed(2)}ms)`);

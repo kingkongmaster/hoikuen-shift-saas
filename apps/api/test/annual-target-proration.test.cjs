@@ -5,6 +5,7 @@ const date = (value) => new Date(`${value}T00:00:00.000Z`);
 const contract = (effectiveFrom, effectiveTo, annualizedTargetMinutes = 115200, overrides = {}) => ({ effectiveFrom: date(effectiveFrom), effectiveTo: effectiveTo ? date(effectiveTo) : null, annualizedTargetMinutes, voidedAt: null, ...overrides });
 const leapStart = date('2031-04-01');
 const leapEnd = date('2032-04-01');
+assert.equal(prorateAnnualTarget(date('2032-04-01'),date('2033-04-01'),[contract('2032-04-01','2033-03-31')]).fiscalYearDays,365);
 
 assert.deepEqual(prorateAnnualTarget(leapStart, leapEnd, []), { annualTargetMinutes: null, coveredDays: 0, fiscalYearDays: 366, calculationStatus: 'NOT_CONFIGURED', unavailableReason: 'CONTRACT_NOT_CONFIGURED' });
 assert.deepEqual(prorateAnnualTarget(leapStart, leapEnd, [contract('2031-04-01', '2032-03-31')]), { annualTargetMinutes: 115200, coveredDays: 366, fiscalYearDays: 366, calculationStatus: 'COMPLETE', unavailableReason: null });

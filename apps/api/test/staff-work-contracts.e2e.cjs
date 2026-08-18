@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { randomUUID, scryptSync } = require('node:crypto');
 const { PrismaClient, MembershipRole } = require('@prisma/client');
 const { Prisma } = require('@prisma/client');
-const { isStaffWorkContractOverlapError } = require('../dist/presentation/staff-work-contracts/staff-work-contracts.service');
+const { isPostgresDeadlockError, isStaffWorkContractOverlapError, withStaffWorkContractCreateDeadlockRetry } = require('../dist/presentation/staff-work-contracts/staff-work-contracts.service');
 
 const prisma = new PrismaClient();
 const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
@@ -18,9 +18,21 @@ async function main() {
   const targeted = new Prisma.PrismaClientUnknownRequestError('PostgresError { code: "23P01", constraint: "StaffWorkContract_no_active_period_overlap" }', { clientVersion: '6.19.3' });
   const otherConstraint = new Prisma.PrismaClientUnknownRequestError('PostgresError { code: "23P01", constraint: "Other_exclusion_constraint" }', { clientVersion: '6.19.3' });
   const otherDatabaseError = new Prisma.PrismaClientUnknownRequestError('PostgresError { code: "08006", message: "connection failure" }', { clientVersion: '6.19.3' });
+  const deadlock = new Prisma.PrismaClientUnknownRequestError('PostgresError { code: "40P01", message: "deadlock detected" }', { clientVersion: '6.19.3' });
   assert.equal(isStaffWorkContractOverlapError(targeted), true);
   assert.equal(isStaffWorkContractOverlapError(otherConstraint), false, 'other 23P01 constraints must not become 409');
   assert.equal(isStaffWorkContractOverlapError(otherDatabaseError), false, 'unrelated database errors must not become 409');
+  assert.equal(isPostgresDeadlockError(deadlock), true);
+  assert.equal(isPostgresDeadlockError(targeted), false, '23P01 is not a retryable deadlock');
+  let attempts = 0; let rechecks = 0;
+  assert.equal(await withStaffWorkContractCreateDeadlockRetry(async () => { attempts += 1; if (attempts === 1) throw deadlock; return 'created'; }, async () => { rechecks += 1; }), 'created');
+  assert.equal(attempts, 2); assert.equal(rechecks, 1);
+  attempts = 0;
+  await assert.rejects(withStaffWorkContractCreateDeadlockRetry(async () => { attempts += 1; throw deadlock; }, async () => { rechecks += 1; }), (error) => error === deadlock);
+  assert.equal(attempts, 2, 'deadlock retry must be limited to one retry');
+  attempts = 0;
+  await assert.rejects(withStaffWorkContractCreateDeadlockRetry(async () => { attempts += 1; throw otherDatabaseError; }, async () => { rechecks += 1; }), (error) => error === otherDatabaseError);
+  assert.equal(attempts, 1, 'unrelated database errors must not be retried');
 
   const [tenant, otherTenant] = await Promise.all([prisma.tenant.create({ data: { name: `Contract ${run}` } }), prisma.tenant.create({ data: { name: `Contract other ${run}` } })]);
   created.tenantIds.push(tenant.id, otherTenant.id);
@@ -61,13 +73,17 @@ async function main() {
 
   await assert.rejects(prisma.staffWorkContract.create({ data: { tenantId: tenant.id, staffId: otherStaff.id, effectiveFrom: new Date('2040-01-01T00:00:00Z'), annualizedTargetMinutes: 1000, prescribedDailyMinutes: 60 } }), 'DB tenant guard');
   await assert.rejects(prisma.staffWorkContract.create({ data: { tenantId: tenant.id, staffId: staff.id, effectiveFrom: new Date('2032-06-01T00:00:00Z'), annualizedTargetMinutes: 1000, prescribedDailyMinutes: 60 } }), 'DB overlap constraint');
-  const concurrentPath = `/staff/${concurrentStaff.id}/work-contracts`;
-  const concurrent = await Promise.all([1, 2].map(() => call(concurrentPath, { method: 'POST', body: JSON.stringify(input('2035-04-01')) }, adminToken)));
-  assert.deepEqual(concurrent.map((result) => result.status).sort(), [201, 409], 'DB race guard must become a safe 409');
+  const concurrentRepeatCount = Number(process.env.CONCURRENT_REPEAT_COUNT || 3);
+  for (let index = 0; index < concurrentRepeatCount; index += 1) {
+    const raceStaff = index === 0 ? concurrentStaff : await prisma.staff.create({ data: { tenantId: tenant.id, employeeNumber: `CC-${run}-${index}`, displayName: `Concurrent staff ${index}` } });
+    const concurrentPath = `/staff/${raceStaff.id}/work-contracts`;
+    const concurrent = await Promise.all([1, 2].map(() => call(concurrentPath, { method: 'POST', body: JSON.stringify(input('2035-04-01')) }, adminToken)));
+    assert.deepEqual(concurrent.map((result) => result.status).sort(), [201, 409], `DB race guard iteration ${index + 1} must become a safe 409`);
+  }
   const logs = await prisma.auditLog.findMany({ where: { tenantId: tenant.id, targetType: 'StaffWorkContract' }, select: { action: true, detail: true } });
   for (const action of ['STAFF_WORK_CONTRACT_CREATED','STAFF_WORK_CONTRACT_UPDATED','STAFF_WORK_CONTRACT_ENDED','STAFF_WORK_CONTRACT_VOIDED']) assert.ok(logs.some((log) => log.action === action), action);
   assert.ok(logs.every((log) => log.detail && !JSON.stringify(log.detail).includes('@e2e.invalid')));
   const listed = await call(path, {}, directorToken); assert.equal(listed.status, 200); assert.ok(listed.body.some((row) => row.id === first.id && row.voidedAt)); assert.ok(listed.body.some((row) => row.id === second.id));
-  console.log('Staff work contracts E2E tests: PASS');
+  console.log(`Staff work contracts E2E tests: PASS (concurrent registration ${concurrentRepeatCount} iterations)`);
 }
 main().finally(async () => { for (const tenantId of created.tenantIds) await prisma.tenant.delete({ where: { id: tenantId } }).catch(() => undefined); if (created.userIds.length) await prisma.user.deleteMany({ where: { id: { in: created.userIds } } }).catch(() => undefined); await prisma.$disconnect(); }).catch((error) => { console.error(error); process.exitCode = 1; });

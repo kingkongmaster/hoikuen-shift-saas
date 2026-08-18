@@ -37,7 +37,10 @@ export class StaffWorkContractsService {
     const data = this.data(user.tenantId, staffId, input);
     await this.assertNoOverlap(data);
     try {
-      const row = await this.prisma.staffWorkContract.create({ data });
+      const row = await withStaffWorkContractCreateDeadlockRetry(
+        () => this.prisma.staffWorkContract.create({ data }),
+        () => this.assertNoOverlap(data),
+      );
       await this.audit.create(user.tenantId, user.sub, 'STAFF_WORK_CONTRACT_CREATED', 'StaffWorkContract', row.id, this.detail(staffId, null, row));
       return row;
     } catch (error) { this.handleWriteError(error); }
@@ -121,6 +124,21 @@ export function isStaffWorkContractOverlapError(error: unknown): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError || error instanceof Prisma.PrismaClientUnknownRequestError)) return false;
   const message = error.message;
   return message.includes('23P01') && message.includes(OVERLAP_CONSTRAINT);
+}
+
+export function isPostgresDeadlockError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError || error instanceof Prisma.PrismaClientUnknownRequestError)) return false;
+  return error.message.includes('40P01');
+}
+
+export async function withStaffWorkContractCreateDeadlockRetry<T>(insert: () => Promise<T>, recheckOverlap: () => Promise<void>): Promise<T> {
+  try {
+    return await insert();
+  } catch (error) {
+    if (!isPostgresDeadlockError(error)) throw error;
+    await recheckOverlap();
+    return insert();
+  }
 }
 
 function date(value: string): Date { return new Date(`${value}T00:00:00.000Z`); }

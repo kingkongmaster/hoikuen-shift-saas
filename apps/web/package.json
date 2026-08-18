@@ -26,6 +26,7 @@
     "test:work-patterns": "node test/work-patterns.test.mjs",
     "test:staff-work-rules": "node test/staff-work-rules.test.mjs",
     "test:staff-work-contracts": "node test/staff-work-contracts.test.mjs",
+    "test:annual-work-summary": "node test/annual-work-summary.test.mjs",
     "test:staff-attributes": "node test/staff-attributes.test.mjs",
     "test:staffing-requirements": "node test/staffing-requirements.test.mjs",
     "test:staffing-requirement-generator": "node test/staffing-requirement-generator.test.mjs",
