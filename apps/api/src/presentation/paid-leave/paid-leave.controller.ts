@@ -38,4 +38,3 @@ export class PaidLeaveController {
   @Get('balance')
   balance(@Req() req: Request & { user: AuthenticatedUser }, @Param('staffId', new ParseUUIDPipe()) staffId: string, @Query('asOf') asOf?: string) { return this.paidLeave.balance(req.user, staffId, asOf); }
 }
-

@@ -33,4 +33,3 @@ export class PaidLeaveReasonDto {
 export class PaidLeaveCorrectionDto extends PaidLeaveUsageInputDto {
   @IsString() @MinLength(1) @MaxLength(1000) reason!: string;
 }
-
