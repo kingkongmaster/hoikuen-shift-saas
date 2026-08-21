@@ -1,8 +1,9 @@
 const assert = require('node:assert/strict');
 const { randomUUID, scryptSync } = require('node:crypto');
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
+const { resolveIsolatedDatabaseUrl, resolveLocalApiBaseUrl } = require('./helpers/isolated-database.cjs');
+const prisma = new PrismaClient({ datasourceUrl: resolveIsolatedDatabaseUrl() });
+const base = resolveLocalApiBaseUrl();
 const run = randomUUID().slice(0, 8); const password = `Paid-${run}!`; const email = `paid-${run}@e2e.invalid`;
 const created = { tenantIds: [], userIds: [] };
 const hash = (value) => { const salt = randomUUID().replaceAll('-', ''); return `${salt}:${scryptSync(value, salt, 64).toString('hex')}`; };
