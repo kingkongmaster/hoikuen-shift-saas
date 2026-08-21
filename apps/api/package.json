@@ -63,6 +63,7 @@
     "test:annual-target-proration": "node test/annual-target-proration.test.cjs",
     "test:annual-fairness:phase3": "node test/annual-fairness-phase3.test.cjs",
     "test:staff-work-contracts:e2e": "node test/staff-work-contracts.e2e.cjs",
+    "test:paid-leave:phase4a": "node test/paid-leave-timezone.test.cjs && node test/paid-leave-phase4a.e2e.cjs",
     "test:all": "npm run test:sprint2 && npm run test:sprint3 && npm run test:sprint4 && npm run test:sprint5 && npm run test:sprint6 && npm run test:sprint7 && npm run test:sprint8",
     "test:regression": "npm run test:all && npm run test:sprint9a1 && npm run test:sprint9a2 && npm run test:sprint9b1a && npm run test:sprint9b1b && npm run test:sprint9b1b:final && npm run test:sprint9c && npm run test:sprint10a && npm run test:rc1-shift && npm run test:rc1-director && npm run test:individual-hours && npm run test:monthly-targets && npm run test:fair-special-shifts && npm run test:fixed-class && npm run test:production-hardening && npm run test:initial-password && npm run test:features && npm run test:work-patterns && npm run test:staff-work-rules && npm run test:staff-attributes && npm run test:staffing-requirements && npm run test:annual-fairness && npm run test:annual-fairness:e2e && npm run test:annual-target-proration && npm run test:staff-work-contracts:e2e"
   },

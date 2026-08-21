@@ -62,7 +62,7 @@ async function main() {
 
   token = (await call('/auth/login', { method: 'POST', body: JSON.stringify({ email: process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local', password: process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!' }) })).body.accessToken;
   const backup = await call('/backups/export', { method: 'POST' }, token); assert.equal(backup.status, 201); assert.ok(Array.isArray(backup.body.data.shiftStaffingRequirements));
-  const legacy = structuredClone(backup.body); delete legacy.data.shiftStaffingRequirements; delete legacy.counts.shiftStaffingRequirements; legacy.integrity.checksum = checksum(legacy.data);
+  const legacy = structuredClone(backup.body); legacy.version=2; for(const key of ['staffWorkContracts','paidLeaveGrants','paidLeaveUsages','paidLeaveAllocations']){delete legacy.data[key];delete legacy.counts[key];} delete legacy.data.shiftStaffingRequirements; delete legacy.counts.shiftStaffingRequirements; legacy.integrity.checksum = checksum(legacy.data);
   assert.equal((await call('/backups/validate', { method: 'POST', body: JSON.stringify({ backup: legacy }) }, token)).status, 201, '旧形式互換');
   const invalid = structuredClone(backup.body); invalid.data.shiftStaffingRequirements[0].requiredCount = 0; invalid.integrity.checksum = checksum(invalid.data);
   assert.equal((await call('/backups/validate', { method: 'POST', body: JSON.stringify({ backup: invalid }) }, token)).status, 422, '不正バックアップ拒否');
