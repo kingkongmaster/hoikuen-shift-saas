@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const page=await readFile(new URL('../src/features/staff/PaidLeaveManagement.tsx',import.meta.url),'utf8');
+const client=await readFile(new URL('../src/api/client.ts',import.meta.url),'utf8');
+const dashboard=await readFile(new URL('../src/features/dashboard/Dashboard.tsx',import.meta.url),'utf8');
+for(const label of ['職員','付与合計','取得済み','現在残高','付与履歴','取得・訂正履歴','人間確認済みとして登録','取得実績を人間確定'])assert.match(page,new RegExp(label));
+assert.match(page,/AI提案や未確定候補は残高に含みません/);
+assert.match(page,/window\.confirm/);assert.match(page,/この有給取得を取り消しますか/);
+for(const label of ['登録中…','確定中…','取消中…','表示順は自動消化順ではありません'])assert.match(page,new RegExp(label));
+for(const api of ['paidLeaveGrants','createPaidLeaveGrant','paidLeaveUsages','paidLeaveBalance','confirmPaidLeaveUsage','cancelPaidLeaveUsage'])assert.match(client,new RegExp(api));
+assert.match(dashboard,/paid-leave/);assert.match(dashboard,/有給管理/);
+console.log('Phase 4-A paid leave management Web test: PASS');
