@@ -1,0 +1,65 @@
+name: Build Windows trial distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      saas_url:
+        description: Approved public HTTPS URL for the AeN Shift SaaS login
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate public SaaS URL
+        shell: pwsh
+        env:
+          AEN_SAAS_URL: ${{ inputs.saas_url }}
+        run: |
+          $uri = $null
+          if (-not [Uri]::TryCreate($env:AEN_SAAS_URL, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https') {
+            throw 'SaaS URL must use HTTPS.'
+          }
+          if ($uri.UserInfo -or $uri.IsLoopback) {
+            throw 'SaaS URL must not contain credentials or use a loopback host.'
+          }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Build installer
+        shell: pwsh
+        env:
+          AEN_SAAS_URL: ${{ inputs.saas_url }}
+        run: |
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' "/DSaaSUrl=$env:AEN_SAAS_URL" 'distribution\windows\installer\AeNShift.iss'
+
+      - name: Assemble unpublished download site
+        shell: pwsh
+        run: |
+          $site = 'distribution\windows\site-output'
+          New-Item -ItemType Directory -Force $site | Out-Null
+          $exe = 'distribution\windows\installer\output\AeN-Shift-Release-1-Musubi-Trial.exe'
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLowerInvariant()
+          $html = Get-Content 'distribution\download-page\index.template.html' -Raw
+          $html.Replace('__INSTALLER_SHA256__', $hash) | Set-Content "$site\index.html" -Encoding UTF8
+          Copy-Item $exe "$site\AeN-Shift-Release-1-Musubi-Trial.exe"
+          Copy-Item 'distribution\windows\assets\AeNShift.ico' "$site\AeNShift.ico"
+          $hash | Set-Content "$site\AeN-Shift-Release-1-Musubi-Trial.exe.sha256" -Encoding ascii
+
+      - name: Upload private review artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: aen-shift-release1-musubi-trial-windows
+          path: distribution/windows/site-output/
+          if-no-files-found: error
+          retention-days: 14

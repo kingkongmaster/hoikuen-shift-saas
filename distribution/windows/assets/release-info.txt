@@ -1,0 +1,12 @@
+AeN Shift
+Release 1 - Musubi Trial
+Version: 1.0.0-musubi.1
+
+このWindows配布版はAeN ShiftクラウドSaaSを安全に開くための入口です。
+Windows PC内にAeN Shiftのデータベースや職員データを保存しません。
+
+更新方法:
+新しいインストーラーを入手し、起動中のAeN Shift画面を閉じてから上書きインストールしてください。
+
+アンインストール:
+Windowsの「設定」→「アプリ」→「インストールされているアプリ」からAeN Shiftを選択してください。
