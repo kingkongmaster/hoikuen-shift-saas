@@ -10,6 +10,7 @@ export class WorkPatternInputDto {
   @IsInt() @Min(0) @Max(480) breakMinutes!: number;
   @IsOptional() @IsHexColor() color?: string | null;
   @IsBoolean() isWorking!: boolean;
+  @IsOptional() @IsBoolean() countsTowardStaffing?: boolean;
   @IsBoolean() isDefault!: boolean;
   @IsBoolean() isActive!: boolean;
 }

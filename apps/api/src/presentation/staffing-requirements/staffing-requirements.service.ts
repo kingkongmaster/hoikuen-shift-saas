@@ -67,20 +67,22 @@ export class StaffingRequirementsService {
     const definition = await db.staffAttributeDefinition.findFirst({ where: { tenantId, id: input.attributeDefinitionId } });
     if (!definition) throw new NotFoundException('属性定義が見つかりません。');
     if (!definition.isActive && (definition.id !== currentDefinitionId || input.isActive)) throw new BadRequestException('無効な属性定義は新規条件・再有効化に指定できません。');
-    return { tenantId, code: input.code, name: input.name.trim(), attributeDefinitionId: definition.id, classType: input.classType ?? null, dayOfWeek: input.dayOfWeek ?? null, startDate, endDate, requiredCount: input.requiredCount, constraintLevel: input.constraintLevel, reason: input.reason?.trim() || null, displayOrder: input.displayOrder, isActive: input.isActive };
+    const pattern = input.workPatternId ? await db.workPattern.findFirst({ where: { tenantId, id: input.workPatternId, isActive: true } }) : null;
+    if (input.workPatternId && !pattern) throw new NotFoundException('勤務パターンが見つかりません。');
+    return { tenantId, code: input.code, name: input.name.trim(), attributeDefinitionId: definition.id, workPatternId: pattern?.id ?? null, classType: input.classType ?? null, dayOfWeek: input.dayOfWeek ?? null, startDate, endDate, requiredCount: input.requiredCount, constraintLevel: input.constraintLevel, reason: input.reason?.trim() || null, displayOrder: input.displayOrder, isActive: input.isActive };
   }
 
   private async checkOverlap(tx: Tx, data: Awaited<ReturnType<StaffingRequirementsService['data']>>, excludeId?: string) {
     if (!data.isActive) return;
-    const rows = await tx.shiftStaffingRequirement.findMany({ where: { tenantId: data.tenantId, attributeDefinitionId: data.attributeDefinitionId, classType: data.classType, dayOfWeek: data.dayOfWeek, isActive: true, ...(excludeId ? { id: { not: excludeId } } : {}) } });
+    const rows = await tx.shiftStaffingRequirement.findMany({ where: { tenantId: data.tenantId, attributeDefinitionId: data.attributeDefinitionId, workPatternId: data.workPatternId, classType: data.classType, dayOfWeek: data.dayOfWeek, isActive: true, ...(excludeId ? { id: { not: excludeId } } : {}) } });
     if (rows.some((row) => this.overlap(row.startDate, row.endDate, data.startDate, data.endDate))) throw new ConflictException('同じ属性・対象・曜日の有効期間が重複しています。');
   }
 
   private overlap(aStart: Date | null, aEnd: Date | null, bStart: Date | null, bEnd: Date | null) { return !aStart || !aEnd || !bStart || !bEnd || aStart <= bEnd && bStart <= aEnd; }
   private async serializable<T>(work: (tx: Tx) => Promise<T>) { try { return await this.prisma.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2002' || error.code === 'P2034')) throw new ConflictException('同じ配置条件が同時に更新されました。再読み込みしてお試しください。'); throw error; } }
   private async requirement(tenantId: string, id: string) { const row = await this.prisma.shiftStaffingRequirement.findFirst({ where: { tenantId, id } }); if (!row) throw new NotFoundException('配置条件が見つかりません。'); return row; }
-  private withDefinition(tenantId: string, id: string) { return this.prisma.shiftStaffingRequirement.findFirstOrThrow({ where: { tenantId, id }, include: { attributeDefinition: true } }); }
+  private withDefinition(tenantId: string, id: string) { return this.prisma.shiftStaffingRequirement.findFirstOrThrow({ where: { tenantId, id }, include: { attributeDefinition: true, workPattern: true } }); }
   private date(value: Date | null) { return value?.toISOString().slice(0, 10) ?? null; }
-  private snapshot(row: ShiftStaffingRequirement) { return { code: row.code, name: row.name, attributeDefinitionId: row.attributeDefinitionId, classType: row.classType, dayOfWeek: row.dayOfWeek, startDate: this.date(row.startDate), endDate: this.date(row.endDate), requiredCount: row.requiredCount, constraintLevel: row.constraintLevel, reason: row.reason, displayOrder: row.displayOrder, isActive: row.isActive }; }
+  private snapshot(row: ShiftStaffingRequirement) { return { code: row.code, name: row.name, attributeDefinitionId: row.attributeDefinitionId, workPatternId: row.workPatternId, classType: row.classType, dayOfWeek: row.dayOfWeek, startDate: this.date(row.startDate), endDate: this.date(row.endDate), requiredCount: row.requiredCount, constraintLevel: row.constraintLevel, reason: row.reason, displayOrder: row.displayOrder, isActive: row.isActive }; }
   private log(user: AuthenticatedUser, action: string, before: ShiftStaffingRequirement | null, after: ShiftStaffingRequirement) { return this.audit.create(user.tenantId, user.sub, action, 'ShiftStaffingRequirement', after.id, { tenantId: user.tenantId, requirementId: after.id, code: after.code, before: before ? this.snapshot(before) : null, after: this.snapshot(after) }); }
 }

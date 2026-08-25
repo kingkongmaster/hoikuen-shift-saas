@@ -1,5 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, SubscriptionStatus } from '@prisma/client';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateStaffDto } from './create-staff.dto';
@@ -30,19 +30,22 @@ export class StaffService {
   }
 
   async create(user: AuthenticatedUser, input: CreateStaffDto) {
-    await this.subscriptions.assertWritable(user.tenantId); await this.subscriptions.assertStaffCapacity(user.tenantId);
+    await this.subscriptions.assertWritable(user.tenantId);
     this.validateRules(input);
     try {
-      const created = await this.prisma.staff.create({
-        data: {
-          ...input,
-          tenantId: user.tenantId,
-          employeeNumber: input.employeeNumber.trim(),
-          displayName: input.displayName.trim(),
-          email: input.email?.trim().toLowerCase() || null,
-          notes: input.notes?.trim() || null,
-        },
-      }); await this.audit.create(user.tenantId,user.sub,'STAFF_CREATED','Staff',created.id,{employeeNumber:created.employeeNumber}); return created;
+      return await this.prisma.$transaction(async (tx) => {
+        const locked = await tx.$queryRaw<Array<{ staffLimit: number; status: SubscriptionStatus; trialEndsAt: Date | null }>>(Prisma.sql`SELECT "staffLimit", "status", "trialEndsAt" FROM "TenantSubscription" WHERE "tenantId" = ${user.tenantId}::uuid FOR UPDATE`);
+        const subscription = locked[0] ?? await this.subscriptions.find(user.tenantId);
+        const expiredTrial = subscription.status === SubscriptionStatus.TRIAL && subscription.trialEndsAt != null && subscription.trialEndsAt < new Date();
+        if (subscription.status === SubscriptionStatus.SUSPENDED) throw new ForbiddenException({ code: 'SUBSCRIPTION_SUSPENDED', message: 'この園の利用は停止されています。' });
+        if (expiredTrial || subscription.status === SubscriptionStatus.EXPIRED || subscription.status === SubscriptionStatus.CANCELLED) throw new ForbiddenException({ code: 'SUBSCRIPTION_EXPIRED', message: 'この園の契約は利用期限を過ぎています。' });
+        const staffLimit = subscription.staffLimit;
+        const count = await tx.staff.count({ where: { tenantId: user.tenantId, isActive: true } });
+        if (count >= staffLimit) throw new ConflictException({ code: 'STAFF_LIMIT_REACHED', message: '職員登録上限に達しています。' });
+        const created = await tx.staff.create({ data: { ...input, tenantId: user.tenantId, employeeNumber: input.employeeNumber.trim(), displayName: input.displayName.trim(), email: input.email?.trim().toLowerCase() || null, notes: input.notes?.trim() || null } });
+        await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'STAFF_CREATED', targetType: 'Staff', targetId: created.id, detail: { employeeNumber: created.employeeNumber } } });
+        return created;
+      });
     } catch (error) {
       this.handleWriteError(error);
     }
@@ -68,9 +71,27 @@ export class StaffService {
 
   async deactivate(user: AuthenticatedUser, id: string) {
     await this.subscriptions.assertWritable(user.tenantId);
-    const current = await this.get(user, id);
-    if (!current.isActive) return current;
-    const updated=await this.prisma.staff.update({ where: { id: current.id }, data: { isActive: false } }); await this.audit.create(user.tenantId,user.sub,'STAFF_DEACTIVATED','Staff',updated.id); return updated;
+    return this.prisma.$transaction(async (tx) => {
+      const [current] = await tx.$queryRaw<Array<{ id: string; userId: string | null; isActive: boolean }>>(Prisma.sql`
+        SELECT "id", "userId", "isActive" FROM "Staff"
+        WHERE "id" = ${id}::uuid AND "tenantId" = ${user.tenantId}::uuid
+        FOR UPDATE
+      `);
+      if (!current) throw new NotFoundException('職員が見つかりません。');
+      const membership = current.userId ? (await tx.$queryRaw<Array<{ isActive: boolean }>>(Prisma.sql`
+        SELECT "isActive" FROM "Membership"
+        WHERE "tenantId" = ${user.tenantId}::uuid AND "userId" = ${current.userId}::uuid
+        FOR UPDATE
+      `))[0] : undefined;
+      const requiresRepair = Boolean(membership?.isActive);
+      if (!current.isActive && !requiresRepair) return tx.staff.findUniqueOrThrow({ where: { id: current.id } });
+      if (current.isActive) await tx.staff.update({ where: { id: current.id }, data: { isActive: false } });
+      if (current.userId && membership && (current.isActive || membership.isActive)) {
+        await tx.membership.update({ where: { tenantId_userId: { tenantId: user.tenantId, userId: current.userId } }, data: { isActive: false, tokenVersion: { increment: 1 } } });
+      }
+      await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'STAFF_DEACTIVATED', targetType: 'Staff', targetId: current.id, detail: { loginAccountDeactivated: Boolean(current.userId), repairedMembershipMismatch: !current.isActive && requiresRepair } } });
+      return tx.staff.findUniqueOrThrow({ where: { id: current.id } });
+    });
   }
 
   private validateRules(input: { canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean; monthlyWorkHourLimit?: number | null; monthlyTargetWorkHours?: number | null; regularWorkStartTime?: string | null; regularWorkEndTime?: string | null }): void {

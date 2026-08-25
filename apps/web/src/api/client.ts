@@ -1,7 +1,7 @@
 export type Role = 'ADMIN' | 'DIRECTOR' | 'CHIEF' | 'STAFF';
 export type Session = {
   accessToken: string;
-  user: { id: string; email: string; displayName: string };
+  user: { id: string; loginId: string; email: string | null; displayName: string };
   tenant: { id: string; name: string; code?: string | null };
   role: Role;
   mustChangePassword: boolean;
@@ -51,6 +51,7 @@ export type StaffInput = Pick<Staff, 'employeeNumber' | 'displayName' | 'employm
   regularWorkEndTime?: string | null;
   notes?: string | null;
 };
+export type StaffLoginAccount = { enabled: boolean; staffId: string; loginId?: string; email?: string | null; role?: 'DIRECTOR' | 'CHIEF' | 'STAFF'; mustChangePassword?: boolean; membershipActive?: boolean };
 export type ShiftRequestType = 'DAY_OFF' | 'PAID_LEAVE' | 'SUMMER_LEAVE' | 'BEREAVEMENT' | 'HALF_DAY_AM' | 'HALF_DAY_PM' | 'OTHER';
 export type ShiftRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type StaffOption = { id: string; employeeNumber: string; displayName: string };
@@ -183,7 +184,7 @@ function fallbackMessage(status: number) {
   return '入力内容に確認が必要な項目があります。表示された内容をご確認ください。';
 }
 function responseMessage(data: unknown, status: number, path = '') {
-  if (status === 401 && path === '/auth/login') return 'メールアドレスまたはパスワードが正しくありません。';
+  if (status === 401 && path === '/auth/login') return 'ログインIDまたはパスワードが正しくありません。';
   if (status === 401 || status >= 500) return fallbackMessage(status);
   if (data && typeof data === 'object') {
     const message = (data as { message?: unknown }).message;
@@ -213,7 +214,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 async function download(path:string, token:string, init:RequestInit={}):Promise<{blob:Blob;name:string}> { emit('enshift:api-start'); try { let response:Response; try { response=await fetch(`${apiBaseUrl}${path}`,{...init,headers:{Authorization:`Bearer ${token}`,...init.headers}}); } catch { const message=navigator.onLine?'ファイルを準備できませんでした。時間をおいてもう一度お試しください。':'現在オフラインのため、ファイルを準備できません。通信が回復してからお試しください。';emit('enshift:api-error',{message});throw new Error(message); } const type=response.headers.get('content-type') ?? ''; if(!response.ok || !type.includes('text/csv') && !type.includes('application/json')) { const message=responseMessage(await response.json().catch(()=>null),response.status);emit('enshift:api-error',{message});throw new Error(message); } const disposition=response.headers.get('content-disposition') ?? ''; const name=/filename="?([^";]+)"?/.exec(disposition)?.[1] ?? 'enshift-download'; return {blob:await response.blob(),name}; } finally { emit('enshift:api-end'); } }
 
 export const api = {
-  login(email: string, password: string) { return request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); },
+  login(loginId: string, password: string) { return request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ loginId, password }) }); },
   me(token: string) { return request<Omit<Session, 'accessToken'>>('/me', {}, token); },
   myCalendar(token: string, month: string) { return request<MyCalendar>(`/me/calendar?month=${encodeURIComponent(month)}`, {}, token); },
   changeInitialPassword(token: string, input: { currentPassword: string; newPassword: string; confirmPassword: string }) { return request<{ success: true; mustChangePassword: false; requiresReauthentication: true }>('/auth/change-initial-password', { method: 'POST', body: JSON.stringify(input) }, token); },
@@ -221,6 +222,11 @@ export const api = {
   createStaff(token: string, input: StaffInput) { return request<Staff>('/staff', { method: 'POST', body: JSON.stringify(input) }, token); },
   updateStaff(token: string, id: string, input: Partial<StaffInput>) { return request<Staff>(`/staff/${id}`, { method: 'PATCH', body: JSON.stringify(input) }, token); },
   deactivateStaff(token: string, id: string) { return request<Staff>(`/staff/${id}`, { method: 'DELETE' }, token); },
+  staffLoginAccount(token:string,id:string){return request<StaffLoginAccount>(`/staff/${id}/login-account`,{},token);},
+  createStaffLoginAccount(token:string,id:string,input:{loginId:string;email?:string;role:'DIRECTOR'|'CHIEF'|'STAFF';temporaryPassword:string;confirmPassword:string}){return request<StaffLoginAccount>(`/staff/${id}/login-account`,{method:'POST',body:JSON.stringify(input)},token);},
+  resetStaffPassword(token:string,id:string,input:{temporaryPassword:string;confirmPassword:string;reason:string}){return request<{success:true;mustChangePassword:true;requiresReauthentication:true}>(`/staff/${id}/login-account/reset-password`,{method:'POST',body:JSON.stringify(input)},token);},
+  deactivateStaffLogin(token:string,id:string,reason:string){return request<{success:true;enabled:false}>(`/staff/${id}/login-account/deactivate`,{method:'POST',body:JSON.stringify({reason})},token);},
+  reactivateStaffLogin(token:string,id:string,reason:string){return request<{success:true;enabled:true}>(`/staff/${id}/login-account/reactivate`,{method:'POST',body:JSON.stringify({reason})},token);},
   requests(token: string, month: string, staffId?: string) { const query = new URLSearchParams({ month }); if (staffId) query.set('staffId', staffId); return request<ShiftRequest[]>(`/requests?${query.toString()}`, {}, token); },
   requestStaffOptions(token: string) { return request<StaffOption[]>('/requests/staff-options', {}, token); },
   createRequest(token: string, input: ShiftRequestInput) { return request<ShiftRequest>('/requests', { method: 'POST', body: JSON.stringify(input) }, token); },

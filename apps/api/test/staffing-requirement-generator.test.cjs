@@ -4,7 +4,7 @@ const { generateRuleBasedSchedule } = require('../dist/application/shifts/rule-b
 const { evaluateStaffingRequirements } = require('../dist/application/shifts/staffing-requirement-evaluator');
 
 const date = new Date('2035-01-01T00:00:00.000Z');
-const requirement = (overrides = {}) => ({ id: 'r1', code: 'QUAL', name: '資格者', attributeDefinitionId: 'a1', classType: null, dayOfWeek: null, startDate: null, endDate: null, requiredCount: 1, constraintLevel: StaffingConstraintLevel.HARD, ...overrides });
+const requirement = (overrides = {}) => ({ id: 'r1', code: 'QUAL', name: '資格者', attributeDefinitionId: 'a1', workPatternId: null, classType: null, dayOfWeek: null, startDate: null, endDate: null, requiredCount: 1, constraintLevel: StaffingConstraintLevel.HARD, ...overrides });
 const assignment = (staffId, assignedClass = AssignedClass.AGE_0) => ({ staffId, workDate: date, shiftType: ShiftType.NORMAL, startTime: '08:30', endTime: '17:00', breakMinutes: 60, note: null, assignedClass });
 const attr = (staffId, overrides = {}) => ({ staffId, attributeDefinitionId: 'a1', startDate: null, endDate: null, ...overrides });
 
@@ -22,6 +22,8 @@ const inactiveDate = evaluateStaffingRequirements([requirement()], [attr('s1', {
 assert.equal(inactiveDate[0].actualCount, 0);
 const duplicate = evaluateStaffingRequirements([requirement()], [attr('s1'), attr('s1')], [assignment('s1'), assignment('s1')]);
 assert.equal(duplicate[0].actualCount, 1);
+const patternScoped = evaluateStaffingRequirements([requirement({ workPatternId: 'p4' })], [attr('s1')], [{ ...assignment('s1'), workPatternId: 'p5' }]);
+assert.equal(patternScoped[0].actualCount, 0);
 
 const staff = [{ id: 's1', employeeNumber: '001', displayName: 'A', assignedClass: AssignedClass.AGE_0, employmentType: 'FULL_TIME', canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: false, lateShiftOnly: false, canWorkSaturdays: true, monthlyWorkHourLimit: null, weeklyAvailableDays: null }];
 const options = { weekdayEarlyRequired: 0, weekdayLateRequired: 0, saturdayEarlyRequired: 0, saturdayLateRequired: 0, saturdayMinimumStaff: 0, saturdayOperationEnabled: false, sundayOperationEnabled: false, maxConsecutiveWorkDays: 6, maxConsecutiveEarlyDays: 1, maxConsecutiveLateDays: 1, defaultStartEarly: '07:00', defaultEndEarly: '16:00', defaultStartNormal: '08:30', defaultEndNormal: '17:00', defaultStartLate: '11:00', defaultEndLate: '19:30', defaultBreakMinutes: 60, classRequirements: [] };
@@ -37,4 +39,10 @@ assert.equal(firstSaturday.staffId, 's2', 'HARD属性を満たせる適格候補
 const infoSchedule = generateRuleBasedSchedule(date, candidateStaff, [], { ...saturdayOptions, staffingRequirements: [requirement({ dayOfWeek: 6, constraintLevel: StaffingConstraintLevel.INFO })], staffAttributeAssignments: [attr('s2')] });
 const stripEvaluation = ({ staffingRequirementEvaluations: _, warnings, ...result }) => ({ ...result, warnings: warnings.filter((item) => !item.code.startsWith('STAFFING_REQUIREMENT_')) });
 assert.deepEqual(stripEvaluation(infoSchedule).assignments, traditional.assignments, 'INFOは割当順位を変更しない');
-console.log('Staffing requirement generator unit tests: PASS (11 scenarios)');
+const exactPattern={id:'p05',code:'P05',startTime:'10:00',endTime:'18:30',breakMinutes:60,isWorking:true,countsTowardStaffing:true,isActive:true};
+const exact=generateRuleBasedSchedule(date,candidateStaff,[],{...options,staffingRequirements:[requirement({workPatternId:exactPattern.id,workPattern:exactPattern,startDate:date,endDate:date})],staffAttributeAssignments:[attr('s2')],replaceLegacyShiftTargetsWhenPatternRequirementsActive:true});
+const exactRow=exact.assignments.find((item)=>item.staffId==='s2'&&item.workDate.toISOString().slice(0,10)==='2035-01-01');
+assert.equal(exactRow.workPatternId,'p05','WorkPattern指定の必要人数は指定勤務そのものを生成する');assert.equal(exactRow.startTime,'10:00');assert.equal(exactRow.endTime,'18:30');
+const meeting=generateRuleBasedSchedule(date,staff,[],{...options,classRequirements:[{classType:AssignedClass.AGE_0,weekdayRequired:1,saturdayRequired:0,isActive:true}],meetingDayRules:[{dayOfWeek:1,occurrence:1,minimumEndTime:'18:30'}]});
+assert.equal(meeting.assignments.find((item)=>item.staffId==='s1'&&item.workDate.toISOString().slice(0,10)==='2035-01-01').endTime,'18:30','職員会議日は確定済み最低退勤時刻まで延長する');
+console.log('Staffing requirement generator unit tests: PASS (13 scenarios)');

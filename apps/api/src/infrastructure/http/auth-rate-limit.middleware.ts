@@ -19,9 +19,9 @@ export class AuthRateLimitMiddleware implements NestMiddleware {
     this.requestCount += 1;
     if (this.requestCount % 100 === 0 || this.buckets.size >= this.maxBuckets) this.removeExpired(now);
     const ip = request.ip || request.socket.remoteAddress || 'unknown';
-    const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : '';
+    const identifier = typeof request.body?.loginId === 'string' ? request.body.loginId.trim().toLowerCase() : typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : '';
     const keys: Array<[string, number]> = [[`ip:${ip}`, this.ipLimit]];
-    if (email) keys.push([`account:${createHash('sha256').update(email).digest('hex')}`, this.accountLimit]);
+    if (identifier) keys.push([`account:${createHash('sha256').update(identifier).digest('hex')}`, this.accountLimit]);
     for (const [key, limit] of keys) {
       const bucket = this.buckets.get(key);
       if (bucket && bucket.resetAt > now && bucket.count >= limit) {

@@ -11,12 +11,14 @@ export class AuthService {
   constructor(private readonly prisma: PrismaService, private readonly passwords: PasswordService, private readonly jwt: JwtService) {}
 
   async login(input: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: input.email.trim().toLowerCase() }, include: { memberships: { where: { isActive: true }, include: { tenant: true }, orderBy: { createdAt: 'asc' } } } });
-    if (!user?.isActive || !(await this.passwords.verify(input.password, user.passwordHash))) throw new UnauthorizedException('メールアドレスまたはパスワードが正しくありません。');
+    const identifier = (input.loginId ?? input.email)?.trim().toLowerCase();
+    if (!identifier) throw new BadRequestException('ログインIDを入力してください。');
+    const user = await this.prisma.user.findFirst({ where: { OR: [{ loginId: identifier }, { email: identifier }] }, include: { memberships: { where: { isActive: true }, include: { tenant: true }, orderBy: { createdAt: 'asc' } } } });
+    if (!user?.isActive || !(await this.passwords.verify(input.password, user.passwordHash))) throw new UnauthorizedException('ログインIDまたはパスワードが正しくありません。');
     const membership = user.memberships[0];
     if (!membership) throw new UnauthorizedException('有効な園への所属がありません。');
-    const payload = { sub: user.id, tenantId: membership.tenantId, role: membership.role, email: user.email, tokenVersion: user.tokenVersion };
-    return { accessToken: await this.jwt.signAsync(payload), user: { id: user.id, email: user.email, displayName: user.displayName }, tenant: { id: membership.tenant.id, name: membership.tenant.name, code: membership.tenant.code }, role: membership.role, mustChangePassword: user.mustChangePassword };
+    const payload = { sub: user.id, tenantId: membership.tenantId, role: membership.role, loginId: user.loginId, email: user.email, tokenVersion: user.tokenVersion, membershipTokenVersion: membership.tokenVersion };
+    return { accessToken: await this.jwt.signAsync(payload), user: { id: user.id, loginId: user.loginId, email: user.email, displayName: user.displayName }, tenant: { id: membership.tenant.id, name: membership.tenant.name, code: membership.tenant.code }, role: membership.role, mustChangePassword: user.mustChangePassword };
   }
 
   async changeInitialPassword(actor: AuthenticatedUser, input: ChangeInitialPasswordDto, requestId?: string) {

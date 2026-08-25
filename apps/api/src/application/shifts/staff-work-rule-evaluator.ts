@@ -12,7 +12,7 @@ export type GeneratorWorkRule = {
   numericValue: number | null;
   priority: number;
   isHardConstraint: boolean;
-  workPattern: { id: string; code: string; startTime: string | null; endTime: string | null; breakMinutes: number; isWorking: boolean; isActive: boolean } | null;
+  workPattern: { id: string; code: string; startTime: string | null; endTime: string | null; breakMinutes: number; isWorking: boolean; countsTowardStaffing?: boolean; isActive: boolean } | null;
 };
 
 const prohibited = new Set<StaffWorkRuleType>([

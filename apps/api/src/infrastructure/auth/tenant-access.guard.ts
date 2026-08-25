@@ -11,8 +11,7 @@ export class TenantAccessGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request & { user: AuthenticatedUser }>();
     const user = request.user;
     const membership = await this.prisma.membership.findUnique({ where: { tenantId_userId: { tenantId: user.tenantId, userId: user.sub } } });
-    if (!membership?.isActive || membership.role !== user.role) throw new ForbiddenException('園へのアクセス権限がありません。');
+    if (!membership?.isActive || membership.role !== user.role || !Number.isInteger(user.membershipTokenVersion) || membership.tokenVersion !== user.membershipTokenVersion) throw new ForbiddenException('園へのアクセス権限がありません。');
     return true;
   }
 }
-
