@@ -12,6 +12,9 @@ async function main() {
   const password = `Generation-${runId}!`; const tenant = await prisma.tenant.create({ data: { name: `生成E2E園 ${runId}` } }); tenantId = tenant.id;
   const admin = await prisma.user.create({ data: { email: `admin-${runId}@e2e.local`, displayName: '生成管理者', passwordHash: hash(password) } }); adminId = admin.id;
   await prisma.membership.create({ data: { tenantId, userId: admin.id, role: MembershipRole.ADMIN } });
+  // Seven staff exist in this fixture. Requiring eight makes the Saturday shortage
+  // physically unavoidable and isolates the production shortage detector itself.
+  await prisma.tenantShiftSetting.create({ data: { tenantId, saturdayMinimumStaff: 8 } });
   const employeeRows = [
     ['GEN-E1', '早出A', AssignedClass.AGE_0, { canWorkEarly: true, canWorkRegular: false, canWorkLate: false, earlyShiftOnly: true }],
     ['GEN-E2', '早出B', AssignedClass.AGE_0, { canWorkEarly: true, canWorkRegular: false, canWorkLate: false, earlyShiftOnly: true }],

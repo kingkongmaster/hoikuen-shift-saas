@@ -55,6 +55,14 @@ const offResult = generateRuleBasedSchedule(month, people, [], { ...options, sta
 assert.equal(assignmentOn(offResult, 's2').shiftType, ShiftType.OFF, 'OFF固定勤務を正常処理');
 assert.equal(assignmentOn(offResult, 's2').workPatternId, 'pattern-OFF');
 
+const noRotation = rule('s2', StaffWorkRuleType.FIXED_WORK_PATTERN, { startDate: month, endDate: month, workPattern: pattern('NO_ROTATION', { isWorking: true, countsTowardStaffing: false }) });
+const noRotationResult = generateRuleBasedSchedule(month, people, [], { ...options, staffWorkRules: [noRotation] });
+const noRotationAssignment = assignmentOn(noRotationResult, 's2');
+assert.equal(noRotationAssignment.shiftType, ShiftType.OTHER, 'シフト無しは勤務OTHERとして扱う');
+assert.equal(noRotationAssignment.assignedClass, null, 'シフト無しは保育ローテーションへ配置しない');
+assert.equal(noRotationAssignment.countsTowardStaffing, false, '必要人数へ算入しない');
+assert.ok(noRotationResult.assignments.some((row) => row.staffId === 's1' && row.workDate.toISOString().slice(0,10) === '2035-01-01' && row.assignedClass === AssignedClass.AGE_0), 'シフト無しとは別に必要人数を配置');
+
 const futureFixed = rule('s2', StaffWorkRuleType.FIXED_WORK_PATTERN, { dayOfWeek: 2, startDate: new Date('2035-01-02T00:00:00Z'), endDate: new Date('2035-01-09T00:00:00Z'), workPattern: pattern('EARLY', { startTime: '07:00', endTime: '16:00' }) });
 const scoped = generateRuleBasedSchedule(month, people, [], { ...options, staffWorkRules: [futureFixed] });
 assert.equal(assignmentOn(scoped, 's2', '2035-01-02').shiftType, ShiftType.EARLY, '特定期間FIXEDを適用');
@@ -62,6 +70,8 @@ assert.notEqual(assignmentOn(scoped, 's2', '2035-01-03').shiftType, ShiftType.EA
 
 const preferred = generateRuleBasedSchedule(month, people, [], { ...options, staffWorkRules: [rule('s2', StaffWorkRuleType.PREFERRED_WORK_PATTERN, { workPattern: pattern('NORMAL'), priority: 10 })] });
 assert.equal(assignmentOn(preferred, 's2').shiftType, ShiftType.NORMAL, 'PREFERREDを公平性より優先');
+const monthlyEarlyOnce = generateRuleBasedSchedule(month, people, [], { ...options, weekdayEarlyRequired: 1, staffWorkRules: [rule('s1', StaffWorkRuleType.MAX_WORK_PATTERN_PER_MONTH, { numericValue: 1, workPattern: pattern('EARLY', { startTime:'07:00', endTime:'16:00' }) })] });
+assert.ok(monthlyEarlyOnce.assignments.filter((row) => row.staffId === 's1' && row.shiftType === ShiftType.EARLY).length <= 1, '特定勤務パターン①の月1回上限を反映');
 const weeklyLimit = generateRuleBasedSchedule(month, [staff('s1', '001')], [], { ...options, staffWorkRules: [rule('s1', StaffWorkRuleType.MAX_WORK_DAYS_PER_WEEK, { numericValue: 1 })] });
 assert.equal(weeklyLimit.assignments.filter((row) => row.staffId === 's1' && row.shiftType === ShiftType.NORMAL && row.workDate.toISOString().slice(0, 10) <= '2035-01-07').length, 1, '週勤務日数上限を反映');
 

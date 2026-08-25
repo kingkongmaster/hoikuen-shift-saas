@@ -13,6 +13,6 @@ import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
   imports: [JwtModule.registerAsync({ inject: [ConfigService], useFactory: (config: ConfigService) => ({ secret: config.getOrThrow<string>('JWT_SECRET'), signOptions: { expiresIn: (config.get<string>('JWT_EXPIRES_IN') ?? '8h') as `${number}${'s' | 'm' | 'h' | 'd'}` } }) })],
   controllers: [AuthController],
   providers: [AuthService, PasswordService, JwtStrategy, JwtAuthGuard, TenantAccessGuard, RolesGuard],
-  exports: [JwtModule, JwtAuthGuard, TenantAccessGuard, RolesGuard],
+  exports: [JwtModule, JwtAuthGuard, TenantAccessGuard, RolesGuard, PasswordService],
 })
 export class AuthModule {}

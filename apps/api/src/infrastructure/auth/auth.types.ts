@@ -4,6 +4,8 @@ export type AuthenticatedUser = {
   sub: string;
   tenantId: string;
   role: MembershipRole;
-  email: string;
+  loginId?: string;
+  email: string | null;
   tokenVersion: number;
+  membershipTokenVersion: number;
 };

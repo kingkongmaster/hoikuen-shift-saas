@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'); const {normalizeTimeRange,parseDateCell,classifyFreeCondition}=require('../scripts/staff-importer/normalization.cjs');
+assert.deepEqual(normalizeTimeRange('９：３０－１５：３０'),{status:'READY',startTime:'09:30',endTime:'15:30'});
+assert.equal(parseDateCell(new Date('2026-09-02T00:00:00Z'),2026,9).status,'READY');
+assert.deepEqual(parseDateCell(46291,2026,9).dates,['2026-09-26']);
+assert.equal(parseDateCell('9/2、9/10',2026,9).dates.length,2);
+assert.equal(parseDateCell('9/119/14',2026,9).status,'REVIEW');
+assert.equal(parseDateCell('9/9/・9/29 p.m',2026,9).status,'REVIEW');
+assert.equal(parseDateCell('9/26●',2026,9).status,'REVIEW');
+assert.deepEqual(classifyFreeCondition('水曜シフト無').structured, [{ type:'NON_ROTATION_WORK_DAY_OF_WEEK',dayOfWeek:3 }]);
+assert.deepEqual(classifyFreeCondition('9/15シフト無').structured, [{ type:'NON_ROTATION_WORK_DATE_CANDIDATE' }]);
+assert.equal(classifyFreeCondition('⑥の次の日③').notes[0].classification,'FUTURE_RULE');
+console.log('Staff importer normalization tests: PASS (8 scenarios)');

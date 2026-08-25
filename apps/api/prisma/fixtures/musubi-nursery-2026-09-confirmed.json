@@ -1,0 +1,76 @@
+{
+  "fixtureType": "MUSUBI_NURSERY_2026_09_CONFIRMED",
+  "targetMonth": "2026-09",
+  "productionUseAllowed": false,
+  "source": "2026-08-24 read-only workbook audit plus nursery confirmations",
+  "privacy": "Names are retained outside Git; S001-S023 map to source rows in the private audit.",
+  "counts": { "displayedStaff": 23, "rotationEligible": 20, "rotationExcluded": 3 },
+  "patterns": [
+    { "code": "01", "label": "①", "startTime": "07:30", "endTime": "16:00", "countsTowardRotation": true },
+    { "code": "02", "label": "②", "startTime": "08:00", "endTime": "16:30", "countsTowardRotation": true },
+    { "code": "03", "label": "③", "startTime": "09:00", "endTime": "17:30", "countsTowardRotation": true },
+    { "code": "04", "label": "④", "startTime": "09:30", "endTime": "18:00", "countsTowardRotation": true },
+    { "code": "05", "label": "⑤", "startTime": "10:00", "endTime": "18:30", "countsTowardRotation": true },
+    { "code": "06", "label": "⑥", "startTime": "11:00", "endTime": "19:30", "countsTowardRotation": true },
+    { "code": "07", "label": "⑦", "startTime": "07:30", "endTime": "15:00", "countsTowardRotation": true, "saturdayOnly": true },
+    { "code": "08", "label": "⑧", "startTime": "09:30", "endTime": "17:00", "countsTowardRotation": true, "saturdayOnly": true },
+    { "code": "09", "label": "⑨", "startTime": "10:30", "endTime": "18:00", "countsTowardRotation": true, "saturdayOnly": true },
+    { "code": "NO_ROTATION", "label": "シフト無し", "startTime": "08:30", "endTime": "17:00", "isWorking": true, "countsTowardRotation": false, "tenantSpecific": true }
+  ],
+  "staff": [
+    { "code": "S001", "sourceRow": 5, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S002", "sourceRow": 6, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S003", "sourceRow": 7, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S004", "sourceRow": 8, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S005", "sourceRow": 9, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S006", "sourceRow": 10, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S007", "sourceRow": 11, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S008", "sourceRow": 12, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S009", "sourceRow": 13, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S010", "sourceRow": 14, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S011", "sourceRow": 15, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S012", "sourceRow": 16, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S013", "sourceRow": 17, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S014", "sourceRow": 18, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S015", "sourceRow": 21, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S016", "sourceRow": 22, "department": "CHILDCARE", "rotationEligible": true, "fixedPattern": "02" },
+    { "code": "S017", "sourceRow": 23, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S018", "sourceRow": 24, "department": "CHILDCARE", "rotationEligible": true },
+    { "code": "S019", "sourceRow": 27, "department": "CHILDCARE_SUPPORT", "rotationEligible": true, "fixedPattern": "01" },
+    { "code": "S020", "sourceRow": 28, "department": "CHILDCARE_SUPPORT", "rotationEligible": true, "fixedTime": ["08:45", "17:15"] },
+    { "code": "S021", "sourceRow": 31, "department": "FOOD_SERVICE", "rotationEligible": false, "fixedTime": ["07:30", "16:00"] },
+    { "code": "S022", "sourceRow": 32, "department": "FOOD_SERVICE", "rotationEligible": false, "fixedTime": ["08:30", "17:00"] },
+    { "code": "S023", "sourceRow": 33, "department": "FOOD_SERVICE", "rotationEligible": false, "fixedTime": ["08:00", "16:30"] }
+  ],
+  "confirmedCorrections": {
+    "withdrawnConditions": [
+      { "condition": "月末月初の同一週に同一職員へ①〜⑥を2回以上割り当てない", "status": "WITHDRAWN_THEN_SUPERSEDED", "reason": "一度撤回連絡があった後、最新の正式回答で月末月初に限定しない全週ルールとして再確定" },
+      { "condition": "土曜日に⑨勤務は存在しない", "status": "WITHDRAWN", "reason": "最新の正式回答で旧⑧を新⑨へ改番すると確定" }
+    ],
+    "weeklyPatternGroupLimit": { "patterns": ["01", "02", "03", "04", "05", "06"], "maxPerStaffPerWeek": 1, "weekStartsOn": "MONDAY", "crossMonth": true, "fixedPreferenceOverridesLimit": true, "relaxation": { "enabled": true, "maxPerWeek": 2, "minimumOnly": true, "automaticThirdAssignment": false, "activationMode": "FORMAL", "historyYears": 3, "recentWindowDays": 90, "explanationLevel": "INFO" }, "exemptStaffCodes": ["S008", "S019", "S016"], "identityEvidence": { "S008": "private source row 12", "S019": "private source row 27", "S016": "private source row 22" }, "tenantFeature": "TENANT_CUSTOM_RULES" },
+    "crossMonthTransition": { "fromPattern": "05", "toPattern": "01", "rule": "⑤の翌日に①を割り当てない", "readsPreviousConfirmedDate": true },
+    "fixedPreferenceOverrides": [
+      { "staffCode": "S005", "date": "2026-09-24", "pattern": "01" },
+      { "staffCode": "S010", "date": "2026-09-24", "pattern": "06" },
+      { "staffCode": "S013", "date": "2026-09-04", "pattern": "01" }
+    ],
+    "saturday07Fixed": { "staffCodes": ["S019", "S020"], "whenWorking": true, "bothWorking": "BOTH_ASSIGNED_07" },
+    "saturdayRenumbering": [
+      { "staffCode": "S008", "dates": ["2026-09-05", "2026-09-19"], "sourcePattern": "08", "pattern": "09" },
+      { "staffCode": "S012", "dates": ["2026-09-05"], "sourcePattern": "08", "pattern": "09" }
+    ],
+    "nonRotationWork": [
+      { "staffCode": "S003", "dayOfWeek": 3 },
+      { "staffCode": "S005", "dates": ["2026-09-15"] },
+      { "staffCode": "S007", "dates": ["2026-09-01"] },
+      { "staffCode": "S012", "dates": ["2026-09-08", "2026-09-09", "2026-09-16", "2026-09-30"] }
+    ],
+    "individualException": { "staffCode": "S012", "date": "2026-09-28", "pattern": "NORMAL", "endTime": "15:00" },
+    "monthlyPatternLimit": { "staffCode": "S012", "pattern": "01", "count": 1, "sourceMeaning": "①は月1回" },
+    "knownDateRepairs": [
+      { "raw": "9/119/14", "dates": ["2026-09-11", "2026-09-14"] },
+      { "raw": "9/9/・9/29 p.m", "dates": ["2026-09-09", "2026-09-29"], "portion": "PM" },
+      { "raw": "9/26●", "dates": ["2026-09-26"], "ignoredMark": "●" }
+    ]
+  }
+}

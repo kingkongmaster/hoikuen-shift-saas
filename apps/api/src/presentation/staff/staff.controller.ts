@@ -9,11 +9,13 @@ import { CreateStaffDto } from './create-staff.dto';
 import { ListStaffQueryDto } from './list-staff-query.dto';
 import { StaffService } from './staff.service';
 import { UpdateStaffDto } from './update-staff.dto';
+import { CreateStaffLoginAccountDto, ResetStaffPasswordDto, StaffLoginAccountReasonDto } from './staff-login-account.dto';
+import { StaffLoginAccountService } from './staff-login-account.service';
 
 @Controller('staff')
 @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard)
 export class StaffController {
-  constructor(private readonly staff: StaffService) {}
+  constructor(private readonly staff: StaffService, private readonly accounts: StaffLoginAccountService) {}
 
   @Get()
   @Roles('ADMIN', 'DIRECTOR')
@@ -36,6 +38,36 @@ export class StaffController {
   @Roles('ADMIN')
   create(@Req() request: Request & { user: AuthenticatedUser }, @Body() input: CreateStaffDto) {
     return this.staff.create(request.user, input);
+  }
+
+  @Get(':id/login-account')
+  @Roles('ADMIN')
+  accountStatus(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.accounts.status(request.user, id);
+  }
+
+  @Post(':id/login-account')
+  @Roles('ADMIN')
+  createAccount(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string, @Body() input: CreateStaffLoginAccountDto) {
+    return this.accounts.create(request.user, id, input);
+  }
+
+  @Post(':id/login-account/reset-password')
+  @Roles('ADMIN')
+  resetPassword(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string, @Body() input: ResetStaffPasswordDto) {
+    return this.accounts.resetPassword(request.user, id, input);
+  }
+
+  @Post(':id/login-account/deactivate')
+  @Roles('ADMIN')
+  deactivateAccount(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string, @Body() input: StaffLoginAccountReasonDto) {
+    return this.accounts.deactivate(request.user, id, input);
+  }
+
+  @Post(':id/login-account/reactivate')
+  @Roles('ADMIN')
+  reactivateAccount(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string, @Body() input: StaffLoginAccountReasonDto) {
+    return this.accounts.reactivate(request.user, id, input);
   }
 
   @Patch(':id')

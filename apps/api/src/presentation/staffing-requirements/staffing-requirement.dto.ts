@@ -7,6 +7,7 @@ export class ShiftStaffingRequirementInputDto {
   @Matches(/^[A-Z][A-Z0-9_]{0,49}$/) code!: string;
   @IsString() @MaxLength(100) name!: string;
   @IsUUID() attributeDefinitionId!: string;
+  @IsOptional() @IsUUID() workPatternId?: string | null;
   @IsOptional() @IsIn(STAFFING_CLASS_TYPES) classType?: (typeof STAFFING_CLASS_TYPES)[number] | null;
   @IsOptional() @IsInt() @Min(0) @Max(6) dayOfWeek?: number | null;
   @IsOptional() @IsDateString({ strict: true }) startDate?: string | null;

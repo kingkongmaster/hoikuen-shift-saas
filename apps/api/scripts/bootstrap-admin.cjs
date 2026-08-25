@@ -32,7 +32,7 @@ async function main() {
     if (activeAdministrator) throw new Error('An active administrator already exists for the tenant.');
     const existing = await tx.user.findUnique({ where: { email } });
     if (existing) throw new Error('A user with this email already exists.');
-    const user = await tx.user.create({ data: { email, displayName, passwordHash: hash(password), isActive: true, mustChangePassword: true } });
+    const user = await tx.user.create({ data: { loginId: email, email, displayName, passwordHash: hash(password), isActive: true, mustChangePassword: true } });
     await tx.membership.upsert({ where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } }, update: { role: MembershipRole.ADMIN, isActive: true }, create: { tenantId: tenant.id, userId: user.id, role: MembershipRole.ADMIN } });
     await tx.staff.upsert({ where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } }, update: { displayName, email, isActive: true }, create: { tenantId: tenant.id, userId: user.id, employeeNumber: process.env.INITIAL_ADMIN_EMPLOYEE_NUMBER ?? 'ADMIN-001', displayName, email, jobTitle: '管理者', employmentType: EmploymentType.FULL_TIME } });
     await tx.auditLog.create({ data: { tenantId: tenant.id, memberId: user.id, action: 'INITIAL_ADMIN_CREATED', targetType: 'User', targetId: user.id, detail: { source: 'bootstrap-admin-cli', mustChangePassword: true } } });

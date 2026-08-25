@@ -7,10 +7,10 @@ import { FeaturesService } from '../features/features.service';
 import type { WorkPatternInputDto } from './work-pattern.dto';
 
 export const SYSTEM_WORK_PATTERNS = [
-  { code: 'EARLY', name: '早出', shortName: '早', displayOrder: 10, startTime: '07:00', endTime: '16:00', breakMinutes: 60, color: '#f59e0b', isWorking: true, isDefault: false },
-  { code: 'NORMAL', name: '通常', shortName: '通', displayOrder: 20, startTime: '08:30', endTime: '17:00', breakMinutes: 60, color: '#10b981', isWorking: true, isDefault: true },
-  { code: 'LATE', name: '遅出', shortName: '遅', displayOrder: 30, startTime: '11:00', endTime: '19:30', breakMinutes: 60, color: '#6366f1', isWorking: true, isDefault: false },
-  { code: 'OFF', name: '休み', shortName: '休', displayOrder: 40, startTime: null, endTime: null, breakMinutes: 0, color: '#94a3b8', isWorking: false, isDefault: false },
+  { code: 'EARLY', name: '早出', shortName: '早', displayOrder: 10, startTime: '07:00', endTime: '16:00', breakMinutes: 60, color: '#f59e0b', isWorking: true, countsTowardStaffing: true, isDefault: false },
+  { code: 'NORMAL', name: '通常', shortName: '通', displayOrder: 20, startTime: '08:30', endTime: '17:00', breakMinutes: 60, color: '#10b981', isWorking: true, countsTowardStaffing: true, isDefault: true },
+  { code: 'LATE', name: '遅出', shortName: '遅', displayOrder: 30, startTime: '11:00', endTime: '19:30', breakMinutes: 60, color: '#6366f1', isWorking: true, countsTowardStaffing: true, isDefault: false },
+  { code: 'OFF', name: '休み', shortName: '休', displayOrder: 40, startTime: null, endTime: null, breakMinutes: 0, color: '#94a3b8', isWorking: false, countsTowardStaffing: false, isDefault: false },
 ] as const;
 const SYSTEM_CODES = new Set<string>(SYSTEM_WORK_PATTERNS.map((row) => row.code));
 
@@ -96,9 +96,9 @@ export class WorkPatternsService {
     if (!input.isActive) throw new BadRequestException('標準勤務パターンは無効化できません。');
     if (code === 'OFF') {
       if (input.isWorking || input.startTime || input.endTime || input.breakMinutes !== 0 || input.isDefault) throw new BadRequestException('OFFは勤務なし・時刻なし・休憩0分の標準パターンです。');
-    } else if (!input.isWorking) throw new BadRequestException('EARLY・NORMAL・LATEは勤務パターンとして維持してください。');
+    } else if (!input.isWorking || input.countsTowardStaffing === false) throw new BadRequestException('EARLY・NORMAL・LATEは勤務・配置算入パターンとして維持してください。');
   }
-  private clean(input: WorkPatternInputDto) { return { ...input, code: input.code.trim().toUpperCase(), name: input.name.trim(), shortName: input.shortName.trim(), startTime: input.startTime || null, endTime: input.endTime || null, color: input.color || null }; }
+  private clean(input: WorkPatternInputDto) { return { ...input, countsTowardStaffing: input.countsTowardStaffing ?? true, code: input.code.trim().toUpperCase(), name: input.name.trim(), shortName: input.shortName.trim(), startTime: input.startTime || null, endTime: input.endTime || null, color: input.color || null }; }
   private async get(tenantId: string, id: string) { const row = await this.prisma.workPattern.findFirst({ where: { id, tenantId } }); if (!row) throw new NotFoundException('勤務パターンが見つかりません。'); return row; }
   private async requireAdvanced(tenantId: string) { if (!(await this.features.resolve(tenantId, 'ADVANCED_WORK_PATTERNS')).enabled) throw new ForbiddenException({ code: 'FEATURE_NOT_ENTITLED', message: '複数勤務パターンはProfessionalまたは個別契約で利用できます。' }); }
 }

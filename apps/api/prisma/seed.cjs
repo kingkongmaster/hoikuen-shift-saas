@@ -44,8 +44,8 @@ async function main() {
   });
   const user = await prisma.user.upsert({
     where: { email },
-    update: { displayName: 'デモ園長', passwordHash: passwordHash(password), mustChangePassword: false, isActive: true },
-    create: { email, displayName: 'デモ園長', passwordHash: passwordHash(password) },
+    update: { loginId: email, displayName: 'デモ園長', passwordHash: passwordHash(password), mustChangePassword: false, isActive: true },
+    create: { loginId: email, email, displayName: 'デモ園長', passwordHash: passwordHash(password) },
   });
   await prisma.membership.upsert({
     where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
@@ -161,8 +161,8 @@ async function main() {
   const staffLoginPassword = password;
   const staffUser = await prisma.user.upsert({
     where: { email: staffLoginEmail },
-    update: { displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword), mustChangePassword: false, isActive: true },
-    create: { email: staffLoginEmail, displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword) },
+    update: { loginId: staffLoginEmail, displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword), mustChangePassword: false, isActive: true },
+    create: { loginId: staffLoginEmail, email: staffLoginEmail, displayName: 'デモ一般職員', passwordHash: passwordHash(staffLoginPassword) },
   });
   await prisma.membership.upsert({
     where: { tenantId_userId: { tenantId: tenant.id, userId: staffUser.id } },

@@ -14,12 +14,15 @@ const options = {
   maxConsecutiveWorkDays: 31, maxConsecutiveEarlyDays: 31, maxConsecutiveLateDays: 31,
   defaultStartEarly: '07:00', defaultEndEarly: '16:00', defaultStartNormal: '08:30', defaultEndNormal: '17:00',
   defaultStartLate: '11:00', defaultEndLate: '19:30', defaultBreakMinutes: 60,
+  systemWorkPatternIds: { EARLY: 'pattern-early', NORMAL: 'pattern-normal', LATE: 'pattern-late' },
+  patternTransitionBlocks: [{ fromWorkPatternIds: ['pattern-05'], toWorkPatternIds: ['pattern-early'] }],
   classRequirements: [{ classType: 'AGE_0', weekdayRequired: 0, saturdayRequired: 0, isActive: true }],
 };
 const patterns = {
   EARLY: { id: 'pattern-early', code: 'EARLY', startTime: '07:00', endTime: '16:00', breakMinutes: 60, isWorking: true, isActive: true },
   NORMAL: { id: 'pattern-normal', code: 'NORMAL', startTime: '08:30', endTime: '17:00', breakMinutes: 60, isWorking: true, isActive: true },
   LATE: { id: 'pattern-late', code: 'LATE', startTime: '11:00', endTime: '19:30', breakMinutes: 60, isWorking: true, isActive: true },
+  P05: { id: 'pattern-05', code: '05', startTime: '10:00', endTime: '18:30', breakMinutes: 60, isWorking: true, isActive: true },
 };
 const rule = (id, staffId, ruleType, type, date, priority = 100) => ({
   id, staffId, ruleType, dayOfWeek: null, startDate: new Date(`${date}T00:00:00.000Z`), endDate: new Date(`${date}T00:00:00.000Z`),
@@ -30,7 +33,7 @@ const shiftOn = (result, date, type) => result.assignments.find((item) => item.w
 const lateToEarly = generateRuleBasedSchedule(month, [member('LATE-YESTERDAY'), member('NORMAL-YESTERDAY')], [], {
   ...options,
   staffWorkRules: [
-    rule('fixed-late', 'LATE-YESTERDAY', 'FIXED_WORK_PATTERN', 'LATE', '2034-08-01'),
+    rule('fixed-late', 'LATE-YESTERDAY', 'FIXED_WORK_PATTERN', 'P05', '2034-08-01'),
     rule('fixed-normal', 'NORMAL-YESTERDAY', 'FIXED_WORK_PATTERN', 'NORMAL', '2034-08-01'),
   ],
 });
@@ -38,9 +41,10 @@ assert.equal(shiftOn(lateToEarly, '2034-08-02', 'EARLY'), 'NORMAL-YESTERDAY', 'A
 
 const necessary = generateRuleBasedSchedule(month, [member('ONLY-EARLY')], [], {
   ...options,
-  staffWorkRules: [rule('fixed-only-late', 'ONLY-EARLY', 'FIXED_WORK_PATTERN', 'LATE', '2034-08-01')],
+  staffWorkRules: [rule('fixed-only-late', 'ONLY-EARLY', 'FIXED_WORK_PATTERN', 'P05', '2034-08-01')],
 });
-assert.equal(shiftOn(necessary, '2034-08-02', 'EARLY'), 'ONLY-EARLY', 'B: 唯一の候補なら遅出翌日でも早出へ配置可能');
+assert.equal(shiftOn(necessary, '2034-08-02', 'EARLY'), undefined, 'B: 唯一の候補でも⑤の翌日に①を割り当てない');
+assert.ok(necessary.warnings.some((row) => row.code === 'EARLY_SHORTAGE'), 'B: ⑤→①を破る代わりに不足を報告');
 
 const earlyToLate = generateRuleBasedSchedule(month, [member('EARLY-YESTERDAY'), member('NORMAL-BEFORE-LATE')], [], {
   ...options, weekdayEarlyRequired: 0, weekdayLateRequired: 1,
@@ -61,4 +65,20 @@ const preferred = generateRuleBasedSchedule(month, [member('PREFERS-EARLY'), mem
 });
 assert.equal(shiftOn(preferred, '2034-08-02', 'EARLY'), 'PREFERS-EARLY', 'D: PREFERREDの早出希望は同種連続SOFT減点より優先');
 
-console.log('Shift transition burden tests: PASS (A-D)');
+const september = new Date('2034-09-01T00:00:00.000Z');
+const crossMonth = generateRuleBasedSchedule(september, [member('A-LATE-AUG31'), member('B-NORMAL-AUG31')], [], {
+  ...options,
+  priorAssignments: [
+    { staffId: 'A-LATE-AUG31', workDate: new Date('2034-08-31T00:00:00.000Z'), shiftType: 'OTHER', workPatternId: 'pattern-05' },
+    { staffId: 'B-NORMAL-AUG31', workDate: new Date('2034-08-31T00:00:00.000Z'), shiftType: 'NORMAL', workPatternId: 'pattern-normal' },
+  ],
+});
+assert.equal(shiftOn(crossMonth, '2034-09-01', 'EARLY'), 'B-NORMAL-AUG31', 'E: 8/31確定⑤を9/1生成時に参照し、月境界を越えて①を回避');
+
+const withoutPrior = generateRuleBasedSchedule(september, [member('A-LATE-AUG31'), member('B-NORMAL-AUG31')], [], options);
+assert.equal(shiftOn(withoutPrior, '2034-09-01', 'EARLY'), 'A-LATE-AUG31', 'F: 比較用・前月確定勤務なしでは職員番号順');
+
+const sixToEarly = generateRuleBasedSchedule(month, [member('SIX-THEN-EARLY')], [], { ...options, weekdayEarlyRequired: 0, staffWorkRules: [rule('six', 'SIX-THEN-EARLY', 'FIXED_WORK_PATTERN', 'LATE', '2034-08-01'), rule('early', 'SIX-THEN-EARLY', 'FIXED_WORK_PATTERN', 'EARLY', '2034-08-02')] });
+assert.equal(shiftOn(sixToEarly, '2034-08-02', 'EARLY'), 'SIX-THEN-EARLY', 'G: ⑥→①は⑤→①ルールだけを理由に遮断しない');
+
+console.log('Shift transition burden tests: PASS (A-G; ⑤ only, ⑥ excluded)');

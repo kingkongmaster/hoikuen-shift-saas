@@ -6,12 +6,12 @@ const scrypt = promisify(nativeScrypt);
 
 @Injectable()
 export class PasswordService {
-  validateNewPassword(password: string, identity: { email: string; displayName: string }): string | null {
+  validateNewPassword(password: string, identity: { email?: string | null; loginId?: string | null; displayName: string }): string | null {
     if (password !== password.trim()) return 'パスワードの先頭と末尾に空白は使用できません。';
     if (password.length < 12 || password.length > 128) return '新しいパスワードは12文字以上128文字以下で入力してください。';
     if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) return '新しいパスワードには英大文字、英小文字、数字、記号をそれぞれ含めてください。';
     const normalized = password.toLocaleLowerCase();
-    if (normalized === identity.email.toLocaleLowerCase() || normalized === identity.displayName.trim().toLocaleLowerCase()) return 'メールアドレスや表示名と同じパスワードは使用できません。';
+    if ([identity.email, identity.loginId, identity.displayName].filter(Boolean).some((value) => normalized === value!.trim().toLocaleLowerCase())) return 'ログインID、メールアドレス、表示名と同じパスワードは使用できません。';
     return null;
   }
 
