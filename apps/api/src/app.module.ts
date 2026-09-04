@@ -28,6 +28,7 @@ import { MusubiProvisionalModule } from './presentation/client-packages/musubi-p
 import { AnnualWorkSummariesModule } from './presentation/annual-work-summaries/annual-work-summaries.module';
 import { StaffWorkContractsModule } from './presentation/staff-work-contracts/staff-work-contracts.module';
 import { PaidLeaveModule } from './presentation/paid-leave/paid-leave.module';
+import { TenantCalendarModule } from './presentation/tenant-calendar/tenant-calendar.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { PaidLeaveModule } from './presentation/paid-leave/paid-leave.module';
     AnnualWorkSummariesModule,
     StaffWorkContractsModule,
     PaidLeaveModule,
+    TenantCalendarModule,
   ],
 })
 export class AppModule implements NestModule {

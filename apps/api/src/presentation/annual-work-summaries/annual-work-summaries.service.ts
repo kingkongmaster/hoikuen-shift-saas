@@ -31,7 +31,7 @@ export class AnnualWorkSummariesService {
             workDate: { gte: range.start, lt: range.endExclusive },
             monthlyShift: { status: 'CONFIRMED' },
           },
-          select: { workDate: true, shiftType: true, startTime: true, endTime: true, breakMinutes: true },
+          select: { workDate: true, shiftType: true, startTime: true, endTime: true, breakMinutes: true, attendanceModifier: { select: { modifierType: true } } },
         },
       },
       orderBy: { employeeNumber: 'asc' },

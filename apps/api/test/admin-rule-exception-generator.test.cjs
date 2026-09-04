@@ -1,0 +1,17 @@
+require('ts-node/register');
+const assert = require('node:assert/strict');
+const { AssignedClass, ShiftType, StaffWorkRuleType } = require('@prisma/client');
+const { generateRuleBasedSchedule } = require('../src/application/shifts/rule-based-shift-generator');
+const month = new Date('2035-01-01T00:00:00.000Z');
+const pattern = { id: 'normal', code: 'NORMAL', startTime: '08:30', endTime: '17:00', breakMinutes: 60, isWorking: true, isActive: true };
+const staff = [{ id: 's1', employeeNumber: 'S001', displayName: '匿名S001', assignedClass: AssignedClass.AGE_0, employmentType: 'FULL_TIME', canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: false, lateShiftOnly: false, canWorkSaturdays: true, monthlyWorkHourLimit: null, weeklyAvailableDays: null }];
+const rule = (ruleType, workPattern) => ({ id: ruleType, staffId: 's1', ruleType, dayOfWeek: null, startDate: month, endDate: month, startTime: null, endTime: null, numericValue: null, priority: ruleType === StaffWorkRuleType.FIXED_WORK_PATTERN ? 0 : 1, isHardConstraint: true, workPattern });
+const options = { weekdayEarlyRequired: 0, weekdayLateRequired: 0, saturdayEarlyRequired: 0, saturdayLateRequired: 0, saturdayMinimumStaff: 0, saturdayOperationEnabled: false, sundayOperationEnabled: false, maxConsecutiveWorkDays: 31, maxConsecutiveEarlyDays: 31, maxConsecutiveLateDays: 31, defaultStartEarly: '07:00', defaultEndEarly: '16:00', defaultStartNormal: '08:30', defaultEndNormal: '17:00', defaultStartLate: '11:00', defaultEndLate: '19:30', defaultBreakMinutes: 60, classRequirements: [], staffWorkRules: [rule(StaffWorkRuleType.FIXED_WORK_PATTERN, pattern), rule(StaffWorkRuleType.UNAVAILABLE_WORK_PATTERN, pattern)] };
+const blocked = generateRuleBasedSchedule(month, staff, [], options);
+assert.equal(blocked.assignments[0].shiftType, ShiftType.OFF);
+assert.ok(blocked.warnings.some((row) => row.code === 'STAFF_WORK_RULE_FIXED_PROHIBITED'));
+const approved = generateRuleBasedSchedule(month, staff, [], { ...options, approvedHardRuleOverrides: [{ date: '2035-01-01', staffId: 's1', workPatternId: 'normal', sourceType: 'ADMIN_CONFIRMED', sourceReference: 'TenantRuleException:test', confirmedAt: '2035-01-01', reason: '日付限定試験' }] });
+assert.equal(approved.assignments[0].shiftType, ShiftType.NORMAL);
+assert.ok(approved.warnings.some((row) => row.code === 'ADMIN_APPROVED_HARD_RULE_OVERRIDE' && row.level === 'INFO'));
+assert.equal(approved.assignments.find((row) => row.workDate.toISOString().slice(0, 10) === '2035-01-02').shiftType, ShiftType.NORMAL, '例外は翌日へ漏出せず通常generator結果になる');
+console.log('Admin date-limited rule exception generator test: PASS');

@@ -75,6 +75,8 @@ async function main() {
     { tenantId, monthlyShiftId: confirmed.id, staffId: unavailableStaff.id, workDate: new Date('2036-04-02T00:00:00Z'), shiftType: ShiftType.PAID_LEAVE },
     { tenantId, monthlyShiftId: draft.id, staffId: staff.id, workDate: new Date('2036-05-01T00:00:00Z'), shiftType: ShiftType.NORMAL, startTime: '09:00', endTime: '18:00', breakMinutes: 60 },
   ] });
+  const modifierAssignment=await prisma.shiftAssignment.create({data:{tenantId,monthlyShiftId:confirmed.id,staffId:staff.id,workDate:new Date('2036-04-04T00:00:00Z'),shiftType:ShiftType.NORMAL,startTime:'09:00',endTime:'16:00',breakMinutes:60}});
+  await prisma.shiftAttendanceModifier.create({data:{tenantId,shiftAssignmentId:modifierAssignment.id,modifierType:'PM_PAID_LEAVE',sourceType:'TEST'}});
 
   const otherTenant = await prisma.tenant.create({ data: { name: `Annual other ${run}` } });
   created.otherTenantId = otherTenant.id;
@@ -89,13 +91,13 @@ async function main() {
   assert.equal(summary.body.summaries.some((row) => row.staffId === otherStaff.id), false, 'other tenant staff must never be returned');
   const row = summary.body.summaries.find((item) => item.staffId === staff.id);
   assert.equal(row.annualTargetMinutes,72237);
-  assert.equal(row.actualWorkedMinutes,480);
+  assert.equal(row.actualWorkedMinutes,840);
   assert.equal(row.paidLeaveEquivalentMinutes,450);
-  assert.equal(row.halfLeaveEquivalentMinutes,180);
-  assert.equal(row.leaveEquivalentMinutes,630);
-  assert.equal(row.fairnessActualMinutes,1110);
-  assert.equal(row.achievementRate,1110/72237);
-  assert.equal(row.differenceMinutes,1110-72237);
+  assert.equal(row.halfLeaveEquivalentMinutes,360);
+  assert.equal(row.leaveEquivalentMinutes,810);
+  assert.equal(row.fairnessActualMinutes,1650);
+  assert.equal(row.achievementRate,1650/72237);
+  assert.equal(row.differenceMinutes,1650-72237);
   assert.equal(row.calculationStatus,'COMPLETE');
   const unavailable = summary.body.summaries.find((item) => item.staffId === unavailableStaff.id);
   assert.equal(unavailable.calculationStatus, 'NOT_CONFIGURED');

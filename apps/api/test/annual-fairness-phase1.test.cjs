@@ -25,10 +25,10 @@ const result = annualWorkSummary([
   assignment(ShiftType.OFF),
 ], prescribedMinutes('09:00', '18:00', 60));
 assert.deepEqual(result, {
-  actualWorkedMinutes: 480,
+  actualWorkedMinutes: 960,
   paidLeaveEquivalentMinutes: 480,
   halfLeaveEquivalentMinutes: 480,
-  fairnessActualMinutes: 1440,
+  fairnessActualMinutes: 1920,
   calculationStatus: 'COMPLETE',
   unavailableReason: null,
 });

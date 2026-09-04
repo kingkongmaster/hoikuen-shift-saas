@@ -46,7 +46,7 @@ export class BackupsService {
     const [tenant, memberships, staff, shiftRequests, monthlyShifts, shiftAssignments, shiftSetting, classRequirements, closedDates, notifications, shiftSwapRequests, auditLogs, tenantFeatures, workPatterns, staffWorkRules, staffAttributeDefinitions, staffAttributeAssignments, shiftStaffingRequirements, staffWorkContracts, paidLeaveGrants, paidLeaveUsages, paidLeaveAllocations] = await Promise.all([
       this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { id: true, name: true, createdAt: true, updatedAt: true } }),
       this.prisma.membership.findMany({ where: { tenantId }, include: { user: { select: { id: true, loginId: true, email: true, displayName: true, isActive: true, createdAt: true, updatedAt: true } } } }),
-      this.prisma.staff.findMany({ where: { tenantId } }), this.prisma.shiftRequest.findMany({ where: { tenantId } }), this.prisma.monthlyShift.findMany({ where: { tenantId } }), this.prisma.shiftAssignment.findMany({ where: { tenantId } }), this.prisma.tenantShiftSetting.findUnique({ where: { tenantId } }), this.prisma.classStaffingRequirement.findMany({ where: { tenantId } }), this.prisma.tenantClosedDate.findMany({ where: { tenantId } }), this.prisma.notification.findMany({ where: { tenantId } }), this.prisma.shiftSwapRequest.findMany({ where: { tenantId } }), this.prisma.auditLog.findMany({ where: { tenantId } }), this.prisma.tenantFeature.findMany({ where: { tenantId } }),
+      this.prisma.staff.findMany({ where: { tenantId } }), this.prisma.shiftRequest.findMany({ where: { tenantId } }), this.prisma.monthlyShift.findMany({ where: { tenantId } }), this.prisma.shiftAssignment.findMany({ where: { tenantId },include:{attendanceModifier:true} }), this.prisma.tenantShiftSetting.findUnique({ where: { tenantId } }), this.prisma.classStaffingRequirement.findMany({ where: { tenantId } }), this.prisma.tenantClosedDate.findMany({ where: { tenantId } }), this.prisma.notification.findMany({ where: { tenantId } }), this.prisma.shiftSwapRequest.findMany({ where: { tenantId } }), this.prisma.auditLog.findMany({ where: { tenantId } }), this.prisma.tenantFeature.findMany({ where: { tenantId } }),
       this.prisma.workPattern.findMany({ where: { tenantId } }),
       this.prisma.staffWorkRule.findMany({ where: { tenantId } }),
       this.prisma.staffAttributeDefinition.findMany({ where: { tenantId } }),
@@ -96,6 +96,7 @@ export class BackupsService {
     }
     for (const assignment of backup.data.shiftAssignments) {
       if (assignment.tenantId !== backup.tenantId) throw new UnprocessableEntityException('別Tenantのシフト割り当てを含むバックアップは利用できません。');
+      if (assignment.attendanceModifier && (assignment.attendanceModifier.tenantId !== backup.tenantId || assignment.attendanceModifier.shiftAssignmentId !== assignment.id)) throw new UnprocessableEntityException('別Tenantまたは不整合な勤務補正を含むバックアップは利用できません。');
       if (assignment.workPatternId != null && !ids.has(assignment.workPatternId)) throw new UnprocessableEntityException('存在しない勤務パターンを参照するシフトが含まれています。');
     }
   }

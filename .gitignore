@@ -39,9 +39,15 @@ Thumbs.db
 
 # Database dumps and backups (Prisma migration.sql files remain tracked)
 *.dump
+*.dump.sha256
 *.backup
 *.sql.gz
 *.sqlite
 *.sqlite3
 *.db
 
+# Tenant PII and submitted customer artifacts stay local/Git-external
+apps/api/prisma/fixtures/musubi-nursery-2026-09-staff-roster.json
+apps/api/prisma/fixtures/musubi-nursery-2026-09-confirmed.json
+docs/ai-shared-log-musubi-beta-phase1-2026-08-26.md
+output/

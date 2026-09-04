@@ -1,0 +1,1 @@
+module.exports = { schemaVersion: 1, packageType: 'TENANT_MONTHLY_INPUT', month: null, requests: [], events: [], closedDates: [], noRotation: [], dateFixedRules: [], ruleExceptions: [], staffingOverrides: [], monthlyFixedAssignments: [] };

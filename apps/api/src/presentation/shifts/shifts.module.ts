@@ -7,6 +7,7 @@ import { AuditModule } from '../audit/audit.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { FeaturesModule } from '../features/features.module';
 import { WorkPatternsModule } from '../work-patterns/work-patterns.module';
+import { MonthlyGenerationContextBuilder } from '../../application/shifts/monthly-generation-context-builder';
 
-@Module({ imports: [SettingsModule, NotificationsModule, AuditModule, SubscriptionsModule, FeaturesModule, WorkPatternsModule], controllers: [ShiftsController], providers: [ShiftsService] })
+@Module({ imports: [SettingsModule, NotificationsModule, AuditModule, SubscriptionsModule, FeaturesModule, WorkPatternsModule], controllers: [ShiftsController], providers: [ShiftsService, MonthlyGenerationContextBuilder] })
 export class ShiftsModule {}

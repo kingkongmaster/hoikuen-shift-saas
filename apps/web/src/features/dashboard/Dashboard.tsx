@@ -18,12 +18,15 @@ import { PersonalCalendar } from '../calendar/PersonalCalendar';
 import { MyPage } from '../profile/MyPage';
 import { AnnualWorkSummaryManagement } from '../staff/AnnualWorkSummaryManagement';
 import { PaidLeaveManagement } from '../staff/PaidLeaveManagement';
+import { TenantCalendarManagement } from '../calendar/TenantCalendarManagement';
 
-type View = 'home' | 'calendar' | 'mypage' | 'staff' | 'annual-work' | 'paid-leave' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
+type View = 'home' | 'calendar' | 'tenant-calendar' | 'mypage' | 'staff' | 'annual-work' | 'paid-leave' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
 const roleLabels = { ADMIN: '管理者', DIRECTOR: '園長', CHIEF: '主任', STAFF: '一般職員' } as const;
+const musubiBeta = import.meta.env.VITE_RELEASE_CHANNEL === 'musubi-beta';
 const viewInfo: Record<View, { title: string; description: string }> = {
   home: { title: 'ホーム', description: '今日の勤務と大切なお知らせを確認できます。' },
   calendar: { title: '個人カレンダー', description: '自分の勤務予定と希望休の状態を月ごとに確認します。' },
+  'tenant-calendar': { title: '行事・日別特例', description: '月間行事と、人数不足時の管理者承認をわかりやすく管理します。' },
   mypage: { title: 'マイページ', description: '自分の基本プロフィールを確認します。' },
   staff: { title: '職員マスター管理', description: '園ごとの職員情報を登録・編集・無効化できます。' },
   'annual-work': { title: '年間勤務', description: '年間目標と確定済み勤務実績を確認します。' },
@@ -56,6 +59,7 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const unread = notifications.filter((row) => !row.isRead).length;
   useEffect(() => {
+    if (musubiBeta) return;
     window.scrollTo({ top: 0, behavior: 'auto' });
     let active = true;
     api.notifications(session.accessToken).then((rows) => { if (active) setNotifications(rows); }).catch(() => undefined);
@@ -96,19 +100,21 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
         <HomeDashboard session={session} notifications={notifications} onOpen={selectView} />
         <section className="mt-7" aria-labelledby="menu-heading">
           <div className="mb-4"><p className="eyebrow">MENU</p><h2 id="menu-heading" className="mt-1 text-xl font-black">よく使うメニュー</h2></div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{everydayMenu.map((item) => <MenuTile key={item.view} {...item} label={item.view === 'shifts' && staffMode ? 'カレンダー' : item.label} description={item.view === 'shifts' && staffMode ? '本人の勤務予定' : item.description} badge={item.view === 'notifications' ? unread : 0} onClick={() => selectView(item.view === 'shifts' && staffMode ? 'calendar' : item.view)} />)}</div>
+          {musubiBeta && <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm"><strong>むすび保育園 Beta</strong><p className="mt-1 text-slate-700">試用期間中は、職員・希望休・勤務条件・2026年9月シフト・印刷に機能を限定しています。</p></div>}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{everydayMenu.filter((item) => !musubiBeta || item.view === 'requests' || item.view === 'shifts').map((item) => <MenuTile key={item.view} {...item} label={item.view === 'shifts' && staffMode ? 'カレンダー' : item.label} description={item.view === 'shifts' && staffMode ? '本人の勤務予定' : item.description} badge={item.view === 'notifications' ? unread : 0} onClick={() => selectView(item.view === 'shifts' && staffMode ? 'calendar' : item.view)} />)}</div>
           <details className="other-menu mt-4"><summary><span className="action-symbol action-symbol-soft" aria-hidden="true">他</span><span><strong>その他のメニュー</strong><small>{staffMode ? 'プロフィール・サポート' : '管理・設定・サポート'}</small></span></summary><div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
             {canManageShifts && <OtherButton symbol="職" label="職員マスター" onClick={() => selectView('staff')} />}
-            {canManageShifts && <OtherButton symbol="年" label="年間勤務" onClick={() => selectView('annual-work')} />}
-            {canManageShifts && <OtherButton symbol="有" label="有給管理" onClick={() => selectView('paid-leave')} />}
+            {canManageShifts && !musubiBeta && <OtherButton symbol="年" label="年間勤務" onClick={() => selectView('annual-work')} />}
+            {canManageShifts && !musubiBeta && <OtherButton symbol="有" label="有給管理" onClick={() => selectView('paid-leave')} />}
             {canManageShifts && <OtherButton symbol="園" label="園設定" onClick={() => selectView('settings')} />}
+            {canManageShifts && <OtherButton symbol="行" label="行事・日別特例" onClick={() => selectView('tenant-calendar')} />}
             {isAdmin && <OtherButton symbol="時" label="勤務パターン" onClick={() => selectView('work-patterns')} />}
-            {canManageShifts && <OtherButton symbol="契" label="契約情報" onClick={() => selectView('subscription')} />}
-            {canManageShifts && <OtherButton symbol="録" label="監査ログ" onClick={() => selectView('audit')} />}
+            {canManageShifts && !musubiBeta && <OtherButton symbol="契" label="契約情報" onClick={() => selectView('subscription')} />}
+            {canManageShifts && !musubiBeta && <OtherButton symbol="録" label="監査ログ" onClick={() => selectView('audit')} />}
             {canManageShifts && <OtherButton symbol="出" label="データ出力" onClick={() => selectView('exports')} />}
-            {canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' && <OtherButton symbol="仮" label="仮運用確認" onClick={() => selectView('musubi-demo')} />}
-            <OtherButton symbol="問" label="お問い合わせ" onClick={() => selectView('feedback')} />
-            <OtherButton symbol="新" label="更新履歴" onClick={() => selectView('updates')} />
+            {!musubiBeta && canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' && <OtherButton symbol="仮" label="仮運用確認" onClick={() => selectView('musubi-demo')} />}
+            {!musubiBeta && <OtherButton symbol="問" label="お問い合わせ" onClick={() => selectView('feedback')} />}
+            {!musubiBeta && <OtherButton symbol="新" label="更新履歴" onClick={() => selectView('updates')} />}
           </div></details>
         </section>
       </> : <>
@@ -122,12 +128,12 @@ export function Dashboard({ session, onLogout }: { session: Session; onLogout: (
       {staffMode ? <>
         <BottomButton symbol="暦" label="カレンダー" active={view === 'calendar'} onClick={() => selectView('calendar')} />
         <BottomButton symbol="休" label="希望休" active={view === 'requests'} onClick={() => selectView('requests')} />
-        <BottomButton symbol="知" label="通知" badge={unread} active={view === 'notifications'} onClick={() => selectView('notifications')} />
+        {!musubiBeta && <BottomButton symbol="知" label="通知" badge={unread} active={view === 'notifications'} onClick={() => selectView('notifications')} />}
         <BottomButton symbol="私" label="マイページ" active={view === 'mypage'} onClick={() => selectView('mypage')} />
       </> : <>
         <BottomButton symbol="休" label="希望休" active={view === 'requests'} onClick={() => selectView('requests')} />
         <BottomButton symbol="勤" label="シフト" active={view === 'shifts'} onClick={() => selectView('shifts')} />
-        <BottomButton symbol="知" label="通知" badge={unread} active={view === 'notifications'} onClick={() => selectView('notifications')} />
+        {!musubiBeta && <BottomButton symbol="知" label="通知" badge={unread} active={view === 'notifications'} onClick={() => selectView('notifications')} />}
       </>}
     </nav>
   </main>;
@@ -138,6 +144,7 @@ function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange, 
     : view === 'mypage' && !canManageShifts ? <MyPage token={session.accessToken} />
     : view === 'musubi-demo' && canManageShifts && session.tenant.code === 'MUSUBI-PROVISIONAL' ? <MusubiProvisionalDemo session={session} />
     : view === 'staff' && canManageShifts ? <StaffManagement token={session.accessToken} readOnly={!isAdmin} />
+    : view === 'tenant-calendar' && canManageShifts ? <TenantCalendarManagement token={session.accessToken} />
     : view === 'annual-work' && canManageShifts ? <AnnualWorkSummaryManagement token={session.accessToken} />
     : view === 'paid-leave' && canManageShifts ? <PaidLeaveManagement token={session.accessToken} />
     : view === 'work-patterns' && isAdmin ? <WorkPatternManagement token={session.accessToken} />
@@ -150,7 +157,7 @@ function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange, 
                 : view === 'exports' && canManageShifts ? <DataExportManagement session={session} />
                   : view === 'feedback' ? <FeedbackManagement session={session} />
                     : view === 'updates' ? <div className="mt-6"><UpdateHistory /></div>
-                      : <ShiftManagement session={session} />;
+                      : <ShiftManagement session={session} onOpenDecisions={() => onNavigate('tenant-calendar')} />;
 }
 function MenuTile({ symbol, label, description, badge, onClick }: { symbol: string; label: string; description: string; badge?: number; onClick: () => void }) {
   return <button type="button" onClick={onClick} className="menu-tile basis-[calc(50%-0.25rem)]"><span className="action-symbol" aria-hidden="true">{symbol}</span><span className="min-w-0 text-left"><strong className="block">{label}</strong><small className="mt-1 block text-xs text-[var(--ink-muted)]">{description}</small></span>{badge ? <span className="menu-badge" aria-label={`未読${badge}件`}>{badge}</span> : null}</button>;

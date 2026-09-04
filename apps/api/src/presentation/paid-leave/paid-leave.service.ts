@@ -7,7 +7,6 @@ import type { PaidLeaveCorrectionDto, PaidLeaveGrantInputDto, PaidLeaveUsageInpu
 
 const usageInclude = { allocations: { orderBy: { createdAt: 'asc' as const } } } as const;
 const paidRequestTypes = new Set<ShiftRequestType>([ShiftRequestType.PAID_LEAVE, ShiftRequestType.HALF_DAY_AM, ShiftRequestType.HALF_DAY_PM]);
-const paidShiftTypes = new Set<ShiftType>([ShiftType.PAID_LEAVE, ShiftType.AM_HALF, ShiftType.PM_HALF]);
 
 @Injectable()
 export class PaidLeaveService {
@@ -103,7 +102,7 @@ export class PaidLeaveService {
     const usageDate = date(input.usageDate);
     const grantIds = input.allocations.map((row) => row.grantId).sort();
     await this.lockGrants(tx, user.tenantId, grantIds);
-    await this.references(tx, user.tenantId, staffId, input.shiftRequestId, input.shiftAssignmentId, usageDate);
+    await this.references(tx, user.tenantId, staffId, input.shiftRequestId, input.shiftAssignmentId, usageDate, input.unit);
     const duplicate = await tx.paidLeaveUsage.findFirst({ where: { tenantId: user.tenantId, staffId, status: PaidLeaveUsageStatus.CONFIRMED, OR: [input.shiftRequestId ? { shiftRequestId: input.shiftRequestId } : undefined, input.shiftAssignmentId ? { shiftAssignmentId: input.shiftAssignmentId } : undefined].filter(Boolean) as Prisma.PaidLeaveUsageWhereInput[] } });
     if (duplicate) throw new ConflictException('同じ申請またはシフト明細の有給取得がすでに確定されています。');
     const grants = await tx.paidLeaveGrant.findMany({ where: { id: { in: grantIds }, tenantId: user.tenantId, staffId, voidedAt: null }, include: { allocations: { where: { usage: { status: PaidLeaveUsageStatus.CONFIRMED } } } } });
@@ -120,9 +119,10 @@ export class PaidLeaveService {
     return row;
   }
 
-  private async references(tx: Prisma.TransactionClient, tenantId: string, staffId: string, requestId: string | null | undefined, assignmentId: string | null | undefined, usageDate: Date) {
-    if (requestId) { const row = await tx.shiftRequest.findFirst({ where: { id: requestId, tenantId, staffId } }); if (!row || row.requestDate.getTime() !== usageDate.getTime() || !paidRequestTypes.has(row.requestType)) throw new BadRequestException('有給取得に対応する同一園・職員・日付の申請を指定してください。'); }
-    if (assignmentId) { const row = await tx.shiftAssignment.findFirst({ where: { id: assignmentId, tenantId, staffId } }); if (!row || row.workDate.getTime() !== usageDate.getTime() || !paidShiftTypes.has(row.shiftType)) throw new BadRequestException('有給取得に対応する同一園・職員・日付のシフト明細を指定してください。'); }
+  private async references(tx: Prisma.TransactionClient, tenantId: string, staffId: string, requestId: string | null | undefined, assignmentId: string | null | undefined, usageDate: Date, unit:PaidLeaveUsageUnit) {
+    if (requestId) { const row = await tx.shiftRequest.findFirst({ where: { id: requestId, tenantId, staffId } }); const half=row?.requestType===ShiftRequestType.HALF_DAY_AM||row?.requestType===ShiftRequestType.HALF_DAY_PM;if (!row || row.requestDate.getTime() !== usageDate.getTime() || !paidRequestTypes.has(row.requestType) || (unit===PaidLeaveUsageUnit.HALF_DAY)!==half) throw new BadRequestException('有給取得に対応する同一園・職員・日付・単位の申請を指定してください。'); }
+    if (unit===PaidLeaveUsageUnit.HALF_DAY&&!assignmentId) throw new ConflictException('基礎勤務が未確定です。勤務Assignmentと半休modifierを確定してから有給を確定してください。');
+    if (assignmentId) { const row = await tx.shiftAssignment.findFirst({ where: { id: assignmentId, tenantId, staffId },include:{attendanceModifier:true} }); const modifierHalf=row?.attendanceModifier?.modifierType==='AM_PAID_LEAVE'||row?.attendanceModifier?.modifierType==='PM_PAID_LEAVE';const full=row?.shiftType===ShiftType.PAID_LEAVE;if (!row || row.workDate.getTime() !== usageDate.getTime() || (unit===PaidLeaveUsageUnit.HALF_DAY?!modifierHalf:!full)) throw new BadRequestException('有給取得に対応する同一園・職員・日付・単位の正式なシフト明細を指定してください。'); }
   }
 
   private async staff(tenantId: string, staffId: string, active = false) { const row = await this.prisma.staff.findFirst({ where: { id: staffId, tenantId } }); if (!row) throw new NotFoundException('職員が見つかりません。'); if (active && !row.isActive) throw new BadRequestException('無効な職員へ有給記録を追加できません。'); return row; }

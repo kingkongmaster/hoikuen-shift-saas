@@ -32,7 +32,7 @@ assert.ok(leave.warnings.some((row) => row.code === 'STAFF_WORK_RULE_FIXED_BLOCK
 
 const closed = generateRuleBasedSchedule(month, people, [], { ...options, closedDates: [{ closedDate: month, name: '検証休園日' }], staffWorkRules: [fixedNormal] });
 assert.equal(assignmentOn(closed, 's2').shiftType, ShiftType.OFF, '休園日をFIXEDより優先');
-assert.ok(closed.warnings.some((row) => row.code === 'STAFF_WORK_RULE_FIXED_BLOCKED'));
+assert.ok(closed.warnings.some((row) => row.code === 'STAFF_WORK_RULE_FIXED_SKIPPED_CLOSED' && row.level === 'INFO'), '正式休園日は固定勤務を安全にskipし、業務違反ERRORにしない');
 
 assert.equal(ruleLabel(null), '勤務条件の競合', '競合理由nullを安全な一般表示にする');
 assert.doesNotThrow(() => generateRuleBasedSchedule(month, people, [], { ...options, staffWorkRules: [fixedNormal, allowedEarlyMonday] }), '問題経路でGeneratorを例外停止させない');

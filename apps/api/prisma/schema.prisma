@@ -65,6 +65,14 @@ enum ShiftType {
   OTHER
 }
 
+enum AttendanceModifierType {
+  AM_PAID_LEAVE
+  PM_PAID_LEAVE
+  EARLY_DEPARTURE
+  LATE_ARRIVAL
+  HOURLY_LEAVE
+}
+
 enum NotificationType {
   SHIFT_CONFIRMED
   SHIFT_UPDATED
@@ -158,9 +166,12 @@ model Tenant {
   paidLeaveGrants                 PaidLeaveGrant[]
   paidLeaveUsages                 PaidLeaveUsage[]
   paidLeaveAllocations            PaidLeaveAllocation[]
+  shiftAttendanceModifiers        ShiftAttendanceModifier[]
   departments                     Department[]
   staffDepartmentAssignments      StaffDepartmentAssignment[]
   conditionalStaffingRequirements ConditionalShiftStaffingRequirement[]
+  events                          TenantEvent[]
+  ruleExceptions                  TenantRuleException[]
   displayName                     String?
   phone                           String?
   postalCode                      String?
@@ -404,6 +415,11 @@ model StaffWorkContract {
   annualizedTargetMinutes Int
   prescribedDailyMinutes  Int
   voidedAt                DateTime?
+  sourceType              String?
+  sourceReference         String?
+  confirmedAt             DateTime?
+  confirmedBy             String?
+  version                 Int       @default(1)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
   tenant                  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -453,25 +469,26 @@ model MonthlyShift {
 }
 
 model ShiftAssignment {
-  id              String           @id @default(uuid()) @db.Uuid
-  tenantId        String           @db.Uuid
-  monthlyShiftId  String           @db.Uuid
-  staffId         String           @db.Uuid
-  workDate        DateTime         @db.Date
-  shiftType       ShiftType
-  startTime       String?
-  endTime         String?
-  breakMinutes    Int?
-  note            String?
-  assignedClass   AssignedClass?
-  workPatternId   String?          @db.Uuid
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  monthlyShift    MonthlyShift     @relation(fields: [tenantId, monthlyShiftId], references: [tenantId, id], onDelete: Cascade, onUpdate: Cascade, map: "ShiftAssignment_tenantId_monthlyShiftId_tenant_guard_fkey")
-  staff           Staff            @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "ShiftAssignment_tenantId_staffId_tenant_guard_fkey")
-  workPattern     WorkPattern?     @relation(fields: [tenantId, workPatternId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "ShiftAssignment_tenantId_workPatternId_tenant_guard_fkey")
-  paidLeaveUsages PaidLeaveUsage[]
+  id                 String                   @id @default(uuid()) @db.Uuid
+  tenantId           String                   @db.Uuid
+  monthlyShiftId     String                   @db.Uuid
+  staffId            String                   @db.Uuid
+  workDate           DateTime                 @db.Date
+  shiftType          ShiftType
+  startTime          String?
+  endTime            String?
+  breakMinutes       Int?
+  note               String?
+  assignedClass      AssignedClass?
+  workPatternId      String?                  @db.Uuid
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  monthlyShift       MonthlyShift             @relation(fields: [tenantId, monthlyShiftId], references: [tenantId, id], onDelete: Cascade, onUpdate: Cascade, map: "ShiftAssignment_tenantId_monthlyShiftId_tenant_guard_fkey")
+  staff              Staff                    @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "ShiftAssignment_tenantId_staffId_tenant_guard_fkey")
+  workPattern        WorkPattern?             @relation(fields: [tenantId, workPatternId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade, map: "ShiftAssignment_tenantId_workPatternId_tenant_guard_fkey")
+  paidLeaveUsages    PaidLeaveUsage[]
+  attendanceModifier ShiftAttendanceModifier?
 
   @@unique([monthlyShiftId, staffId, workDate])
   @@unique([tenantId, id], map: "ShiftAssignment_tenantId_id_key")
@@ -479,6 +496,26 @@ model ShiftAssignment {
   @@index([tenantId, staffId, workDate])
   @@index([monthlyShiftId, workDate])
   @@index([tenantId, workPatternId])
+}
+
+model ShiftAttendanceModifier {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  tenantId           String                 @db.Uuid
+  shiftAssignmentId  String                 @unique @db.Uuid
+  modifierType       AttendanceModifierType
+  effectiveStartTime String?
+  effectiveEndTime   String?
+  sourceType         String
+  sourceReference    String?
+  confirmedAt        DateTime?
+  confirmedBy        String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shiftAssignment    ShiftAssignment        @relation(fields: [tenantId, shiftAssignmentId], references: [tenantId, id], onDelete: Cascade, onUpdate: Cascade, map: "ShiftAttendanceModifier_tenant_assignment_guard_fkey")
+
+  @@unique([tenantId, shiftAssignmentId])
+  @@index([tenantId, modifierType])
 }
 
 model WorkPattern {
@@ -561,6 +598,12 @@ model StaffWorkRule {
   isHardConstraint Boolean           @default(true)
   reason           String?
   isActive         Boolean           @default(true)
+  sourceType       String?
+  sourceReference  String?
+  confirmedAt      DateTime?
+  confirmedBy      String?
+  version          Int               @default(1)
+  supersedesRuleId String?           @db.Uuid
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -613,6 +656,11 @@ model ShiftStaffingRequirement {
   reason                String?
   displayOrder          Int                      @default(0)
   isActive              Boolean                  @default(true)
+  sourceType            String?
+  sourceReference       String?
+  confirmedAt           DateTime?
+  confirmedBy           String?
+  version               Int                      @default(1)
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
   tenant                Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -756,6 +804,55 @@ model ClassStaffingRequirement {
 
   @@unique([tenantId, classType])
   @@index([tenantId, isActive])
+}
+
+model TenantEvent {
+  id                      String    @id @default(uuid()) @db.Uuid
+  tenantId                String    @db.Uuid
+  eventDate               DateTime  @db.Date
+  name                    String
+  eventType               String
+  targetClasses           Json?
+  targetStaffCodes        Json?
+  allowedWorkPatternCodes Json?
+  fixedTimeStaffAllowed   Boolean   @default(true)
+  note                    String?
+  sourceType              String
+  sourceReference         String?
+  confirmedAt             DateTime?
+  confirmedBy             String?
+  version                 Int       @default(1)
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  tenant                  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, eventDate, name])
+  @@index([tenantId, eventDate, isActive])
+}
+
+model TenantRuleException {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  exceptionDate   DateTime  @db.Date
+  exceptionType   String
+  configuration   Json
+  reason          String
+  sourceType      String
+  sourceReference String?
+  confirmedAt     DateTime?
+  confirmedBy     String?
+  effectiveFrom   DateTime? @db.Date
+  effectiveTo     DateTime? @db.Date
+  version         Int       @default(1)
+  supersedesId    String?   @db.Uuid
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, exceptionDate, exceptionType])
+  @@index([tenantId, exceptionDate, isActive])
 }
 
 model TenantClosedDate {

@@ -7,6 +7,7 @@ const shiftLabels: Record<ShiftType, string> = {
   EARLY: '早出勤務', NORMAL: '通常勤務', LATE: '遅出勤務', OFF: 'お休み', PAID_LEAVE: '有給休暇', SUMMER_LEAVE: '夏季休暇', AM_HALF: '午前半休', PM_HALF: '午後半休', OTHER: 'その他',
 };
 const workingTypes = new Set<ShiftType>(['EARLY', 'NORMAL', 'LATE', 'AM_HALF', 'PM_HALF', 'OTHER']);
+const musubiBeta = import.meta.env.VITE_RELEASE_CHANNEL === 'musubi-beta';
 
 export function HomeDashboard({ session, notifications, onOpen }: { session: Session; notifications: Notification[]; onOpen: (view: 'shifts' | 'calendar' | 'notifications' | 'requests' | 'swaps') => void }) {
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
@@ -26,7 +27,7 @@ export function HomeDashboard({ session, notifications, onOpen }: { session: Ses
   const unread = notifications.filter((item) => !item.isRead);
   if (loading) return <div><span className="sr-only" role="status">今日の予定を確認しています…</span><SkeletonState cards={3} label="今日の予定を確認しています…" /></div>;
   return <div className="space-y-5">
-    {(session.role === 'ADMIN' || session.role === 'DIRECTOR') && <AdminHomeSummary session={session} notifications={notifications} onOpen={onOpen} />}
+    {(session.role === 'ADMIN' || session.role === 'DIRECTOR') && !musubiBeta && <AdminHomeSummary session={session} notifications={notifications} onOpen={onOpen} />}
 
     <section className="today-card" aria-labelledby="today-shift-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -44,12 +45,12 @@ export function HomeDashboard({ session, notifications, onOpen }: { session: Ses
       <button type="button" onClick={() => onOpen(session.role === 'STAFF' || session.role === 'CHIEF' ? 'calendar' : 'shifts')} className="btn-primary mt-6 w-full sm:w-fit"><span className="action-symbol" aria-hidden="true">勤</span>{session.role === 'STAFF' || session.role === 'CHIEF' ? '個人カレンダーを見る' : '月間シフトを見る'}</button>
     </section>
 
-    <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
-      <section className="card" aria-labelledby="today-news-title">
+    <div className={musubiBeta ? 'grid gap-5' : 'grid gap-5 lg:grid-cols-[1.35fr_0.65fr]'}>
+      {!musubiBeta && <section className="card" aria-labelledby="today-news-title">
         <div className="flex items-center justify-between gap-3"><div><p className="eyebrow">INFORMATION</p><h3 id="today-news-title" className="mt-1 text-xl font-bold">今日のお知らせ</h3></div><span className="count-label">未読 {unread.length}件</span></div>
         {notifications.length ? <ul className="mt-5 space-y-3">{notifications.slice(0, 3).map((item) => <li key={item.id} className="notice-row"><span className={`notice-dot ${item.isRead ? 'notice-dot-read' : ''}`} aria-hidden="true" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{item.title}</p><span className="text-label">{item.isRead ? '確認済み' : '未読'}</span></div><p className="mt-1 line-clamp-2 text-sm leading-6 text-[var(--ink-muted)]">{item.message}</p></div></li>)}</ul> : <div className="mt-5 rounded-xl bg-[var(--canvas)] p-4"><p className="font-bold">園からのお知らせはまだありません</p><p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">新しいお知らせが届くと、この場所に表示されます。</p></div>}
         <button type="button" onClick={() => onOpen('notifications')} className="btn-secondary mt-5 w-full sm:w-fit"><span className="action-symbol action-symbol-soft" aria-hidden="true">知</span>通知をすべて見る</button>
-      </section>
+      </section>}
       <section className="card" aria-labelledby="next-shift-title">
         <p className="eyebrow">NEXT</p><h3 id="next-shift-title" className="mt-1 text-xl font-bold">次回勤務</h3>
         {nextAssignment ? <div className="mt-5"><p className="text-lg font-bold text-[var(--brand-deep)]">{formatDate(nextAssignment.workDate.slice(0, 10))}</p><p className="mt-2 text-2xl font-black">{shiftLabels[nextAssignment.shiftType]}</p><p className="mt-3 text-sm font-semibold text-[var(--ink-muted)]">{nextAssignment.startTime ?? '—'} 〜 {nextAssignment.endTime ?? '—'}</p></div> : <p className="mt-5 text-sm leading-6 text-[var(--ink-muted)]">確定済みの次回勤務はありません。</p>}

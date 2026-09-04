@@ -1,0 +1,114 @@
+name: aen-shift-musubi-beta
+
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-api-environment: &api-environment
+  NODE_ENV: production
+  DEPLOYMENT_ENV: production
+  API_PORT: "3000"
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the root-owned deployment environment file}
+  DATABASE_CONNECT_ON_STARTUP: "true"
+  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root-owned deployment environment file}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+  WEB_ORIGIN: https://${AEN_SHIFT_DOMAIN:?Set AEN_SHIFT_DOMAIN}
+  TRUST_PROXY: "1"
+  LOG_LEVEL: ${LOG_LEVEL:-log}
+  READINESS_DB_TIMEOUT_MS: ${READINESS_DB_TIMEOUT_MS:-3000}
+
+services:
+  edge:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      AEN_SHIFT_DOMAIN: ${AEN_SHIFT_DOMAIN:?Set AEN_SHIFT_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/musubi-beta/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [public, frontend]
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    mem_limit: 96m
+    cpus: 0.25
+    logging: *bounded-logging
+
+  web:
+    image: ${AEN_SHIFT_WEB_IMAGE:?Set the immutable prebuilt Web image reference}
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      API_UPSTREAM: http://api:3000
+    expose: ["8080"]
+    networks: [frontend]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    mem_limit: 96m
+    cpus: 0.25
+    logging: *bounded-logging
+
+  api:
+    image: ${AEN_SHIFT_API_IMAGE:?Set the immutable prebuilt API image reference}
+    restart: unless-stopped
+    environment: *api-environment
+    expose: ["3000"]
+    networks: [frontend, database]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 384m
+    cpus: 0.75
+    logging: *bounded-logging
+
+  migrate:
+    profiles: ["operations"]
+    image: ${AEN_SHIFT_MIGRATION_IMAGE:?Set the immutable prebuilt migration image reference}
+    command: ["node", "scripts/migration.cjs", "status"]
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the root-owned deployment environment file}
+      DEPLOYMENT_ENV: production
+      DATABASE_TARGET_ID: ${DATABASE_TARGET_ID:?Set a descriptive database target id}
+      CONFIRM_DATABASE_TARGET_ID: ${CONFIRM_DATABASE_TARGET_ID:?Confirm the database target id}
+      CONFIRM_DEPLOYMENT_ENV: production
+      ALLOW_PRODUCTION_MIGRATION: ${ALLOW_PRODUCTION_MIGRATION:-false}
+    networks: [database]
+    mem_limit: 512m
+    cpus: 1.0
+    logging: *bounded-logging
+
+networks:
+  public:
+  frontend:
+    internal: true
+  database:
+    external: true
+    name: ${POSTGRES_DOCKER_NETWORK:?Set the network already joined by aen-shift-postgres}
+
+volumes:
+  caddy_data:
+  caddy_config:

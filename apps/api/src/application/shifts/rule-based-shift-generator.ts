@@ -4,20 +4,24 @@ import { evaluateStaffingRequirements, evaluationWarnings, staffingPriority, typ
 import { applicableRules, fixedRule, patternType, preferenceRank, prohibitionConflict, ruleEligibility, ruleLabel, type GeneratorWorkRule } from './staff-work-rule-evaluator';
 import { futureHardReservationPlan, type FutureCandidateCapacity, type FutureHardReservation, type FutureHardSlot } from './future-hard-capacity-evaluator';
 import { activeRequirements, hasAttribute } from './staffing-requirement-evaluator';
+import { assignmentTimeBreakdown } from '../attendance/assignment-time-breakdown';
 
 export type GeneratorAnnualFairness = { annualTargetMinutes: number; confirmedFairnessMinutes: number; prescribedMinutesByDate?: Record<string, number> };
 export type GeneratorStaff = { id: string; employeeNumber: string; displayName: string; assignedClass: AssignedClass; employmentType: EmploymentType; isDirector?: boolean; canWorkEarly: boolean; canWorkRegular: boolean; canWorkLate: boolean; earlyShiftOnly: boolean; lateShiftOnly: boolean; canWorkSaturdays: boolean; monthlyWorkHourLimit: number | null; monthlyTargetWorkDays?: number | null; monthlyTargetWorkHours?: number | null; weeklyAvailableDays: number | null; regularWorkStartTime?: string | null; regularWorkEndTime?: string | null; annualFairness?: GeneratorAnnualFairness };
 export type GeneratorRequest = { staffId: string; requestDate: Date; requestType: ShiftRequestType; reason: string | null };
 export type GenerationWarning = { code: string; level: 'INFO' | 'WARNING' | 'ERROR'; workDate: string; staffId?: string; classType?: AssignedClass; required?: number; assigned?: number; message: string; details?: Record<string, unknown> };
-export type GeneratedAssignment = { staffId: string; workDate: Date; shiftType: ShiftType; workPatternId?: string | null; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null; countsTowardStaffing?: boolean };
+export type GeneratedAttendanceModifier = { modifierType: 'AM_PAID_LEAVE' | 'PM_PAID_LEAVE'; effectiveStartTime: string | null; effectiveEndTime: string | null; sourceType: 'APPROVED_SHIFT_REQUEST' };
+export type GeneratedAssignment = { staffId: string; workDate: Date; shiftType: ShiftType; workPatternId?: string | null; startTime: string | null; endTime: string | null; breakMinutes: number | null; note: string | null; assignedClass: AssignedClass | null; countsTowardStaffing?: boolean; attendanceModifier?: GeneratedAttendanceModifier };
 export type SpecialShiftSummary = { staffId: string; employeeNumber: string; displayName: string; earlyCount: number; lateCount: number; totalSpecialShiftCount: number; saturdayCount: number; workCount: number; earlyCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE'; lateCategory: 'DEDICATED' | 'GENERAL' | 'NOT_ELIGIBLE' };
 export type GeneratorWeeklyPatternGroup = { groupCode: string; maxPerWeek: number; shiftTypes?: ShiftType[]; workPatternIds?: string[] };
 export type GeneratorPatternTransitionBlock = { fromWorkPatternIds: string[]; toWorkPatternIds: string[] };
 export type GeneratorMeetingDayRule = { dayOfWeek: number; occurrence: number; minimumEndTime: string };
 export type WeeklyPatternRelaxation = { enabled: boolean; maxPerWeek: number; explanationLevel?: 'INFO' | 'WARNING'; historyYears?: number; recentWindowDays?: number; formalStatus?: 'FORMAL' | 'PROVISIONAL_VALIDATION' };
+export type ApprovedWeeklyThirdAssignmentException = { date: string; maxPerWeek: 3; maxAssignments: number; sourceType: 'ADMIN_CONFIRMED'; sourceReference: string; confirmedAt: string; reason: string };
+export type ApprovedHardRuleOverride = { date: string; staffId: string; workPatternId: string; sourceType: 'ADMIN_CONFIRMED'; sourceReference: string; confirmedAt: string; reason: string };
 export type GeneratorFairnessWindows = { recentStart: Date; fiscalStart: Date; longTermStart: Date };
 export type WeeklyPatternRelaxationRecord = { staffId: string; employeeNumber: string; workDate: string; weekStart: string; workPatternId: string; workPatternCode: string; previousWeeklyCount: number; resultingWeeklyCount: number; monthlyGroupCountBefore: number; annualGroupCountBefore: number; monthlyRelaxedWeekCountBefore: number; annualRelaxedWeekCountBefore: number; recentGroupCountBefore: number; recentRelaxedWeekCountBefore: number; longTermGroupCountBefore: number; longTermRelaxedWeekCountBefore: number; longTermOpportunityWeekCountBefore: number; longTermGroupRateBefore: number | null; longTermRelaxedWeekRateBefore: number | null; historyWindowStart: string; requirementCode: string };
-export type GeneratorOptions = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff?: number; saturdayOperationEnabled?: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing?: boolean; directorClassPlacementMode?: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number; closedDates?: Array<{ closedDate: Date; name: string }>; classRequirements?: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean }>; staffingRequirements?: GeneratorStaffingRequirement[]; conditionalStaffingRequirements?: GeneratorConditionalStaffingRequirement[]; staffAttributeAssignments?: GeneratorAttributeAssignment[]; staffWorkRules?: GeneratorWorkRule[]; priorAssignments?: Array<{ staffId: string; workDate: Date; shiftType: ShiftType; workPatternId?: string | null }>; weeklyPatternGroups?: GeneratorWeeklyPatternGroup[]; weeklyPatternGroupExemptStaffIds?: string[]; fixedWorkPatternOverridesWeeklyLimit?: boolean; weeklyPatternRelaxation?: WeeklyPatternRelaxation; fairnessWindows?: GeneratorFairnessWindows; patternTransitionBlocks?: GeneratorPatternTransitionBlock[]; systemWorkPatternIds?: Partial<Record<ShiftType, string>>; replaceLegacyShiftTargetsWhenPatternRequirementsActive?: boolean; meetingDayRules?: GeneratorMeetingDayRule[]; futureHardCapacityReservation?: boolean; annualFairnessSoft?: boolean };
+export type GeneratorOptions = { weekdayEarlyRequired: number; weekdayLateRequired: number; saturdayEarlyRequired: number; saturdayLateRequired: number; saturdayMinimumStaff?: number; saturdayOperationEnabled?: boolean; sundayOperationEnabled: boolean; directorCountsTowardStaffing?: boolean; directorClassPlacementMode?: 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL'; maxConsecutiveWorkDays: number; maxConsecutiveEarlyDays: number; maxConsecutiveLateDays: number; defaultStartEarly: string; defaultEndEarly: string; defaultStartNormal: string; defaultEndNormal: string; defaultStartLate: string; defaultEndLate: string; defaultBreakMinutes: number; closedDates?: Array<{ closedDate: Date; name: string }>; classRequirements?: Array<{ classType: AssignedClass; weekdayRequired: number; saturdayRequired: number; isActive: boolean }>; staffingRequirements?: GeneratorStaffingRequirement[]; conditionalStaffingRequirements?: GeneratorConditionalStaffingRequirement[]; staffAttributeAssignments?: GeneratorAttributeAssignment[]; staffWorkRules?: GeneratorWorkRule[]; priorAssignments?: Array<{ staffId: string; workDate: Date; shiftType: ShiftType; workPatternId?: string | null }>; weeklyPatternGroups?: GeneratorWeeklyPatternGroup[]; weeklyPatternGroupExemptStaffIds?: string[]; fixedWorkPatternOverridesWeeklyLimit?: boolean; weeklyPatternRelaxation?: WeeklyPatternRelaxation; approvedWeeklyThirdAssignmentExceptions?: ApprovedWeeklyThirdAssignmentException[]; approvedHardRuleOverrides?: ApprovedHardRuleOverride[]; fairnessWindows?: GeneratorFairnessWindows; patternTransitionBlocks?: GeneratorPatternTransitionBlock[]; systemWorkPatternIds?: Partial<Record<ShiftType, string>>; replaceLegacyShiftTargetsWhenPatternRequirementsActive?: boolean; fillOpenUnassignedWithNormal?: boolean; meetingDayRules?: GeneratorMeetingDayRule[]; futureHardCapacityReservation?: boolean; annualFairnessSoft?: boolean };
 
 const defaultTargets: Partial<Record<AssignedClass, number>> = { AGE_0: 3, AGE_1: 2, AGE_2: 2, AGE_3: 2, AGE_4: 2, AGE_5: 2 };
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -33,6 +37,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
   const workStreak = new Map<string, number>(); const earlyStreak = new Map<string, number>(); const lateStreak = new Map<string, number>();
   const warned = new Set<string>();
   const weeklyPatternRelaxations: WeeklyPatternRelaxationRecord[] = [];
+  const approvedWeeklyThirdAssignments: Array<WeeklyPatternRelaxationRecord & { sourceType: 'ADMIN_CONFIRMED'; sourceReference: string; confirmedAt: string; reason: string }> = [];
   const futureHardCapacitySummary = { evaluations: 0, cacheHits: 0, planBuilds: 0, maxFlowCalls: 0, incrementalUpdates: 0, maxFlowCallsByDate: {} as Record<string, number> };
   const add = (warning: GenerationWarning) => { const requirementDetail = warning.code === 'WORK_PATTERN_REQUIREMENT_SHORTAGE' ? warning.message : ''; const key = `${warning.code}:${warning.workDate}:${warning.staffId ?? ''}:${warning.classType ?? ''}:${requirementDetail}`; if (!warned.has(key)) { warned.add(key); warnings.push(warning); } };
   const start = new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth(), 1)); const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
@@ -43,12 +48,13 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     const fixedStaffIds = new Set<string>();
     const futureCapacityCache = new Map<string, number>();
     let futurePlan: { slots: FutureHardSlot[]; capacities: FutureCandidateCapacity[]; futureDates: Date[]; reservations: FutureHardReservation[] } | null = null;
-    for (const member of staff) { const request = fixed.get(`${member.id}:${key}`); day.set(member.id, request ? assignment(member, workDate, requestTypeToShiftType(request.requestType), options, '希望休を優先') : assignment(member, workDate, ShiftType.OFF, options)); }
+    for (const member of staff) { const request = fixed.get(`${member.id}:${key}`); day.set(member.id, request && !isHalfDayRequest(request.requestType) ? assignment(member, workDate, requestTypeToShiftType(request.requestType), options, '希望休を優先') : assignment(member, workDate, ShiftType.OFF, options)); }
     for (const member of staff) {
       const rule = fixedRule(options.staffWorkRules ?? [], member.id, workDate); if (!rule?.workPattern) continue;
       const request = fixed.get(`${member.id}:${key}`);
-      if (closedName || (saturday && options.saturdayOperationEnabled === false) || (sunday && !options.sundayOperationEnabled) || request) {
-        add({ code: 'STAFF_WORK_RULE_FIXED_BLOCKED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんの固定勤務は${closedName ? '休園日' : request ? '承認済み休暇' : '休園設定'}を優先したため割り当てませんでした。` }); continue;
+      if (closedName || (saturday && options.saturdayOperationEnabled === false) || (sunday && !options.sundayOperationEnabled) || (request && !isHalfDayRequest(request.requestType))) {
+        const expectedClosure = !!closedName || (saturday && options.saturdayOperationEnabled === false) || (sunday && !options.sundayOperationEnabled);
+        add({ code: expectedClosure ? 'STAFF_WORK_RULE_FIXED_SKIPPED_CLOSED' : 'STAFF_WORK_RULE_FIXED_BLOCKED', level: expectedClosure ? 'INFO' : 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんの固定勤務は${closedName ? '休園日' : request ? '承認済み休暇' : '休園設定'}を優先したため割り当てませんでした。` }); continue;
       }
       if (!rule.workPattern.isActive) { add({ code: 'STAFF_WORK_RULE_FIXED_PATTERN_INACTIVE', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんの固定勤務パターンが無効なため割り当てませんでした。` }); continue; }
       const type = patternType(rule); if (!type) continue;
@@ -56,7 +62,9 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       if (options.fixedWorkPatternOverridesWeeklyLimit !== true && weeklyPatternLimitExceeded(member.id, workDate, type, rule.workPattern.id)) { add({ code: 'WEEKLY_PATTERN_GROUP_LIMIT_BLOCKED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんは同一週の対象勤務グループ上限に達しているため、固定勤務を割り当てませんでした。` }); continue; }
       const times = rule.workPattern.startTime && rule.workPattern.endTime ? { startTime: rule.workPattern.startTime, endTime: rule.workPattern.endTime } : null;
       const conflict = prohibitionConflict(options.staffWorkRules ?? [], member.id, workDate, type, times);
-      if (conflict) { add({ code: 'STAFF_WORK_RULE_FIXED_PROHIBITED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんの固定勤務は${ruleLabel(conflict)}と競合するため割り当てませんでした。` }); continue; }
+      const approvedOverride = options.approvedHardRuleOverrides?.find((item) => item.date === key && item.staffId === member.id && item.workPatternId === rule.workPattern!.id);
+      if (conflict && !approvedOverride) { add({ code: 'STAFF_WORK_RULE_FIXED_PROHIBITED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんの固定勤務は${ruleLabel(conflict)}と競合するため割り当てませんでした。` }); continue; }
+      if (conflict && approvedOverride) add({ code: 'ADMIN_APPROVED_HARD_RULE_OVERRIDE', level: 'INFO', workDate: key, staffId: member.id, message: `${member.displayName}さんは「${ruleLabel(conflict)}」に対する日付限定例外が管理者承認済みのため、指定勤務を割り当てました。`, details: { sourceType: approvedOverride.sourceType, sourceReference: approvedOverride.sourceReference, confirmedAt: approvedOverride.confirmedAt, reason: approvedOverride.reason } });
       day.set(member.id, assignmentFromPattern(member, workDate, type, rule.workPattern, options, '個別勤務ルールによる固定勤務'));
       fixedStaffIds.add(member.id);
     }
@@ -92,14 +100,22 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       }
       const assignedWorking = [...day.values()].filter((item) => isWorking(item.shiftType)).length;
       if ((saturday || sunday) && assignedWorking < saturdayMinimumStaff) { addRequestConstraintWarning(); add({ code: 'SATURDAY_MINIMUM_SHORTAGE', level: 'ERROR', workDate: key, required: saturdayMinimumStaff, assigned: assignedWorking, message: `${key}（${weekdays[workDate.getUTCDay()]}）の最低勤務人数が${saturdayMinimumStaff - assignedWorking}人不足しています。` }); }
+      if (options.fillOpenUnassignedWithNormal && !saturday && !sunday) {
+        for (const member of staff) {
+          if (day.get(member.id)?.shiftType !== ShiftType.OFF || !eligible(member, ShiftType.NORMAL)) continue;
+          day.set(member.id, assignment(member, workDate, ShiftType.NORMAL, options, '平日普通出', member.isDirector ? null : member.assignedClass));
+        }
+      }
       assignClasses(targets);
     }
     for (const rule of options.meetingDayRules ?? []) {
       if (!isOccurrenceOfWeekday(workDate, rule.dayOfWeek, rule.occurrence)) continue;
-      for (const item of day.values()) if (isWorking(item.shiftType) && item.endTime && item.endTime < rule.minimumEndTime) { item.endTime = rule.minimumEndTime; item.note = [item.note, '園固有の職員会議日は指定時刻まで勤務'].filter(Boolean).join(' / '); }
+      for (const item of day.values()) if (!fixedStaffIds.has(item.staffId) && isWorking(item.shiftType) && item.endTime && item.endTime < rule.minimumEndTime) { item.endTime = rule.minimumEndTime; item.note = [item.note, '園固有の職員会議日は指定時刻まで勤務'].filter(Boolean).join(' / '); }
     }
     for (const member of staff) {
-      const item = day.get(member.id)!; assignments.push(item); const working = isWorking(item.shiftType);
+      const item = day.get(member.id)!; const request = fixed.get(`${member.id}:${key}`); if (request && isHalfDayRequest(request.requestType) && isWorking(item.shiftType)) { item.attendanceModifier = request.requestType === ShiftRequestType.HALF_DAY_PM ? { modifierType: 'PM_PAID_LEAVE', effectiveStartTime: halfDayBoundary(item.startTime, item.endTime), effectiveEndTime: item.endTime, sourceType: 'APPROVED_SHIFT_REQUEST' } : { modifierType: 'AM_PAID_LEAVE', effectiveStartTime: item.startTime, effectiveEndTime: halfDayBoundary(item.startTime, item.endTime), sourceType: 'APPROVED_SHIFT_REQUEST' }; item.note = [item.note, request.requestType === ShiftRequestType.HALF_DAY_PM ? '半P' : '半A'].filter(Boolean).join(' / '); }
+      if (request && isHalfDayRequest(request.requestType) && !isWorking(item.shiftType)) add({ code: 'HALF_DAY_BASE_ASSIGNMENT_UNCONFIRMED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんの半休申請は基礎勤務が未確定です。勤務帯を管理者が確定してから半休補正を付与してください。` });
+      assignments.push(item); const working = isWorking(item.shiftType);
       workStreak.set(member.id, working ? (workStreak.get(member.id) ?? 0) + 1 : 0); earlyStreak.set(member.id, item.shiftType === ShiftType.EARLY ? (earlyStreak.get(member.id) ?? 0) + 1 : 0); lateStreak.set(member.id, item.shiftType === ShiftType.LATE ? (lateStreak.get(member.id) ?? 0) + 1 : 0);
       if (working) { minutes.set(member.id, (minutes.get(member.id) ?? 0) + minutesFor(item)); days.set(`${member.id}:${weekKey(key)}`, (days.get(`${member.id}:${weekKey(key)}`) ?? 0) + 1); workCount.set(member.id, (workCount.get(member.id) ?? 0) + 1); if (saturday) saturdayCount.set(member.id, (saturdayCount.get(member.id) ?? 0) + 1); }
       const fairnessMinutes = generatedFairnessFor(item, member); if (fairnessMinutes == null) generatedFairnessUnavailable.add(member.id); else generatedFairnessMinutes.set(member.id, (generatedFairnessMinutes.get(member.id) ?? 0) + fairnessMinutes);
@@ -108,7 +124,8 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     }
 
     function eligible(member: GeneratorStaff, type: ShiftType) {
-      if (fixed.has(`${member.id}:${key}`)) return false;
+      const request = fixed.get(`${member.id}:${key}`); if (request && !isHalfDayRequest(request.requestType)) return false;
+      if (request && isHalfDayRequest(request.requestType) && !fixedStaffIds.has(member.id)) return false;
       if (fixedStaffIds.has(member.id)) return false;
       if (saturday && !member.canWorkSaturdays) return false;
       if (type === ShiftType.EARLY && (!member.canWorkEarly || member.lateShiftOnly || (earlyStreak.get(member.id) ?? 0) >= options.maxConsecutiveEarlyDays)) return false;
@@ -137,13 +154,22 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     function allocateRequiredPattern(pattern: GeneratorWorkPattern, attributeDefinitionId: string, requiredCount: number, constraintLevel: string, requirementCode: string, replaceExistingPattern = false) {
       const existing = () => [...day.values()].filter((item) => item.workPatternId === pattern.id && hasAttribute(options.staffAttributeAssignments ?? [], item.staffId, attributeDefinitionId, workDate)).length;
       while (existing() < requiredCount) {
-        const candidates = staff.filter((member) => day.get(member.id)?.shiftType === ShiftType.OFF && eligibleForPattern(member, pattern, attributeDefinitionId));
+        const canTakeRequirement = (candidate: GeneratorStaff) => day.get(candidate.id)?.shiftType === ShiftType.OFF
+          || (replaceExistingPattern && isWorking(day.get(candidate.id)!.shiftType));
+        const candidates = staff.filter((member) => canTakeRequirement(member) && eligibleForPattern(member, pattern, attributeDefinitionId));
         let member = candidates.sort(comparePattern(pattern))[0];
         let relaxationRecord: WeeklyPatternRelaxationRecord | null = null;
         if (!member && options.weeklyPatternRelaxation?.enabled) {
-          const relaxedCandidates = staff.filter((candidate) => day.get(candidate.id)?.shiftType === ShiftType.OFF && eligibleForPattern(candidate, pattern, attributeDefinitionId, true));
+          const relaxedCandidates = staff.filter((candidate) => canTakeRequirement(candidate) && eligibleForPattern(candidate, pattern, attributeDefinitionId, true));
           member = relaxedCandidates.sort(compareWeeklyRelaxation(pattern))[0];
           if (member) relaxationRecord = relaxationRecordFor(member, pattern, requirementCode);
+        }
+        const approvedException = options.approvedWeeklyThirdAssignmentExceptions?.find((item) => item.date === key && approvedWeeklyThirdAssignments.filter((row) => row.workDate === key).length < item.maxAssignments);
+        let approvedThird = false;
+        if (!member && approvedException) {
+          const approvedCandidates = staff.filter((candidate) => canTakeRequirement(candidate) && eligibleForPattern(candidate, pattern, attributeDefinitionId, true, approvedException.maxPerWeek));
+          member = approvedCandidates.sort(compareWeeklyRelaxation(pattern))[0];
+          if (member) { relaxationRecord = relaxationRecordFor(member, pattern, requirementCode); approvedThird = true; }
         }
         if (!member) {
           addRequestConstraintWarning();
@@ -151,10 +177,13 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
           add({ code: 'WORK_PATTERN_REQUIREMENT_SHORTAGE', level: constraintLevel === 'HARD' ? 'ERROR' : 'WARNING', workDate: key, required: requiredCount, assigned: existing(), message: `${requirementCode}の勤務パターンを割り当て可能な職員が不足しています。` }); break;
         }
         if (replaceExistingPattern) {
-          const displaced = [...day.values()].find((item) => item.workPatternId === pattern.id && !fixedStaffIds.has(item.staffId) && !hasAttribute(options.staffAttributeAssignments ?? [], item.staffId, attributeDefinitionId, workDate));
+          const memberPrevious = day.get(member.id)!;
+          const displaced = [...day.values()].find((item) => item.staffId !== member!.id && item.workPatternId === pattern.id && !fixedStaffIds.has(item.staffId) && !hasAttribute(options.staffAttributeAssignments ?? [], item.staffId, attributeDefinitionId, workDate));
           if (displaced) {
-            const displacedStaff = staff.find((item) => item.id === displaced.staffId)!;
-            day.set(displaced.staffId, assignment(displacedStaff, workDate, ShiftType.OFF, options));
+            // Conditional requirements refine who occupies an already-filled
+            // pattern slot. Swap the selected qualified member's current work
+            // with the displaced member so base staffing counts are preserved.
+            day.set(displaced.staffId, { ...memberPrevious, staffId: displaced.staffId, assignedClass: null });
           }
         }
         const type = shiftTypeForPattern(pattern.id);
@@ -162,19 +191,23 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
         if (relaxationRecord) {
           weeklyPatternRelaxations.push(relaxationRecord);
           const level = options.weeklyPatternRelaxation?.explanationLevel ?? 'INFO';
-          add({ code: 'WEEKLY_PATTERN_LIMIT_RELAXED', level, workDate: key, staffId: member.id, required: requiredCount, assigned: existing(), message: `${requirementCode}の必要人数を満たすため、週1回原則を必要最小限だけ週2回へ緩和しました。`, details: { ...relaxationRecord, shortageWithoutRelaxation: 1, selectionReason: `直近の週2回週${relaxationRecord.recentRelaxedWeekCountBefore}回、当月${relaxationRecord.monthlyRelaxedWeekCountBefore}回、現年度${relaxationRecord.annualRelaxedWeekCountBefore}回、長期${relaxationRecord.longTermRelaxedWeekCountBefore}/${relaxationRecord.longTermOpportunityWeekCountBefore}機会週、直近・月・年度・長期の対象勤務負担を順に比較` } });
+          if (approvedThird && approvedException) {
+            approvedWeeklyThirdAssignments.push({ ...relaxationRecord, sourceType: approvedException.sourceType, sourceReference: approvedException.sourceReference, confirmedAt: approvedException.confirmedAt, reason: approvedException.reason });
+            add({ code: 'ADMIN_APPROVED_WEEKLY_THIRD_ASSIGNMENT', level: 'INFO', workDate: key, staffId: member.id, required: requiredCount, assigned: existing(), message: `${requirementCode}の不足解消に限り、管理者承認済みの週3回目を適用しました。`, details: { ...relaxationRecord, ...approvedException, shortageWithoutException: 1 } });
+          } else add({ code: 'WEEKLY_PATTERN_LIMIT_RELAXED', level, workDate: key, staffId: member.id, required: requiredCount, assigned: existing(), message: `${requirementCode}の必要人数を満たすため、週1回原則を必要最小限だけ週2回へ緩和しました。`, details: { ...relaxationRecord, shortageWithoutRelaxation: 1, selectionReason: `直近の週2回週${relaxationRecord.recentRelaxedWeekCountBefore}回、当月${relaxationRecord.monthlyRelaxedWeekCountBefore}回、現年度${relaxationRecord.annualRelaxedWeekCountBefore}回、長期${relaxationRecord.longTermRelaxedWeekCountBefore}/${relaxationRecord.longTermOpportunityWeekCountBefore}機会週、直近・月・年度・長期の対象勤務負担を順に比較` } });
         }
         consumeFutureCapacity(member, type);
       }
     }
-    function eligibleForPattern(member: GeneratorStaff, pattern: GeneratorWorkPattern, attributeDefinitionId: string, allowWeeklyRelaxation = false) {
+    function eligibleForPattern(member: GeneratorStaff, pattern: GeneratorWorkPattern, attributeDefinitionId: string, allowWeeklyRelaxation = false, weeklyMaximumOverride?: number) {
       if (!hasAttribute(options.staffAttributeAssignments ?? [], member.id, attributeDefinitionId, workDate) || fixed.has(`${member.id}:${key}`) || fixedStaffIds.has(member.id)) return false;
       if (saturday && !member.canWorkSaturdays) return false;
       const type = shiftTypeForPattern(pattern.id);
+      if ((type === ShiftType.EARLY || type === ShiftType.LATE) && isFixedClass(member.assignedClass) && staff.some((other) => other.id !== member.id && other.assignedClass === member.assignedClass && day.get(other.id)?.shiftType === type)) return false;
       if (type === ShiftType.EARLY && (!member.canWorkEarly || member.lateShiftOnly || (earlyStreak.get(member.id) ?? 0) >= options.maxConsecutiveEarlyDays)) return false;
       if (type === ShiftType.LATE && (!member.canWorkLate || member.earlyShiftOnly || (lateStreak.get(member.id) ?? 0) >= options.maxConsecutiveLateDays)) return false;
       if (blockedByPreviousPattern(member.id, workDate, pattern.id)) return false;
-      if (allowWeeklyRelaxation ? !weeklyPatternRelaxationAllowed(member.id, workDate, type, pattern.id) : weeklyPatternLimitExceeded(member.id, workDate, type, pattern.id)) return false;
+      if (allowWeeklyRelaxation ? !weeklyPatternRelaxationAllowed(member.id, workDate, type, pattern.id, weeklyMaximumOverride) : weeklyPatternLimitExceeded(member.id, workDate, type, pattern.id)) return false;
       if (!ruleEligibility(options.staffWorkRules ?? [], member.id, workDate, type, pattern.startTime && pattern.endTime ? { startTime: pattern.startTime, endTime: pattern.endTime } : null).eligible) return false;
       if ((workStreak.get(member.id) ?? 0) >= options.maxConsecutiveWorkDays) return false;
       const nextMinutes = (minutes.get(member.id) ?? 0) + minutesForPattern(pattern); const nextDays = (days.get(`${member.id}:${weekKey(key)}`) ?? 0) + 1;
@@ -274,11 +307,11 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
       });
     }
     function weeklyGroupFor(workPatternId: string) { return (options.weeklyPatternGroups ?? []).find((group) => group.workPatternIds?.includes(workPatternId)); }
-    function weeklyPatternRelaxationAllowed(staffId: string, date: Date, shiftType: ShiftType, workPatternId?: string | null) {
+    function weeklyPatternRelaxationAllowed(staffId: string, date: Date, shiftType: ShiftType, workPatternId?: string | null, maximumOverride?: number) {
       if (!workPatternId || options.weeklyPatternGroupExemptStaffIds?.includes(staffId)) return false;
       const group = weeklyGroupFor(workPatternId); if (!group || !(group.shiftTypes?.includes(shiftType) || group.workPatternIds?.includes(workPatternId))) return false;
       const count = groupAssignmentCount(staffId, group, (item) => weekKey(iso(item.workDate)) === weekKey(iso(date)));
-      return count >= group.maxPerWeek && count < (options.weeklyPatternRelaxation?.maxPerWeek ?? group.maxPerWeek);
+      return count >= group.maxPerWeek && count < (maximumOverride ?? options.weeklyPatternRelaxation?.maxPerWeek ?? group.maxPerWeek);
     }
     function groupAssignmentCount(staffId: string, group: GeneratorWeeklyPatternGroup, dateFilter: (item: { workDate: Date }) => boolean) {
       const sameGroup = (item: { shiftType: ShiftType; workPatternId?: string | null }) => group.shiftTypes?.includes(item.shiftType) || (!!item.workPatternId && group.workPatternIds?.includes(item.workPatternId));
@@ -307,7 +340,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     function placementNeed(member: GeneratorStaff) { if (!isFixedClass(member.assignedClass)) return 0; const requirement = classTargets().find((item) => item.classType === member.assignedClass); if (!requirement) return 0; const target = saturday || sunday ? requirement.saturdayRequired : requirement.weekdayRequired; const assigned = staff.filter((item) => item.assignedClass === member.assignedClass && isWorking(day.get(item.id)!.shiftType)).length; return Math.max(0, target - assigned); }
     function normalizedTargetDeficit(member: GeneratorStaff) { const ratios: number[] = []; if (member.monthlyTargetWorkDays) ratios.push(Math.max(0, member.monthlyTargetWorkDays - (workCount.get(member.id) ?? 0)) / member.monthlyTargetWorkDays); if (member.monthlyTargetWorkHours) { const targetMinutes = member.monthlyTargetWorkHours * 60; ratios.push(Math.max(0, targetMinutes - (minutes.get(member.id) ?? 0)) / targetMinutes); } return ratios.length ? ratios.reduce((sum, value) => sum + value, 0) / ratios.length : 0; }
     function compareAnnualFairness(a: GeneratorStaff, b: GeneratorStaff) { if (options.annualFairnessSoft === false || !a.annualFairness || !b.annualFairness || generatedFairnessUnavailable.has(a.id) || generatedFairnessUnavailable.has(b.id)) return 0; const rateA = (a.annualFairness.confirmedFairnessMinutes + (generatedFairnessMinutes.get(a.id) ?? 0) + minutesForType(ShiftType.NORMAL, options, a)) / a.annualFairness.annualTargetMinutes; const rateB = (b.annualFairness.confirmedFairnessMinutes + (generatedFairnessMinutes.get(b.id) ?? 0) + minutesForType(ShiftType.NORMAL, options, b)) / b.annualFairness.annualTargetMinutes; return rateA - rateB; }
-    function generatedFairnessFor(item: GeneratedAssignment, member: GeneratorStaff): number | null { if (isWorking(item.shiftType)) return minutesFor(item); if (item.shiftType !== ShiftType.PAID_LEAVE && item.shiftType !== ShiftType.AM_HALF && item.shiftType !== ShiftType.PM_HALF) return 0; const prescribed = member.annualFairness?.prescribedMinutesByDate?.[iso(item.workDate)]; if (prescribed == null) return member.annualFairness ? null : 0; return item.shiftType === ShiftType.PAID_LEAVE ? prescribed : prescribed / 2; }
+    function generatedFairnessFor(item: GeneratedAssignment, member: GeneratorStaff): number | null { const prescribed=member.annualFairness?.prescribedMinutesByDate?.[iso(item.workDate)]??null;try{const value=assignmentTimeBreakdown(item,prescribed);return value.actualWorkMinutes+value.paidLeaveMinutes;}catch{return member.annualFairness?null:0;} }
     function allocate(type: ShiftType, required: number) {
       const existing = staff.filter((member) => day.get(member.id)?.shiftType === type); let count = existing.length; const usedFixedClasses = new Set(existing.map((member) => member.assignedClass).filter(isFixedClass)); let rejectedByClass = false;
       const candidates = staff.filter((m) => day.get(m.id)?.shiftType === ShiftType.OFF && eligible(m, type));
@@ -491,6 +524,7 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     }
     function assignClasses(targets: ReturnType<typeof classTargets>) {
       const used = new Set<string>();
+      for (const item of day.values()) if (isWorking(item.shiftType) && item.countsTowardStaffing !== false) item.assignedClass = null;
       for (const requirement of targets) {
         const target = saturday || sunday ? requirement.saturdayRequired : requirement.weekdayRequired; let count = 0;
         const regularCandidates = staff.filter((m) => !m.isDirector && isWorking(day.get(m.id)!.shiftType) && day.get(m.id)!.countsTowardStaffing !== false && !used.has(m.id));
@@ -509,7 +543,12 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
           }
           return a.employeeNumber.localeCompare(b.employeeNumber, 'ja');
         });
-        for (const member of candidates.slice(0, target)) { const item = day.get(member.id)!; item.assignedClass = requirement.classType; used.add(member.id); count += 1; if (member.assignedClass !== requirement.classType) add({ code: member.assignedClass === AssignedClass.FREE || member.assignedClass === AssignedClass.SUPPORT ? 'FREE_SUPPORT_COVERAGE' : 'CROSS_CLASS_SUPPORT', level: 'INFO', workDate: key, staffId: member.id, classType: requirement.classType, message: `${member.displayName}さんを${classLabel(requirement.classType)}へ補完配置しました。` }); }
+        for (const member of candidates) {
+          if (count >= target) break;
+          const item = day.get(member.id)!;
+          if ((item.shiftType === ShiftType.EARLY || item.shiftType === ShiftType.LATE) && [...used].some((staffId) => { const placed = day.get(staffId)!; return placed.assignedClass === requirement.classType && placed.shiftType === item.shiftType; })) continue;
+          item.assignedClass = requirement.classType; used.add(member.id); count += 1; if (member.assignedClass !== requirement.classType) add({ code: member.assignedClass === AssignedClass.FREE || member.assignedClass === AssignedClass.SUPPORT ? 'FREE_SUPPORT_COVERAGE' : 'CROSS_CLASS_SUPPORT', level: 'INFO', workDate: key, staffId: member.id, classType: requirement.classType, message: `${member.displayName}さんを${classLabel(requirement.classType)}へ補完配置しました。` });
+        }
         if (placement === 'SHORTAGE_ONLY' && count < target) {
           const helper = directors.find((member) => !used.has(member.id));
           if (helper) { day.get(helper.id)!.assignedClass = requirement.classType; used.add(helper.id); add({ code: 'DIRECTOR_HELP', level: 'INFO', workDate: key, staffId: helper.id, classType: requirement.classType, message: `${helper.displayName}さんを${classLabel(requirement.classType)}応援へ配置しました。` }); if (options.directorCountsTowardStaffing) count += 1; }
@@ -533,10 +572,10 @@ export function generateRuleBasedSchedule(targetMonth: Date, staffInput: Generat
     const actual = rule.ruleType === StaffWorkRuleType.MIN_WORK_DAYS_PER_MONTH ? scoped.length : scoped.reduce((sum, item) => sum + minutesFor(item), 0);
     if (actual < rule.numericValue) add({ code: rule.ruleType === StaffWorkRuleType.MIN_WORK_DAYS_PER_MONTH ? 'STAFF_WORK_RULE_MIN_DAYS_UNMET' : 'STAFF_WORK_RULE_MIN_MINUTES_UNMET', level: rule.isHardConstraint ? 'ERROR' : 'WARNING', workDate: iso(new Date(end.getTime() - 86400000)), staffId: rule.staffId, required: rule.numericValue, assigned: actual, message: `個別勤務ルールの最低${rule.ruleType === StaffWorkRuleType.MIN_WORK_DAYS_PER_MONTH ? '勤務日数' : '勤務時間（分）'}を満たしていません（必要${rule.numericValue}、実績${actual}）。` });
   }
-  if (!options.staffingRequirements?.length) return { assignments, warnings, specialShiftSummary, weeklyPatternRelaxations, futureHardCapacitySummary };
+  if (!options.staffingRequirements?.length) return { assignments, warnings, specialShiftSummary, weeklyPatternRelaxations, approvedWeeklyThirdAssignments, futureHardCapacitySummary };
   const staffingRequirementEvaluations = evaluateStaffingRequirements(options.staffingRequirements, options.staffAttributeAssignments ?? [], assignments.filter((item) => isWorking(item.shiftType) && item.countsTowardStaffing !== false));
   warnings.push(...evaluationWarnings(staffingRequirementEvaluations));
-  return { assignments, warnings, specialShiftSummary, weeklyPatternRelaxations, staffingRequirementEvaluations, futureHardCapacitySummary };
+  return { assignments, warnings, specialShiftSummary, weeklyPatternRelaxations, approvedWeeklyThirdAssignments, staffingRequirementEvaluations, futureHardCapacitySummary };
 }
 
 function classPriority(member: GeneratorStaff, target: AssignedClass) { if (member.assignedClass === target) return 0; if (member.assignedClass === AssignedClass.FREE) return 1; if (member.assignedClass === AssignedClass.SUPPORT) return 2; return 3; }
@@ -549,7 +588,9 @@ function minutesFor(item: GeneratedAssignment) { if (!item.startTime || !item.en
 function minutesForType(type: ShiftType, options: GeneratorOptions, member: GeneratorStaff) { const times = timesForMember(type, options, member); if (!times) return 0; const [sh, sm] = times.startTime.split(':').map(Number); const [eh, em] = times.endTime.split(':').map(Number); return Math.max(0, eh * 60 + em - sh * 60 - sm - options.defaultBreakMinutes); }
 function minutesForPattern(pattern: GeneratorWorkPattern) { if (!pattern.startTime || !pattern.endTime) return 0; const [sh, sm] = pattern.startTime.split(':').map(Number); const [eh, em] = pattern.endTime.split(':').map(Number); return Math.max(0, eh * 60 + em - sh * 60 - sm - pattern.breakMinutes); }
 function isWorking(type: ShiftType) { return (workingShiftTypes as readonly ShiftType[]).includes(type); }
-function requestTypeToShiftType(type: ShiftRequestType) { if (type === ShiftRequestType.PAID_LEAVE) return ShiftType.PAID_LEAVE; if (type === ShiftRequestType.SUMMER_LEAVE) return ShiftType.SUMMER_LEAVE; if (type === ShiftRequestType.HALF_DAY_AM) return ShiftType.AM_HALF; if (type === ShiftRequestType.HALF_DAY_PM) return ShiftType.PM_HALF; return ShiftType.OFF; }
+function requestTypeToShiftType(type: ShiftRequestType) { if (type === ShiftRequestType.PAID_LEAVE) return ShiftType.PAID_LEAVE; if (type === ShiftRequestType.SUMMER_LEAVE) return ShiftType.SUMMER_LEAVE; return ShiftType.OFF; }
+function isHalfDayRequest(type: ShiftRequestType) { return type === ShiftRequestType.HALF_DAY_AM || type === ShiftRequestType.HALF_DAY_PM; }
+function halfDayBoundary(startTime: string | null, endTime: string | null) { if (!startTime || !endTime) return null; const [sh, sm] = startTime.split(':').map(Number); const [eh, em] = endTime.split(':').map(Number); const middle = Math.floor(((sh * 60 + sm) + (eh * 60 + em)) / 2); return `${String(Math.floor(middle / 60)).padStart(2, '0')}:${String(middle % 60).padStart(2, '0')}`; }
 function iso(value: Date) { return value.toISOString().slice(0, 10); }
 function weekKey(value: string) { const date = new Date(`${value}T00:00:00.000Z`); date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7)); return iso(date); }
 function isOccurrenceOfWeekday(date: Date, dayOfWeek: number, occurrence: number) { return date.getUTCDay() === dayOfWeek && Math.floor((date.getUTCDate() - 1) / 7) + 1 === occurrence; }

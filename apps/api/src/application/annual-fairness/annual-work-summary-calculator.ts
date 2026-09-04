@@ -1,7 +1,8 @@
 import { ShiftType } from '@prisma/client';
+import { assignmentTimeBreakdown, type PaidLeaveModifierType } from '../attendance/assignment-time-breakdown';
 
 const workedTypes = new Set<ShiftType>([ShiftType.EARLY, ShiftType.NORMAL, ShiftType.LATE, ShiftType.OTHER]);
-const halfLeaveTypes = new Set<ShiftType>([ShiftType.AM_HALF, ShiftType.PM_HALF]);
+const leaveTypes = new Set<ShiftType>([ShiftType.PAID_LEAVE, ShiftType.AM_HALF, ShiftType.PM_HALF]);
 
 export type AnnualSummaryAssignment = {
   workDate?: Date;
@@ -9,6 +10,7 @@ export type AnnualSummaryAssignment = {
   startTime: string | null;
   endTime: string | null;
   breakMinutes: number | null;
+  attendanceModifier?: { modifierType: PaidLeaveModifierType | string } | null;
 };
 
 export type PrescribedMinutesResolver = (assignment: AnnualSummaryAssignment) => number | null;
@@ -26,9 +28,17 @@ export function annualWorkSummary(
   assignments: AnnualSummaryAssignment[],
   prescribedWorkMinutes: number | null | PrescribedMinutesResolver,
 ): AnnualWorkSummary {
-  const workedAssignments = assignments.filter((assignment) => workedTypes.has(assignment.shiftType));
-  const workedMinutes = workedAssignments.map(assignmentMinutes);
-  if (workedMinutes.some((minutes) => minutes == null)) {
+  const resolve = typeof prescribedWorkMinutes === 'function' ? prescribedWorkMinutes : () => prescribedWorkMinutes;
+  if (assignments.some((assignment) => workedTypes.has(assignment.shiftType) && (!assignment.startTime || !assignment.endTime))) {
+    return { actualWorkedMinutes:null, paidLeaveEquivalentMinutes:null, halfLeaveEquivalentMinutes:null, fairnessActualMinutes:null, calculationStatus:'UNAVAILABLE', unavailableReason:'WORKED_ASSIGNMENT_MINUTES_UNAVAILABLE' };
+  }
+  if (assignments.some((assignment) => leaveTypes.has(assignment.shiftType) && resolve(assignment) == null)) {
+    return { actualWorkedMinutes:assignments.filter(row=>workedTypes.has(row.shiftType)).reduce((sum,row)=>sum+assignmentTimeBreakdown(row).actualWorkMinutes,0), paidLeaveEquivalentMinutes:null, halfLeaveEquivalentMinutes:null, fairnessActualMinutes:null, calculationStatus:'UNAVAILABLE', unavailableReason:'PRESCRIBED_WORK_MINUTES_UNAVAILABLE' };
+  }
+  const breakdowns = assignments.map((assignment) => {
+    try { return assignmentTimeBreakdown(assignment, resolve(assignment)); } catch { return null; }
+  });
+  if (breakdowns.some((value) => value == null)) {
     return {
       actualWorkedMinutes: null,
       paidLeaveEquivalentMinutes: null,
@@ -38,24 +48,10 @@ export function annualWorkSummary(
       unavailableReason: 'WORKED_ASSIGNMENT_MINUTES_UNAVAILABLE',
     };
   }
-  const actualWorkedMinutes = workedMinutes.reduce<number>((sum, minutes) => sum + (minutes as number), 0);
-  const paidLeave = assignments.filter((assignment) => assignment.shiftType === ShiftType.PAID_LEAVE);
-  const halfLeave = assignments.filter((assignment) => halfLeaveTypes.has(assignment.shiftType));
-  const resolve = typeof prescribedWorkMinutes === 'function' ? prescribedWorkMinutes : () => prescribedWorkMinutes;
-  const paidMinutes = paidLeave.map(resolve);
-  const halfMinutes = halfLeave.map(resolve);
-  if ([...paidMinutes, ...halfMinutes].some((minutes) => minutes == null)) {
-    return {
-      actualWorkedMinutes,
-      paidLeaveEquivalentMinutes: null,
-      halfLeaveEquivalentMinutes: null,
-      fairnessActualMinutes: null,
-      calculationStatus: 'UNAVAILABLE',
-      unavailableReason: 'PRESCRIBED_WORK_MINUTES_UNAVAILABLE',
-    };
-  }
-  const paidLeaveEquivalentMinutes = paidMinutes.reduce<number>((sum, minutes) => sum + (minutes as number), 0);
-  const halfLeaveEquivalentMinutes = Math.round(halfMinutes.reduce<number>((sum, minutes) => sum + (minutes as number), 0) / 2);
+  const values=breakdowns as NonNullable<(typeof breakdowns)[number]>[];
+  const actualWorkedMinutes=values.reduce((sum,row)=>sum+row.actualWorkMinutes,0);
+  const paidLeaveEquivalentMinutes=values.filter(row=>row.representation==='FULL_PAID_LEAVE').reduce((sum,row)=>sum+row.paidLeaveMinutes,0);
+  const halfLeaveEquivalentMinutes=values.filter(row=>row.representation==='WORK_WITH_MODIFIER'||row.representation==='LEGACY_HALF_LEAVE').reduce((sum,row)=>sum+row.paidLeaveMinutes,0);
   return {
     actualWorkedMinutes,
     paidLeaveEquivalentMinutes,
@@ -69,12 +65,6 @@ export function annualWorkSummary(
 export function prescribedMinutes(startTime: string | null, endTime: string | null, breakMinutes: number): number | null {
   if (!startTime || !endTime) return null;
   const minutes = timeMinutes(endTime) - timeMinutes(startTime) - breakMinutes;
-  return minutes > 0 ? minutes : null;
-}
-
-function assignmentMinutes(assignment: AnnualSummaryAssignment): number | null {
-  if (!assignment.startTime || !assignment.endTime) return null;
-  const minutes = timeMinutes(assignment.endTime) - timeMinutes(assignment.startTime) - (assignment.breakMinutes ?? 0);
   return minutes > 0 ? minutes : null;
 }
 

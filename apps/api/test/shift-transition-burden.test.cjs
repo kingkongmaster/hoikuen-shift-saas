@@ -78,7 +78,17 @@ assert.equal(shiftOn(crossMonth, '2034-09-01', 'EARLY'), 'B-NORMAL-AUG31', 'E: 8
 const withoutPrior = generateRuleBasedSchedule(september, [member('A-LATE-AUG31'), member('B-NORMAL-AUG31')], [], options);
 assert.equal(shiftOn(withoutPrior, '2034-09-01', 'EARLY'), 'A-LATE-AUG31', 'F: 比較用・前月確定勤務なしでは職員番号順');
 
-const sixToEarly = generateRuleBasedSchedule(month, [member('SIX-THEN-EARLY')], [], { ...options, weekdayEarlyRequired: 0, staffWorkRules: [rule('six', 'SIX-THEN-EARLY', 'FIXED_WORK_PATTERN', 'LATE', '2034-08-01'), rule('early', 'SIX-THEN-EARLY', 'FIXED_WORK_PATTERN', 'EARLY', '2034-08-02')] });
-assert.equal(shiftOn(sixToEarly, '2034-08-02', 'EARLY'), 'SIX-THEN-EARLY', 'G: ⑥→①は⑤→①ルールだけを理由に遮断しない');
+const october = new Date('2035-10-01T00:00:00.000Z');
+const crossMonthOctober = generateRuleBasedSchedule(october, [member('A-P05-SEP30'), member('B-P04-SEP30')], [], {
+  ...options,
+  priorAssignments: [
+    { staffId: 'A-P05-SEP30', workDate: new Date('2035-09-30T00:00:00.000Z'), shiftType: 'OTHER', workPatternId: 'pattern-05' },
+    { staffId: 'B-P04-SEP30', workDate: new Date('2035-09-30T00:00:00.000Z'), shiftType: 'OTHER', workPatternId: 'pattern-04' },
+  ],
+});
+assert.equal(shiftOn(crossMonthOctober, '2035-10-01', 'EARLY'), 'B-P04-SEP30', 'G: 9/30確定⑤から10/1①を禁止し、④から①は許可');
 
-console.log('Shift transition burden tests: PASS (A-G; ⑤ only, ⑥ excluded)');
+const sixToEarly = generateRuleBasedSchedule(month, [member('SIX-THEN-EARLY')], [], { ...options, weekdayEarlyRequired: 0, staffWorkRules: [rule('six', 'SIX-THEN-EARLY', 'FIXED_WORK_PATTERN', 'LATE', '2034-08-01'), rule('early', 'SIX-THEN-EARLY', 'FIXED_WORK_PATTERN', 'EARLY', '2034-08-02')] });
+assert.equal(shiftOn(sixToEarly, '2034-08-02', 'EARLY'), 'SIX-THEN-EARLY', 'H: ⑥→①は⑤→①ルールだけを理由に遮断しない');
+
+console.log('Shift transition burden tests: PASS (A-H; both month boundaries; ⑤ only, ④/⑥ excluded)');

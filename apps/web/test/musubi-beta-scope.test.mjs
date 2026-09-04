@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const dashboard = fs.readFileSync(new URL('../src/features/dashboard/Dashboard.tsx', import.meta.url), 'utf8');
+const home = fs.readFileSync(new URL('../src/features/dashboard/HomeDashboard.tsx', import.meta.url), 'utf8');
+const error = fs.readFileSync(new URL('../src/components/ErrorBoundary.tsx', import.meta.url), 'utf8');
+const shifts = fs.readFileSync(new URL('../src/features/shifts/ShiftManagement.tsx', import.meta.url), 'utf8');
+assert.match(dashboard, /VITE_RELEASE_CHANNEL === 'musubi-beta'/);
+assert.match(dashboard, /everydayMenu\.filter\(\(item\) => !musubiBeta \|\| item\.view === 'requests' \|\| item\.view === 'shifts'\)/);
+for (const view of ['subscription', 'annual-work', 'feedback', 'updates', 'musubi-demo']) assert.match(dashboard, new RegExp(`!musubiBeta[^\\n]*${view}`), `${view} must be hidden in Musubi Beta navigation`);
+assert.match(dashboard, /!musubiBeta && <BottomButton symbol="知"/);
+assert.match(home, /!musubiBeta && <AdminHomeSummary/);
+assert.match(home, /!musubiBeta && <section[^>]+today-news-title/);
+assert.doesNotMatch(error, /href="#"/);
+assert.match(error, /href="\/"/);
+assert.match(shifts, /role="dialog"/);
+assert.match(shifts, /管理者の判断が必要です/);
+assert.match(shifts, /この問題は管理者でも上書きできません。承認ボタンは表示しません。/);
+assert.match(shifts, /日付限定例外・基礎勤務を登録/);
+assert.match(shifts, /月間判断材料/);
+console.log('Musubi Beta scope tests: PASS');

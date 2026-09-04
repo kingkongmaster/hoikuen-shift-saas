@@ -1,0 +1,1 @@
+module.exports = { ...require('./monthly-template.cjs'), month: '2026-09', referenceOnly: true, frozenSubmittedFinal: true, legacySeptemberFinalDigest: '411bfd595553afa4dda3ee4fb6ceaa5eb70e304c2143cee8ed24f60f7cd01c46', note: '提出済みFINALの照合情報。一般generatorの正解や今後の月の入力として使用しない。' };
