@@ -1,0 +1,122 @@
+[
+  {
+    "name": "20260716000100_init_sprint1",
+    "checksum": "008ac9c601a2534c89f62fdbf44bead82ab18ebfee3955478e1fcfb72f5db500"
+  },
+  {
+    "name": "20260716000200_staff_master",
+    "checksum": "01567e3eba097bf925839c19572aa97d2caa8a3e697c6f504430d8bc97dcefd0"
+  },
+  {
+    "name": "20260716000300_shift_requests",
+    "checksum": "410fb483b13c57185b155ba7eab4f6ec8af01fe21a329a7f288c006c4378a264"
+  },
+  {
+    "name": "20260717000400_monthly_shifts",
+    "checksum": "c81d347a801fa998274d2068ce6e8c6d4394219a1b9216de5eddb921996fb51c"
+  },
+  {
+    "name": "20260717000500_shift_settings",
+    "checksum": "1617309ed1540bd704ebe84f68521b1ae6145960c9ff46b4c9d01602dd1e4c29"
+  },
+  {
+    "name": "20260717000600_notifications_swaps_audit",
+    "checksum": "031738519b6de83ef28f37f0be92b581a0a24630d5a87d88052936bc1aedcb6d"
+  },
+  {
+    "name": "20260717000700_saas_subscriptions",
+    "checksum": "ee1cc0b1aa85ea4d9f10e275096d5ff65e0b89cb20f1aa3fb11c54481303a3b2"
+  },
+  {
+    "name": "20260717000800_tenant_code",
+    "checksum": "65fbcb2d05159fff5914f935f16d14ef90a4a518d90d2788cc99d2e11d1938a4"
+  },
+  {
+    "name": "20260717000900_setup_consent_fields",
+    "checksum": "5c9512dd0efa29c88f366a295e68a28648700b25d72c061af17ffb8b1c1ff25a"
+  },
+  {
+    "name": "20260723000100_sprint9c_saturday_operation",
+    "checksum": "fb46a10fe7023aaa57b5f6fe2f67b9392870cc6a5570feadf4bf0d3622c049c4"
+  },
+  {
+    "name": "20260724000100_saturday_minimum_staff",
+    "checksum": "d5c08c0816601d246c520c085d7496f5ad64e3c994e12646468e6f76f402d73c"
+  },
+  {
+    "name": "20260724000200_director_staffing_rules",
+    "checksum": "eb912a9619f5a68c65f9015d7c04d418b6e299e4e0b7aa8f99c43e7ef3b9c6f3"
+  },
+  {
+    "name": "20260728000100_individual_working_hours",
+    "checksum": "c89dee9b2217829b0dc69fd1317f1470b1af0ef32402f5d32847e56d2b610967"
+  },
+  {
+    "name": "20260728000200_monthly_work_targets",
+    "checksum": "b1341b2baf317b046785291d5395391480c93e1562d216c5eac2f6abc6269c48"
+  },
+  {
+    "name": "20260728000300_force_initial_password_change",
+    "checksum": "9d72a7ca1780c6bfdf3ac0bdbad7d93448edc02e2a4321533d542de054bf0223"
+  },
+  {
+    "name": "20260730000100_feature_entitlements",
+    "checksum": "77426f738d04422f6ada58713d524d60f966c0b32b45380b00344122b4c41173"
+  },
+  {
+    "name": "20260730000200_work_pattern_foundation",
+    "checksum": "bb535133094fdfaac1e815aee46cd497241d8d05cefd3a8f20149cf854c8be56"
+  },
+  {
+    "name": "20260730000210_work_pattern_default_unique",
+    "checksum": "ff827d294644a8bd55967fc37264dbe39ad08fcf17fb41084b6cf8c935da7f75"
+  },
+  {
+    "name": "20260730000300_staff_work_rule_foundation",
+    "checksum": "424655436e3cd4bd7163dd0e4ead9c6465ee0cb8ce07f6e5028321ec8ef80d49"
+  },
+  {
+    "name": "20260730000400_staff_attribute_foundation",
+    "checksum": "f7572b3cb1a2b33b57733bcf44d499d82af86d7b542cfb386b683f6f2862a216"
+  },
+  {
+    "name": "20260803000100_staffing_requirement_foundation",
+    "checksum": "ab7b7444ba2bed17bc17cb1173f40f5e69bacdba88f7ba30c2f85d0dff449280"
+  },
+  {
+    "name": "20260817000100_tenant_phase1_composite_fks",
+    "checksum": "3cc6c6fcd3a8120c6f10ed75c0c747556f709164e61261298ccbcb9b1521a711"
+  },
+  {
+    "name": "20260818000100_annual_fairness_phase1",
+    "checksum": "a1fae0a5f1f744c278bfc8d7c2d8eae4de5235426974c054538d9e43c584d8d6"
+  },
+  {
+    "name": "20260818000200_annual_fairness_phase2a",
+    "checksum": "3c501073a3feee211abb515a81c474ccf147f82a7c4353b44df1dd6aa44d52a3"
+  },
+  {
+    "name": "20260821024501_paid_leave_phase4a",
+    "checksum": "694b29f061723db0ec4de03186699324e3c17b6f7e2479a91c4e3c8e7788e9e9"
+  },
+  {
+    "name": "20260821090000_release1_staff_login_foundation",
+    "checksum": "cb93ace60d84d6b606b80bb4ba217ffaeb9335cae9952c91de721f5625c73a3d"
+  },
+  {
+    "name": "20260824010000_common_tenant_workforce_foundation",
+    "checksum": "a2bb493f0c5280bab112ce065c8250a59439cbdf8c844932008421c7ec50fc44"
+  },
+  {
+    "name": "20260824020000_work_pattern_staffing_semantics",
+    "checksum": "1c7fe760028e8d41f5e8e16ef9c25798190564489ed685595fd9c79a967479e3"
+  },
+  {
+    "name": "20260901090000_shift_attendance_modifier",
+    "checksum": "31548a751cd2a955f4b2cfe85fc3ee19c83e45b02a013a0afc159e7dad8727c9"
+  },
+  {
+    "name": "20260901120000_tenant_events_rule_exceptions_provenance",
+    "checksum": "0429fa60263af05dd37bcfaca5d1d0041be5c799c08c08d7380336266eed4f5f"
+  }
+]

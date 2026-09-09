@@ -1,7 +1,8 @@
-const fs = require('node:fs');
 const path = require('node:path');
 const { PrismaClient } = require('@prisma/client');
+const { assertEnvironment, assertDatabaseSafety, recordDryRun } = require('./lib/production-operation-guard.cjs');
 
+const { readRoster } = require('./lib/roster-file-security.cjs');
 const prisma = new PrismaClient();
 const apply = process.argv.includes('--apply');
 const verifyOnly = process.argv.includes('--verify');
@@ -10,7 +11,7 @@ const workspaceRoot = path.resolve(__dirname, '../../..');
 const allowedEmployment = new Set(['FULL_TIME', 'PART_TIME', 'REEMPLOYED']);
 const allowedClass = new Set(['AGE_0', 'AGE_1', 'AGE_2', 'AGE_3', 'AGE_4', 'AGE_5', 'FREE', 'SUPPORT']);
 
-function stop(message) { throw new Error(message); }
+function stop(message) { const error = new Error(message); error.safe = true; throw error; }
 function outsideWorkspace(file) { const resolved = path.resolve(file); return resolved !== workspaceRoot && !resolved.startsWith(`${workspaceRoot}${path.sep}`); }
 function text(value, field, max) { if (typeof value !== 'string' || !value.trim() || value.trim().length > max) stop(`${field} is invalid.`); return value.trim(); }
 function optionalTime(value, field) { if (value == null) return null; if (typeof value !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) stop(`${field} must be HH:mm or null.`); return value; }
@@ -19,8 +20,9 @@ function boolean(value, field) { if (typeof value !== 'boolean') stop(`${field} 
 function loadInput() {
   if (!inputArg) stop('Usage: node scripts/import-musubi-beta.cjs <git-external-input.json> [--apply|--verify]');
   if (!outsideWorkspace(inputArg)) stop('Input must remain outside the Git workspace.');
-  const stat = fs.statSync(inputArg); if (!stat.isFile() || stat.size > 2 * 1024 * 1024) stop('Input must be a JSON file of 2MB or less.');
-  const input = JSON.parse(fs.readFileSync(inputArg, 'utf8'));
+  const { bytes, checksum } = readRoster(inputArg);
+  let input;
+  try { input = JSON.parse(bytes.toString('utf8')); } catch { stop('SYSTEM_SAFETY_BLOCK:ROSTER_JSON:invalid JSON'); }
   if (input.schemaVersion !== 1 || input.packageType !== 'MUSUBI_BETA_STAFF_IMPORT') stop('Unsupported import package.');
   if (input.productionUseApproved !== true) stop('productionUseApproved=true is required in the separately approved Git-external package.');
   if (!/^[0-9a-f-]{36}$/i.test(input.tenantId || '')) stop('tenantId must be an explicit UUID.');
@@ -29,6 +31,7 @@ function loadInput() {
   const seen = new Set();
   const staff = input.staff.map((raw, index) => {
     const employeeNumber = text(raw.employeeNumber, `staff[${index}].employeeNumber`, 50);
+    if (!/^S(00[1-9]|01[0-9]|02[0-3])$/.test(employeeNumber)) stop('SYSTEM_SAFETY_BLOCK:ROSTER_CODE:anonymous staff code required');
     if (seen.has(employeeNumber)) stop(`Duplicate employeeNumber at staff[${index}].`); seen.add(employeeNumber);
     const departmentCode = text(raw.departmentCode, `staff[${index}].departmentCode`, 50).toUpperCase();
     if (!allowedEmployment.has(raw.employmentType)) stop(`staff[${index}].employmentType is invalid.`);
@@ -42,7 +45,7 @@ function loadInput() {
   const food = staff.filter((row) => row.isFoodService); if (food.length !== 3 || food.some((row) => row.generatorEligible || row.departmentCode !== 'FOOD_SERVICE')) stop('Food service must contain exactly three generator-excluded staff.');
   const adminEmployeeNumber = text(input.adminEmployeeNumber, 'adminEmployeeNumber', 50);
   if (!seen.has(adminEmployeeNumber)) stop('Administrator employeeNumber must identify one of the 23 staff records.');
-  return { input, staff, adminEmployeeNumber };
+  return { input, staff, adminEmployeeNumber, checksum };
 }
 
 async function inspect(data) {
@@ -60,7 +63,7 @@ async function inspect(data) {
   const unchanged = (incoming, existing) => existing.displayName === incoming.displayName && existing.employmentType === incoming.employmentType && existing.assignedClass === incoming.assignedClass && existing.canWorkEarly === incoming.canWorkEarly && existing.canWorkRegular === incoming.canWorkRegular && existing.canWorkLate === incoming.canWorkLate && existing.earlyShiftOnly === incoming.earlyShiftOnly && existing.lateShiftOnly === incoming.lateShiftOnly && existing.canWorkSaturdays === incoming.canWorkSaturdays && existing.monthlyWorkHourLimit === incoming.monthlyWorkHourLimit && existing.monthlyTargetWorkDays === incoming.monthlyTargetWorkDays && Number(existing.monthlyTargetWorkHours) === Number(incoming.monthlyTargetWorkHours) && existing.weeklyAvailableDays === incoming.weeklyAvailableDays && existing.regularWorkStartTime === incoming.regularWorkStartTime && existing.regularWorkEndTime === incoming.regularWorkEndTime && existing.isActive && existing.departmentAssignments.some((item) => item.department.code === incoming.departmentCode) && existing.attributeAssignments.some((item) => item.attributeDefinition.code === 'GENERATOR_EXCLUDED') === !incoming.generatorEligible && (incoming.employeeNumber !== data.adminEmployeeNumber || existing.userId === activeAdmins[0].userId);
   const newRows = data.staff.filter((row) => !byNumber.has(row.employeeNumber));
   const skippedRows = data.staff.filter((row) => byNumber.has(row.employeeNumber) && unchanged(row, byNumber.get(row.employeeNumber)));
-  const summary = { mode: verifyOnly ? 'VERIFY' : apply ? 'APPLY' : 'DRY_RUN', tenantId: tenant.id, new: newRows.length, update: data.staff.length - newRows.length - skippedRows.length, skip: skippedRows.length, errors: 0, displayed: data.staff.length, generatorEligible: data.staff.filter((row) => row.generatorEligible).length, foodService: data.staff.filter((row) => row.isFoodService).length, administratorLink: admin ? 'ALREADY_LINKED' : 'PENDING_LINK', resultingStaffLimit: Math.max(23, tenant.subscription?.staffLimit ?? 0) };
+  const summary = { mode: verifyOnly ? 'VERIFY' : apply ? 'APPLY' : 'DRY_RUN', checksum: data.checksum, anonymousCodesValid: true, new: newRows.length, update: data.staff.length - newRows.length - skippedRows.length, skip: skippedRows.length, errors: 0, displayed: data.staff.length, generatorEligible: data.staff.filter((row) => row.generatorEligible).length, foodService: data.staff.filter((row) => row.isFoodService).length, administratorLink: admin ? 'ALREADY_LINKED' : 'PENDING_LINK', resultingStaffLimit: Math.max(23, tenant.subscription?.staffLimit ?? 0) };
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
   return { tenant, activeAdminUserId: activeAdmins[0].userId, byNumber };
 }
@@ -99,5 +102,5 @@ async function verify(data) {
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`); if (!result.pass) process.exitCode = 1;
 }
 
-async function main() { const data = loadInput(); const state = await inspect(data); if (verifyOnly) return verify(data); if (!apply) return; await applyImport(data, state); await verify(data); }
-main().catch((error) => { process.stderr.write(`${error instanceof Error ? error.message : 'Import failed.'}\n`); process.exitCode = 1; }).finally(() => prisma.$disconnect());
+async function main() { const data = loadInput(); const mode=verifyOnly?'VERIFY':apply?'APPLY':'DRY_RUN'; const operation='musubi-roster'; const guard=assertEnvironment({tenantId:data.input.tenantId,operation,mode,packageDigest:data.checksum}); await assertDatabaseSafety(prisma,data.input.tenantId); const state = await inspect(data); if (verifyOnly) return verify(data); if (!apply) { recordDryRun(operation,data.input.tenantId,guard); return; } if (readRoster(inputArg).checksum !== data.checksum) stop('SYSTEM_SAFETY_BLOCK:ROSTER_CHANGED:input changed after verification'); await applyImport(data, state); await verify(data); }
+main().catch((error) => { process.stderr.write(`${error instanceof Error && (error.safe === true || error.message.startsWith('SYSTEM_SAFETY_BLOCK:')) ? error.message : 'SYSTEM_SAFETY_BLOCK:ROSTER_IMPORT_FAILED:import failed'}\n`); process.exitCode = 1; }).finally(() => prisma.$disconnect());

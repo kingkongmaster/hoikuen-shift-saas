@@ -72,6 +72,7 @@
     "test:fixed-assignment-materializer": "node test/fixed-assignment-materializer.test.cjs",
     "test:admin-rule-exception-generator": "node test/admin-rule-exception-generator.test.cjs",
     "test:generation-preflight": "node -r ts-node/register test/generation-preflight-validator.test.ts",
+    "test:production-operation-guard": "node test/production-operation-guard.test.cjs",
     "test:weekly-rotation-confirm": "node test/weekly-rotation-confirm.e2e.cjs",
     "test:musubi-october-admin-flow": "node test/musubi-october-admin-flow.e2e.cjs",
     "test:annual-fairness:e2e": "node test/annual-work-summaries.e2e.cjs",
@@ -117,5 +118,16 @@
     "prisma": "^6.16.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "ajv@8.12.0": "8.18.0",
+    "browserslist@4.28.6": "4.28.7",
+    "glob@10.4.5": "10.5.0",
+    "js-yaml@4.3.0": "4.3.1",
+    "picomatch@4.0.1": "4.0.4",
+    "qs@6.15.3": "6.16.0",
+    "webpack": "5.97.1",
+    "brace-expansion@1": "1.1.18",
+    "brace-expansion@2": "2.1.4"
   }
 }

@@ -1,0 +1,8 @@
+{
+  "name": "@enshift/migration",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "prisma": "6.19.3"
+  }
+}

@@ -1,3 +1,4 @@
 # Install only after /etc/aen-shift/backup.env and its PGPASSFILE are mode 600.
 # This repository does not install or modify crontab automatically.
-17 2 * * * aenshift set -a; . /etc/aen-shift/backup.env; set +a; /opt/aen-shift/current/ops/postgres-backup/backup.sh
+CRON_TZ=Asia/Tokyo
+17 2 * * * aenshift docker compose --env-file /opt/aen-shift/.env -f /opt/aen-shift/current/compose.musubi-beta.yaml --profile operations run --rm backup

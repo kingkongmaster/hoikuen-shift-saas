@@ -15,8 +15,9 @@ if (deployment === 'production' && process.env.ALLOW_PRODUCTION_MIGRATION !== 't
 
 const prismaAction = action === 'deploy' && !dryRun ? 'deploy' : 'status';
 if (dryRun) process.stdout.write('Dry-run performs migrate status only; Prisma migrate deploy has no SQL dry-run mode.\n');
-const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const result = spawnSync(executable, ['prisma', 'migrate', prismaAction], { encoding: 'utf8', env: process.env });
+const executable = process.execPath;
+const prismaCli = require.resolve('prisma/build/index.js');
+const result = spawnSync(executable, [prismaCli, 'migrate', prismaAction], { encoding: 'utf8', env: process.env });
 const sensitive = [process.env.DATABASE_URL];
 try { const parsed = new URL(process.env.DATABASE_URL); sensitive.push(parsed.hostname, decodeURIComponent(parsed.username), decodeURIComponent(parsed.password)); } catch {}
 const sanitize = (value) => sensitive.filter(Boolean).reduce((output, secret) => output.split(secret).join('[REDACTED]'), value || '');

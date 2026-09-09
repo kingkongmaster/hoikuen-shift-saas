@@ -2,7 +2,7 @@
 
 ## 1. 境界
 
-本手順は人間が承認後に実行する。`compose.musubi-beta.yaml`は、Web/APIを既存の`aen-shift-postgres`へ接続する追加構成であり、既存PostgreSQL Compose、volume、03:00 JSTバックアップを変更しない。
+本手順は人間が承認後に実行する。`compose.musubi-beta.yaml`は、Caddy/Web/API/PostgreSQL、private network、persistent volumeとoperations/backup profileを一体で定義する。正式な初期投入順序とproduction guardは`docs/musubi-production-provisioning-runbook.md`を正とする。
 
 通常API起動はmigration（DB構造更新）やseed（デモデータ投入）を実行しない。VPS上でbuildせず、CIまたは管理されたbuild端末で作った変更不能なimage tag/digestを指定する。
 
@@ -12,8 +12,8 @@
 
 - `AEN_SHIFT_DOMAIN`, `ACME_EMAIL`
 - `AEN_SHIFT_API_IMAGE`, `AEN_SHIFT_WEB_IMAGE`, `AEN_SHIFT_MIGRATION_IMAGE`
-- `POSTGRES_DOCKER_NETWORK`: `aen-shift-postgres`が参加済みのDocker network名
-- `DATABASE_URL`: 内部ホスト名を`aen-shift-postgres`、DB/userを`aen_shift`とする接続URL
+- `POSTGRES_DB`, `POSTGRES_USER`, root-owned password file, backup pgpass file
+- `DATABASE_URL`: 内部ホスト名を`postgres`とする接続URL
 - `JWT_SECRET`, `JWT_EXPIRES_IN`
 - `DATABASE_TARGET_ID`, `CONFIRM_DATABASE_TARGET_ID`
 
@@ -21,10 +21,10 @@ Composeの`.env`読込み先は`/opt/aen-shift/.env`を使えるが、既存キ�
 
 ## 3. 既存PostgreSQLとの統合
 
-1. `docker inspect`でPostgreSQLが参加するnetwork名だけを確認する。環境変数やpasswordは表示しない。
-2. `POSTGRES_DOCKER_NETWORK`へそのnetwork名を指定する。
-3. `aen-shift-postgres`の5432はpublishしない。
-4. Beta Composeはexternal networkへ参加し、APIと一回限りのmigrationだけがDBへ接続する。
+1. PostgreSQLのpassword fileとbackup pgpassをroot-owned mode 600で用意する。
+2. `postgres_data` volumeとinternal `database` networkを作成する。
+3. PostgreSQLの5432はpublishしない。
+4. API、migration、operations、backupだけをdatabase networkへ参加させる。
 5. edge以外にhost portを割り当てない。
 
 ## 4. HTTPS
@@ -51,7 +51,7 @@ Caddy（証明書取得とHTTPS中継を行うWebサーバー）が80を443へ�
 
 ## 6. Tenant・管理者・importer checklist
 
-1. `admin:bootstrap`を`INITIAL_ADMIN_STAFF_MODE=deferred-link`、23名中の`INITIAL_ADMIN_EMPLOYEE_NUMBER`付きで実行する。UserとMembershipだけを作り、ダミーStaffを作らない。
+1. 明示Tenant UUIDについてbootstrap dry-run、対象固有apply token付きapply、verifyの順で実行する。`INITIAL_ADMIN_STAFF_MODE=deferred-link`を使い、ダミーStaffを作らない。
 2. Git外packageを`import:musubi-beta`へ渡し、まず引数なしのdry-runを保存する。ログに氏名は出ない。
 3. 新規/更新、23/20/3、管理者リンク、Tenant IDを二者確認。
 4. productionでは`ALLOW_PRODUCTION_MUSUBI_IMPORT=true`、`CONFIRM_MUSUBI_TENANT_ID`、`CONFIRM_MUSUBI_STAFF_COUNT=23`を一回限りで設定して`--apply`。
@@ -97,7 +97,7 @@ swapは勝手に変更しない。人の承認がある場合に1〜2GBを候補
 
 ## 12. Known limitations
 
-- 自動生成Version 1は必要人数充足を保証せず、警告後に人が確認・修正する。
+- generatorは業務条件を自動突破しない。未解決事項は`BUSINESS_DECISION_REQUIRED`として管理者へ返し、system safety異常はoverride不可の`SYSTEM_SAFETY_BLOCK`とする。
 - ②希望優先、S005/S010⑤一般条件、第3金曜会議は正式回答がなければ自動条件へ入れない。
 - PDFはサーバー生成ではなくブラウザの「PDFとして保存」。
 - PWAは画面shellをcacheするが、オフラインで業務データの閲覧・編集はできない。

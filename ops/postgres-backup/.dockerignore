@@ -1,0 +1,8 @@
+*
+!backup.sh
+!retention.sh
+!offhost-copy.sh
+!lib.sh
+!Dockerfile
+!status.py
+!check-status.sh

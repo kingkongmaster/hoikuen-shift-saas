@@ -13,39 +13,24 @@ ops_prepare_backup_directory "${BACKUP_DIRECTORY:-}"
 ops_require_command pg_dump
 ops_require_command pg_restore
 
-status_directory="$BACKUP_DIRECTORY/status"
-mkdir -p "$status_directory"
-chmod 700 "$status_directory"
-status_file="$status_directory/latest.env"
-success_file="$status_directory/last-success.env"
-failure_file="$status_directory/last-failure.env"
-log_file="$status_directory/operations.log"
-touch "$log_file"
-chmod 600 "$log_file"
+ops_require_command python3
+run_id=$(python3 "$SCRIPT_DIRECTORY/status.py" start backup)
 partial=''
-
+destination=''
+checksum=''
 record_failure() {
   exit_code=${1:-1}
+  [ "$exit_code" -ne 0 ] || exit_code=1
   trap - EXIT HUP INT TERM
-  reason=${failure_reason:-backup_command_failed}
-  rm -f -- "${partial:-}"
-  {
-    printf 'status=FAILURE\n'
-    printf 'environment=%s\n' "$environment"
-    printf 'lastFailureAt=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-    printf 'lastFailureReason=%s\n' "$reason"
-  } >"$failure_file"
-  cp "$failure_file" "$status_file"
-  chmod 600 "$failure_file"
-  chmod 600 "$status_file"
-  ops_log "backup failure: environment=$environment reason=$reason" >>"$log_file"
+  [ -z "$partial" ] || rm -f -- "$partial"
+  python3 "$SCRIPT_DIRECTORY/status.py" finish backup "$run_id" "$exit_code" "$destination" "$checksum" || true
   exit "$exit_code"
 }
 trap 'record_failure $?' EXIT
 trap 'record_failure 130' HUP INT TERM
 
-timestamp=$(date -u '+%Y%m%dT%H%M%SZ')
-base="aen-shift_${environment}_${timestamp}.dump"
+timestamp=$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))')
+base="aen-shift_${environment}_${timestamp}_${run_id}.dump"
 destination="$BACKUP_DIRECTORY/$base"
 partial="$BACKUP_DIRECTORY/.$base.partial.$$"
 failure_reason=pg_dump_failed
@@ -68,15 +53,11 @@ ops_assert_private_file "$checksum_file"
 ops_sha256_verify "$destination" "$checksum_file"
 
 failure_reason=retention_failed
-BACKUP_DIRECTORY="$BACKUP_DIRECTORY" BACKUP_ENVIRONMENT="$environment" BACKUP_RETENTION_COUNT="${BACKUP_RETENTION_COUNT:-7}" "$SCRIPT_DIRECTORY/retention.sh" >>"$log_file" 2>&1 || record_failure
-{
-  printf 'status=SUCCESS\n'
-  printf 'environment=%s\n' "$environment"
-  printf 'lastSuccessAt=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  printf 'lastBackupFile=%s\n' "$base"
-} >"$success_file"
-cp "$success_file" "$status_file"
-chmod 600 "$success_file" "$status_file"
-ops_log "backup success: environment=$environment file=$base" >>"$log_file"
+BACKUP_DIRECTORY="$BACKUP_DIRECTORY" BACKUP_ENVIRONMENT="$environment" BACKUP_RETENTION_COUNT="${BACKUP_RETENTION_COUNT:-7}" "$SCRIPT_DIRECTORY/retention.sh" >/dev/null 2>&1 || record_failure 74
+checksum=$(awk 'NR == 1 {print $1}' "$checksum_file")
+if [ "${OFFHOST_COPY_ENABLED:-false}" = true ]; then
+  "$SCRIPT_DIRECTORY/offhost-copy.sh" "$destination" >/dev/null 2>&1 || record_failure 75
+fi
+python3 "$SCRIPT_DIRECTORY/status.py" finish backup "$run_id" 0 "$destination" "$checksum"
 trap - EXIT HUP INT TERM
 printf '%s\n' "$destination"

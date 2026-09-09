@@ -1,8 +1,11 @@
 const assert = require('node:assert/strict');
-const base = process.env.API_BASE_URL || 'http://127.0.0.1:18083/api';
+const base = process.env.API_BASE_URL;
+assert.equal(process.env.TEST_DATABASE_ISOLATED, 'true');
+assert.ok(base && ['127.0.0.1', 'localhost'].includes(new URL(base).hostname));
 async function call(path, options = {}, token) { const response = await fetch(`${base}${path}`, { ...options, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...options.headers } }); const body = await response.json().catch(() => null); if (!response.ok) throw new Error(`${options.method || 'GET'} ${path}: ${response.status} ${JSON.stringify(body)}`); return body; }
 (async () => {
-  const loginId=process.env.MUSUBI_E2E_LOGIN_ID||'phase-a-admin@example.invalid'; const initialPassword=process.env.MUSUBI_E2E_INITIAL_PASSWORD||'PhaseA-Local-Only-2026!'; const changedPassword=process.env.MUSUBI_E2E_CHANGED_PASSWORD||'PhaseA-Local-Changed-2026!';
+  const loginId=process.env.MUSUBI_E2E_LOGIN_ID; const initialPassword=process.env.MUSUBI_E2E_INITIAL_PASSWORD; const changedPassword=process.env.MUSUBI_E2E_CHANGED_PASSWORD;
+  assert.ok(loginId && initialPassword && changedPassword);
   let login; try { login = await call('/auth/login', { method: 'POST', body: JSON.stringify({ loginId, password: initialPassword }) }); } catch { login = await call('/auth/login', { method: 'POST', body: JSON.stringify({ loginId, password: changedPassword }) }); }
   if (login.mustChangePassword) { await call('/auth/change-initial-password', { method: 'POST', body: JSON.stringify({ currentPassword: initialPassword, newPassword: changedPassword, confirmPassword: changedPassword }) }, login.accessToken); login = await call('/auth/login', { method: 'POST', body: JSON.stringify({ loginId, password: changedPassword }) }); }
   const token = login.accessToken;

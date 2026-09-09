@@ -20,6 +20,30 @@ x-api-environment: &api-environment
   READINESS_DB_TIMEOUT_MS: ${READINESS_DB_TIMEOUT_MS:-3000}
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set the production database name}
+      POSTGRES_USER: ${POSTGRES_USER:?Set the production database owner}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      TZ: Asia/Tokyo
+      PGTZ: Asia/Tokyo
+    secrets: [postgres_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [database]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    shm_size: 128m
+    mem_limit: 1024m
+    cpus: 1.5
+    logging: *bounded-logging
+
   edge:
     image: caddy:2.10-alpine
     restart: unless-stopped
@@ -74,6 +98,9 @@ services:
     environment: *api-environment
     expose: ["3000"]
     networks: [frontend, database]
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -97,8 +124,71 @@ services:
       CONFIRM_DEPLOYMENT_ENV: production
       ALLOW_PRODUCTION_MIGRATION: ${ALLOW_PRODUCTION_MIGRATION:-false}
     networks: [database]
+    depends_on:
+      postgres:
+        condition: service_healthy
     mem_limit: 512m
     cpus: 1.0
+    logging: *bounded-logging
+
+  operations:
+    profiles: ["operations"]
+    image: ${AEN_SHIFT_OPERATIONS_IMAGE:?Set the immutable prebuilt Operations image reference}
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the root-owned deployment environment file}
+      DEPLOYMENT_ENV: production
+      DATABASE_TARGET_ID: ${DATABASE_TARGET_ID:?Set a descriptive database target id}
+      CONFIRM_DATABASE_TARGET_ID: ${CONFIRM_DATABASE_TARGET_ID:?Confirm the database target id}
+      DATABASE_TARGET_DATABASE: ${POSTGRES_DB:?Set the production database name}
+      CONFIRM_DEPLOYMENT_ENV: production
+      ALLOW_PRODUCTION_PROVISIONING: ${ALLOW_PRODUCTION_PROVISIONING:-false}
+      PROVISIONING_STATE_DIRECTORY: /var/lib/aen-shift/provisioning
+    volumes:
+      - provisioning_state:/var/lib/aen-shift/provisioning
+      - type: bind
+        source: ${MUSUBI_ROSTER_DIRECTORY:?Set the approved dedicated roster directory}
+        target: /run/aen-shift-roster
+        read_only: true
+        bind:
+          create_host_path: false
+    user: "20001:20001"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [database]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+    logging: *bounded-logging
+
+  backup:
+    profiles: ["operations"]
+    image: ${AEN_SHIFT_BACKUP_IMAGE:?Set the immutable prebuilt Backup image reference}
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${BACKUP_PGUSER:?Set the least-privilege backup role}
+      PGDATABASE: ${POSTGRES_DB:?Set the production database name}
+      PGPASSFILE: /run/secrets/backup_pgpass
+      BACKUP_ENVIRONMENT: production
+      BACKUP_DIRECTORY: /var/backups/aen-shift/postgresql
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-7}
+      OFFHOST_COPY_ENABLED: ${OFFHOST_COPY_ENABLED:-false}
+      BACKUP_ENCRYPTION_RECIPIENT: ${BACKUP_ENCRYPTION_RECIPIENT:-}
+      OFFHOST_UPLOAD_ADAPTER: ${OFFHOST_UPLOAD_ADAPTER:-}
+      TZ: Asia/Tokyo
+    secrets: [backup_pgpass]
+    volumes:
+      - postgres_backups:/var/backups/aen-shift/postgresql
+    networks: [database]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
     logging: *bounded-logging
 
 networks:
@@ -106,9 +196,17 @@ networks:
   frontend:
     internal: true
   database:
-    external: true
-    name: ${POSTGRES_DOCKER_NETWORK:?Set the network already joined by aen-shift-postgres}
+    internal: true
 
 volumes:
   caddy_data:
   caddy_config:
+  postgres_data:
+  postgres_backups:
+  provisioning_state:
+
+secrets:
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE:?Set the root-owned PostgreSQL password file path}
+  backup_pgpass:
+    file: ${BACKUP_PGPASS_FILE:?Set the root-owned backup pgpass file path}
