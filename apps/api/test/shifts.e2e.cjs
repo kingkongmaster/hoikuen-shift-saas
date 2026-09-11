@@ -9,7 +9,10 @@ const ownerPassword = process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!';
 const runId = randomUUID().slice(0, 8).toUpperCase();
 const monthDate = new Date(Date.UTC(new Date().getUTCFullYear() + 1, 0, 1));
 const month = monthDate.toISOString().slice(0, 7);
-const workDate = `${month}-05`;
+// Use open weekdays: the confirmation safety gate now rejects closed-date work.
+const openDates = Array.from({length: 20}, (_, i) => new Date(Date.UTC(monthDate.getUTCFullYear(),0,i+4))).filter(d=>d.getUTCDay()>0&&d.getUTCDay()<6).map(d=>d.toISOString().slice(0,10));
+const workDate = openDates[0];
+const secondWorkDate = openDates[1];
 let scheduleId; let otherScheduleId; let staffId; let otherStaffId; let staffUserId; let otherTenantId; let tenantId; let originalSaturdayOperationEnabled;
 
 function hash(password) { const salt = randomUUID().replaceAll('-', ''); return `${salt}:${scryptSync(password, salt, 64).toString('hex')}`; }
@@ -32,7 +35,7 @@ async function main() {
   assert.equal((await request('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, staffToken)).status, 403);
   const create = await request('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, adminToken); assert.equal(create.status, 201); scheduleId = create.body.id;
   assert.equal((await request('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, adminToken)).status, 409);
-  assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate, shiftType: 'EARLY' }, { staffId, workDate: `${month}-10`, shiftType: 'NORMAL' }, { staffId: otherStaffId, workDate, shiftType: 'NORMAL' }] }) }, adminToken)).status, 200);
+  assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate, shiftType: 'EARLY' }, { staffId, workDate: secondWorkDate, shiftType: 'NORMAL' }, { staffId: otherStaffId, workDate, shiftType: 'NORMAL' }] }) }, adminToken)).status, 200);
   const listed = await request(`/shifts?month=${month}`, {}, adminToken); assert.equal(listed.status, 200); assert.equal(listed.body.assignments.length, 3); assert.ok(listed.body.warnings.some((warning) => warning.code === 'EARLY_NOT_AVAILABLE'));
   assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate: `${month}-01`, shiftType: 'NORMAL' }, { staffId, workDate: `${month}-01`, shiftType: 'LATE' }] }) }, adminToken)).status, 409);
   assert.equal((await request(`/shifts/${scheduleId}/assignments`, { method: 'PUT', body: JSON.stringify({ assignments: [{ staffId, workDate: `${month}-99`, shiftType: 'NORMAL' }] }) }, adminToken)).status, 400);

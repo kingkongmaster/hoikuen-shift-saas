@@ -74,3 +74,43 @@ Python 3 is included in the backup image. `status.py` owns JSON records in the p
 Example local status check: `docker compose --profile operations run --rm --entrypoint sh backup /opt/aen-shift/backup/check-status.sh`. The same backup volume must be used by backup, monitor and restore. Restore invocation must now provide BACKUP_DIRECTORY; no new remote restore permission is introduced. For an abandoned STARTED record, preserve the evidence, verify the prior process is no longer running, then record failure using its exact run UUID via `status.py finish backup <runId> 1`; never erase state to manufacture health.
 
 Generations contain a UTC microsecond timestamp and UUID. Retention keeps at least seven generations, including associated encrypted files. Off-host failure marks the entire run failed while retaining the local archive. Do not source JSON or legacy status records as shell code. Keep all state and archives private.
+
+## Release Gate: role-separated connections
+
+API receives only the application-role `DATABASE_URL`. Migration receives only
+`MIGRATION_DATABASE_URL`, mapped to its process-local `DATABASE_URL`. Operations
+receives only `OPERATIONS_DATABASE_URL` (aen_app). Web and Caddy receive neither DB
+nor JWT credentials. Build Web with `VITE_RELEASE_CHANNEL=musubi-beta`.
+
+After all migrations, and before starting API/operations, run
+`deploy/musubi-beta/application-grants.sql` through PostgreSQL 16 psql as
+`aen_migrator`, using a human-managed service entry and PGPASSFILE. Verify the
+host, database, role and backup before executing; do not put URLs/passwords on
+the command line or print resolved Compose environments. Example invocation
+(with the service entry already safely configured):
+
+```sh
+PGSERVICE=aen_migration psql -X -v ON_ERROR_STOP=1 -f deploy/musubi-beta/application-grants.sql
+```
+
+The transaction revokes application schema/database CREATE and TEMP privileges,
+grants business-table CRUD, and denies `_prisma_migrations`. The read-only
+`aen_release_migration_status` view exposes only migration name, checksum,
+completion and rollback timestamps. Operations uses it to retain exact-release
+verification without granting access to migration logs or migration-table DML.
+A missing or mismatched attestation stops operations. Reapply grants after future
+migrations before enabling runtime traffic. This is provisioning SQL, not a
+rewrite or addition to Prisma migrations.
+
+Backup retains a dedicated read-only role and its own PGPASSFILE; it is never
+mounted in API, Web, migration or operations. The maintenance role performs
+restore into a new isolated database only. Neither backup nor restore credentials
+are sourced from the three application/migration/operations URL variables.
+
+`backup-grants.sql` sets SELECT-only privileges for a pre-provisioned `aen_backup`
+role. Run it as `aen_migrator` with the same confirmed target after application
+grants; the file creates no login or secret. Set `BACKUP_PGUSER=aen_backup` and
+mount only its protected PGPASSFILE in the backup container. Maintenance must
+create/manage that dedicated login separately before first operational backup.
+Use the maintenance role, never aen_app/aen_backup, for restore and ownership
+verification. PostgreSQL backup contains PII and must remain access restricted.

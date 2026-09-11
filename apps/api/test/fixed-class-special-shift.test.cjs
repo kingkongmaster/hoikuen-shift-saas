@@ -51,3 +51,17 @@ for (const type of ['EARLY', 'LATE']) {
 assert.ok(generated.assignments.some((row) => row.staffId === demo[13].id && ['EARLY','NORMAL','LATE'].includes(row.shiftType)), '子育て支援担当は勤務条件どおり生成対象');
 assert.equal(generated.assignments.some((row) => row.staffId === 'ADMIN-001'), false, '園長は14名に含まれない');
 console.log('Fixed-class special-shift constraints: PASS (8 scenarios)');
+
+// Unselected coverage candidates retain a meaningful base placement, not null.
+const placementOptions = { ...base, weekdayEarlyRequired: 0, weekdayLateRequired: 0, saturdayOperationEnabled: false,
+  classRequirements: [{ classType: 'AGE_0', weekdayRequired: 1, saturdayRequired: 0, isActive: true }] };
+const surplus = generateRuleBasedSchedule(month, [member('a', 'AGE_0'), member('b', 'AGE_0'), member('c', 'FREE'), member('d', 'SUPPORT')], [], placementOptions);
+for (const row of surplus.assignments.filter(r => ['EARLY','NORMAL','LATE'].includes(r.shiftType))) assert.ok(row.assignedClass, 'working surplus keeps base class/free/support');
+for (const [baseClass, code] of [['FREE', 'FREE_SUPPORT_COVERAGE'], ['SUPPORT', 'FREE_SUPPORT_COVERAGE'], ['AGE_1', 'CROSS_CLASS_SUPPORT']]) {
+  const coverage = generateRuleBasedSchedule(month, [member('cover', baseClass)], [], placementOptions);
+  const first = onDay(coverage, 'NORMAL')[0];
+  assert.equal(first.assignedClass, 'AGE_0');
+  assert.ok(coverage.warnings.some(w => w.code === code && w.workDate === day));
+  assert.ok(!coverage.warnings.some(w => w.code === 'CLASS_SHORTAGE' && w.workDate === day));
+}
+console.log('Class placement retention / free support / cross-class coverage PASS');

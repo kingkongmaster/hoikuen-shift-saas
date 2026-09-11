@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict');
+const { preferenceRank } = require('../dist/application/shifts/staff-work-rule-evaluator');
+const rule = {id:'r',staffId:'s',ruleType:'PREFERRED_WORK_PATTERN',dayOfWeek:null,startDate:null,endDate:null,priority:1,workPattern:{id:'p02',code:'P02',isWorking:true}};
+const d=new Date('2035-01-01T00:00:00Z');
+assert.equal(preferenceRank([rule],'s',d,'OTHER','p02'),1);
+assert.equal(preferenceRank([rule],'s',d,'OTHER','p03'),Number.MAX_SAFE_INTEGER,'P02 preference must not favor P03');
+assert.equal(preferenceRank([rule],'s',d,'OTHER'),Number.MAX_SAFE_INTEGER,'ambiguous OTHER must not inherit preference');
+console.log('pattern preference identity PASS');
+const { generateRuleBasedSchedule }=require('../dist/application/shifts/rule-based-shift-generator');
+const member=(id,number)=>({id,employeeNumber:number,displayName:id,assignedClass:'AGE_0',employmentType:'FULL_TIME',canWorkEarly:true,canWorkRegular:true,canWorkLate:true,canWorkSaturdays:true});
+const p=(id)=>({id,code:id.toUpperCase(),startTime:'08:00',endTime:'17:00',breakMinutes:60,isWorking:true,countsTowardStaffing:true,isActive:true});
+const options={weekdayEarlyRequired:0,weekdayLateRequired:0,saturdayEarlyRequired:0,saturdayLateRequired:0,saturdayMinimumStaff:0,saturdayOperationEnabled:false,sundayOperationEnabled:false,maxConsecutiveWorkDays:31,maxConsecutiveEarlyDays:31,maxConsecutiveLateDays:31,defaultStartEarly:'07:00',defaultEndEarly:'16:00',defaultStartNormal:'08:30',defaultEndNormal:'17:00',defaultStartLate:'10:00',defaultEndLate:'19:00',defaultBreakMinutes:60,classRequirements:[],replaceLegacyShiftTargetsWhenPatternRequirementsActive:true,staffAttributeAssignments:['a','s'].map(staffId=>({staffId,attributeDefinitionId:'eligible',startDate:null,endDate:null})),staffWorkRules:[rule]};
+function allocation(patternId,extraRules=[]){return generateRuleBasedSchedule(d,[member('a','001'),member('s','002')],[],{...options,staffWorkRules:[rule,...extraRules],staffingRequirements:[{id:'requirement',code:'PATTERN',attributeDefinitionId:'eligible',requiredCount:1,constraintLevel:'HARD',workPatternId:patternId,workPattern:p(patternId),startDate:d,endDate:d}]}).assignments.find(x=>+x.workDate===+d&&x.workPatternId===patternId);}
+assert.equal(allocation('p02').staffId,'s','P02 receives preference ahead of fairness');
+assert.equal(allocation('p03').staffId,'a','P03 must retain its original candidate ordering');
+assert.equal(allocation('p02',[{...rule,id:'blocked',ruleType:'UNAVAILABLE_DAY_OF_WEEK',dayOfWeek:1}]).staffId,'a','SOFT preference never bypasses HARD unavailability');
+console.log('pattern allocation / HARD precedence PASS');
+const both=generateRuleBasedSchedule(d,[member('a','001'),member('s','002')],[],{...options,staffingRequirements:['p03','p02'].map((id,index)=>({id,code:`${index}`,attributeDefinitionId:'eligible',requiredCount:1,constraintLevel:'HARD',workPatternId:id,workPattern:p(id),startDate:d,endDate:d}))});
+assert.equal(both.assignments.find(x=>+x.workDate===+d&&x.staffId==='s').workPatternId,'p02');
+assert.equal(both.assignments.find(x=>+x.workDate===+d&&x.staffId==='a').workPatternId,'p03');
+console.log('both P02/P03 eligible PASS');

@@ -98,7 +98,15 @@ swapは勝手に変更しない。人の承認がある場合に1〜2GBを候補
 ## 12. Known limitations
 
 - generatorは業務条件を自動突破しない。未解決事項は`BUSINESS_DECISION_REQUIRED`として管理者へ返し、system safety異常はoverride不可の`SYSTEM_SAFETY_BLOCK`とする。
-- ②希望優先、S005/S010⑤一般条件、第3金曜会議は正式回答がなければ自動条件へ入れない。
+- ②希望はSOFT優先であり固定勤務とは別。対象・期間・優先度未確定の設定は追加しない。第3金曜会議はTenant設定で最低退勤18:30を適用し、固定勤務等の除外を維持する。
 - PDFはサーバー生成ではなくブラウザの「PDFとして保存」。
 - PWAは画面shellをcacheするが、オフラインで業務データの閲覧・編集はできない。
 - password resetメール、Push通知、完全なJSON restoreは未実装。
+
+## Release Gate: role-separated connections
+
+API DATABASE_URL uses aen_app; MIGRATION_DATABASE_URL uses aen_migrator; OPERATIONS_DATABASE_URL uses aen_app for data-only jobs. Each service receives only its own connection. Web/edge receive no database credentials. Keep Phase 3 database volume, secret files and pinned image.
+
+After all migrations, run application-grants.sql as aen_migrator on the verified target before starting API. It excludes _prisma_migrations from runtime privileges. Never give API the migration URL. Backup uses its dedicated read-only PGPASSFILE; restore is a human-operated isolated-database task.
+
+For musubi-beta build Web with VITE_RELEASE_CHANNEL=musubi-beta and run API with RELEASE_CHANNEL=musubi-beta. Backup JSON endpoints return 403 even to ADMIN/DIRECTOR; CSV and printing retain their original authorization. JSON preview is not operational restore. Use pg_dump and isolated restore for operational recovery.

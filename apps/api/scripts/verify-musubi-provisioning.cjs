@@ -28,7 +28,7 @@ async function main() {
     prisma.shiftAssignment.count({ where: { tenantId, workDate: { gte: start, lt: end } } }),
     prisma.tenantEvent.count({ where: { tenantId, eventDate: { gte: start, lt: end } } }),
     prisma.tenantRuleException.count({ where: { tenantId, exceptionDate: { gte: start, lt: end }, isActive: true } }),
-    prisma.$queryRawUnsafe('SELECT count(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NULL AND rolled_back_at IS NULL'),
+    prisma.$queryRawUnsafe('SELECT count(*)::int AS count FROM "aen_release_migration_status" WHERE finished_at IS NULL AND rolled_back_at IS NULL'),
   ]);
   const expectedAssignments = process.env.EXPECTED_ASSIGNMENT_COUNT ? Number(process.env.EXPECTED_ASSIGNMENT_COUNT) : null;
   const pass = staff === 23 && excluded === 3 && food === 3 && admins === 1 && rules === 42 && requirements === 33 && contracts === 8 && failedMigrations[0].count === 0 && (expectedAssignments == null || assignments === expectedAssignments);

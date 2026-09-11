@@ -5,6 +5,9 @@ const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
 const ownerEmail = process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local';
 const ownerPassword = process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!';
 const testMonth = '2030-01';
+// RC1 demo: 14 working staff plus the non-generating ADMIN-001 account.
+const expectedStaffCodes = Array.from({ length: 14 }, (_, index) => `STAFF-${String(index + 1).padStart(3, '0')}`);
+const daysInMonth = new Date(Date.UTC(Number(testMonth.slice(0, 4)), Number(testMonth.slice(5, 7)), 0)).getUTCDate();
 const workingTypes = new Set([ShiftType.EARLY, ShiftType.NORMAL, ShiftType.LATE]);
 const testStartedAt = new Date();
 let createdScheduleId = null;
@@ -45,7 +48,9 @@ async function main(databaseUrl = resolveIsolatedDatabaseUrl()) {
 
   const generated = await call(`/shifts/${before.body.schedule.id}/generate`, { method: 'POST' }, token);
   assert.equal(generated.status, 201);
-  assert.equal(generated.body.generatedCount, 14 * 31, '自動生成対象14名の8月31日分を生成');
+  assert.equal(expectedStaffCodes.length, 14);
+  assert.equal(daysInMonth, 31);
+  assert.equal(generated.body.generatedCount, expectedStaffCodes.length * daysInMonth, 'RC1勤務職員14名の2030年1月分');
   assert.equal(generated.body.workingAssignmentCount + generated.body.offAssignmentCount + generated.body.leaveAssignmentCount, generated.body.generatedCount);
   assert.ok(generated.body.workingAssignmentCount >= 200, '必要人数を満たす現実的なデモ配置');
   createdNotificationIds = (await prisma.notification.findMany({ where: { tenantId: '00000000-0000-4000-8000-000000000001', type: 'SHIFT_UPDATED', title: 'シフト自動生成', createdAt: { gte: testStartedAt } }, select: { id: true } })).map((item) => item.id);
@@ -55,14 +60,40 @@ async function main(databaseUrl = resolveIsolatedDatabaseUrl()) {
   assert.equal(after.body.assignments.length, generated.body.generatedCount);
   const working = after.body.assignments.filter((item) => workingTypes.has(item.shiftType));
   assert.equal(working.length, generated.body.workingAssignmentCount);
-  assert.ok(working.every((item) => item.startTime && item.endTime && item.assignedClass), '勤務区分・時刻・配置クラスを保存');
 
+  assert.equal(after.body.staff.length, 15, '勤務14名と管理専用1名を表示');
+  assert.deepEqual(after.body.staff.map(s => s.employeeNumber).sort(), ['ADMIN-001', ...expectedStaffCodes].sort());
+  assert.equal(new Set(after.body.assignments.map(a => `${a.staffId}:${a.workDate.slice(0, 10)}`)).size, after.body.assignments.length, '同一職員・日付の重複なし');
+  for (const code of expectedStaffCodes) {
+    const member = after.body.staff.find(s => s.employeeNumber === code);
+    assert.equal(member.isActive, true);
+    assert.equal(after.body.assignments.filter(a => a.staffId === member.id).length, daysInMonth, `${code}: 31日分`);
+  }
   const staffById = new Map(after.body.staff.map((staff) => [staff.id, staff]));
   const director = after.body.staff.find((staff) => staff.employeeNumber === 'ADMIN-001');
   assert.ok(director, 'デモ園長・管理者の職員情報を取得');
   assert.ok(!after.body.assignments.some((item) => item.staffId === director.id), '園長・管理者を自動生成対象に含めない');
+  assert.ok(working.every((item) => item.startTime && item.endTime && item.assignedClass), '勤務区分・時刻・配置クラスを保存');
   assert.ok(working.some((item) => staffById.get(item.staffId)?.employmentType === 'PART_TIME' && item.shiftType === ShiftType.NORMAL), 'パートの通常勤務');
   assert.ok(working.some((item) => staffById.get(item.staffId)?.employmentType === 'REEMPLOYED'), '再雇用の勤務');
+  const classShiftKeys = working.filter(a => ['EARLY', 'LATE'].includes(a.shiftType) && a.assignedClass?.startsWith('AGE_')).map(a => `${a.workDate.slice(0,10)}:${a.assignedClass}:${a.shiftType}`);
+  assert.equal(new Set(classShiftKeys).size, classShiftKeys.length, '配置後のクラス別早出・遅出重複なし');
+  const printed = await call(`/exports/print/shifts?month=${testMonth}`, {}, token);
+  assert.equal(printed.status, 200);
+  const printByKey = new Map(printed.body.assignments.map(a => [`${a.employeeNumber}:${a.date}`, a]));
+  const csvResponse = await fetch(`${base}/exports/shifts.csv?month=${testMonth}`, { headers: { authorization: `Bearer ${token}` } });
+  assert.equal(csvResponse.status, 200);
+  const csv = await csvResponse.text();
+  const csvRows = csv.replace(/^\uFEFF/, '').trim().split(/\r?\n/).slice(1).map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replace(/""/g, '"')));
+  assert.equal(csvRows.length, after.body.assignments.length);
+  for (const row of working) {
+    const code = staffById.get(row.staffId).employeeNumber;
+    const date = row.workDate.slice(0,10);
+    const printedRow = printByKey.get(`${code}:${date}`);
+    assert.ok(printedRow?.assignedClass, '印刷データに配置表示あり');
+    const csvRow = csvRows.find(r => r[0] === code && r[4] === date);
+    assert.equal(csvRow?.[7], printedRow.assignedClass, 'CSVと印刷の配置ラベル一致');
+  }
   const saturdays = new Map();
   for (const item of working.filter((assignment) => new Date(`${assignment.workDate.slice(0, 10)}T00:00:00Z`).getUTCDay() === 6)) {
     const date = item.workDate.slice(0, 10); const counts = saturdays.get(date) ?? { total: 0, early: 0, late: 0, normal: 0 }; counts.total += 1; if (item.shiftType === ShiftType.EARLY) counts.early += 1; if (item.shiftType === ShiftType.LATE) counts.late += 1; if (item.shiftType === ShiftType.NORMAL) counts.normal += 1; saturdays.set(date, counts);

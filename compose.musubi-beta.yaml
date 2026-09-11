@@ -10,6 +10,7 @@ x-api-environment: &api-environment
   NODE_ENV: production
   DEPLOYMENT_ENV: production
   API_PORT: "3000"
+  RELEASE_CHANNEL: musubi-beta
   DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the root-owned deployment environment file}
   DATABASE_CONNECT_ON_STARTUP: "true"
   JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root-owned deployment environment file}
@@ -21,7 +22,7 @@ x-api-environment: &api-environment
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set the production database name}
@@ -117,7 +118,7 @@ services:
     command: ["node", "scripts/migration.cjs", "status"]
     restart: "no"
     environment:
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the root-owned deployment environment file}
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:?Set the migration-role connection in the root-owned deployment environment file}
       DEPLOYMENT_ENV: production
       DATABASE_TARGET_ID: ${DATABASE_TARGET_ID:?Set a descriptive database target id}
       CONFIRM_DATABASE_TARGET_ID: ${CONFIRM_DATABASE_TARGET_ID:?Confirm the database target id}
@@ -136,7 +137,7 @@ services:
     image: ${AEN_SHIFT_OPERATIONS_IMAGE:?Set the immutable prebuilt Operations image reference}
     restart: "no"
     environment:
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the root-owned deployment environment file}
+      DATABASE_URL: ${OPERATIONS_DATABASE_URL:?Set the application-role operations connection in the root-owned deployment environment file}
       DEPLOYMENT_ENV: production
       DATABASE_TARGET_ID: ${DATABASE_TARGET_ID:?Set a descriptive database target id}
       CONFIRM_DATABASE_TARGET_ID: ${CONFIRM_DATABASE_TARGET_ID:?Confirm the database target id}

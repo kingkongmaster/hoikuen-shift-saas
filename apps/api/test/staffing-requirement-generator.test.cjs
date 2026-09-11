@@ -46,3 +46,17 @@ assert.equal(exactRow.workPatternId,'p05','WorkPattern指定の必要人数は�
 const meeting=generateRuleBasedSchedule(date,staff,[],{...options,classRequirements:[{classType:AssignedClass.AGE_0,weekdayRequired:1,saturdayRequired:0,isActive:true}],meetingDayRules:[{dayOfWeek:1,occurrence:1,minimumEndTime:'18:30'}]});
 assert.equal(meeting.assignments.find((item)=>item.staffId==='s1'&&item.workDate.toISOString().slice(0,10)==='2035-01-01').endTime,'18:30','職員会議日は確定済み最低退勤時刻まで延長する');
 console.log('Staffing requirement generator unit tests: PASS (13 scenarios)');
+
+// Anonymous tenant-config regression: third Friday only, fixed workers excluded.
+const meetingOptions={...options,classRequirements:[{classType:AssignedClass.AGE_0,weekdayRequired:1,saturdayRequired:0,isActive:true}]};
+const configured=generateRuleBasedSchedule(date,staff,[],{...meetingOptions,meetingDayRules:[{dayOfWeek:5,occurrence:3,minimumEndTime:'18:30'}]});
+const unconfigured=generateRuleBasedSchedule(date,staff,[],meetingOptions);
+for(const row of configured.assignments){
+ const expected=unconfigured.assignments.find(x=>x.staffId===row.staffId&&+x.workDate===+row.workDate);
+ if(row.workDate.toISOString().startsWith('2035-01-19')) assert.equal(row.endTime,'18:30');
+ else assert.equal(row.endTime,expected.endTime,'meeting must not affect other dates');
+}
+assert.notEqual(unconfigured.assignments.find(x=>x.workDate.toISOString().startsWith('2035-01-19')).endTime,'18:30','another tenant without config is unchanged');
+const fixedMeeting=generateRuleBasedSchedule(date,staff,[],{...meetingOptions,meetingDayRules:[{dayOfWeek:5,occurrence:3,minimumEndTime:'18:30'}],staffWorkRules:[{id:'fixed',staffId:'s1',ruleType:'FIXED_WORK_PATTERN',dayOfWeek:null,startDate:null,endDate:null,workPattern:{id:'fixed-p02',code:'P02',isWorking:true,isActive:true,startTime:'08:00',endTime:'17:00',breakMinutes:60}}]});
+assert.equal(fixedMeeting.assignments.find(x=>x.workDate.toISOString().startsWith('2035-01-19')).endTime,'17:00');
+console.log('third Friday tenant config / fixed exclusion PASS');

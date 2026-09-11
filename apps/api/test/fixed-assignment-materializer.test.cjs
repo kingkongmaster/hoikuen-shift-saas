@@ -25,3 +25,12 @@ assert.equal(rows.find((row) => row.workDate.toISOString().startsWith('2026-09-0
 assert.equal(rows.find((row) => row.workDate.toISOString().startsWith('2026-09-22')).note, '休園日');
 assert.throws(() => materializeFixedAssignments({ staff: [{ id: 'bad', regularWorkStartTime: null, regularWorkEndTime: null }], requests: [], start, end, closedDates: [], sundayOperationEnabled: false, defaultBreakMinutes: 60 }));
 console.log('Fixed assignment materializer tests: PASS');
+
+const kitchen = ['k1','k2','k3'].map(id=>({id,regularWorkStartTime:'08:30',regularWorkEndTime:'17:00'}));
+const kitchenRows=materializeFixedAssignments({staff:kitchen,requests:[],start:new Date('2035-01-01T00:00:00Z'),end:new Date('2035-02-01T00:00:00Z'),closedDates:[],sundayOperationEnabled:false,defaultBreakMinutes:60});
+assert.equal(kitchenRows.length,3*31,'three anonymous fixed workers remain visible all month');
+for(const id of kitchen.map(x=>x.id)) {
+ const row=kitchenRows.find(x=>x.staffId===id&&x.workDate.toISOString().startsWith('2035-01-01'));
+ assert.equal(row.startTime,'08:30');assert.equal(row.endTime,'17:00');assert.equal(row.assignedClass,null);
+}
+console.log('three anonymous fixed workers / no childcare class assignment PASS');

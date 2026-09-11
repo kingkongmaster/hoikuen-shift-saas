@@ -78,7 +78,7 @@ async function assertDatabaseSafety(prisma, tenantId, { requireTenant = true } =
   let target;
   try {
     [target] = await prisma.$queryRawUnsafe('SELECT current_database() AS database, current_schema() AS schema');
-    migrations = await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at, rolled_back_at FROM "public"."_prisma_migrations"');
+    migrations = await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at, rolled_back_at FROM "public"."aen_release_migration_status"');
   } catch { fail('DATABASE_SCHEMA_UNVERIFIED', 'database schema and migration history could not be verified'); }
   if (!target || target.database !== process.env.DATABASE_TARGET_DATABASE?.trim()) fail('DATABASE_NAME_MISMATCH', 'connected database does not match the confirmed target');
   if (target.schema !== 'public') fail('SCHEMA_MISMATCH', 'connected schema must be public');

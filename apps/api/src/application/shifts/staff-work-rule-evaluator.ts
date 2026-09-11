@@ -62,8 +62,8 @@ export function ruleEligibility(rules: GeneratorWorkRule[], staffId: string, dat
   };
 }
 
-export function preferenceRank(rules: GeneratorWorkRule[], staffId: string, date: Date, type: ShiftType) {
-  const preferred = applicableRules(rules, staffId, date).filter((rule) => rule.ruleType === StaffWorkRuleType.PREFERRED_WORK_PATTERN && patternType(rule) === type);
+export function preferenceRank(rules: GeneratorWorkRule[], staffId: string, date: Date, type: ShiftType, workPatternId?: string) {
+  const preferred = applicableRules(rules, staffId, date).filter((rule) => rule.ruleType === StaffWorkRuleType.PREFERRED_WORK_PATTERN && (workPatternId ? rule.workPattern?.id === workPatternId : type !== ShiftType.OTHER && patternType(rule) === type));
   return preferred.length ? preferred[0].priority : Number.MAX_SAFE_INTEGER;
 }
 

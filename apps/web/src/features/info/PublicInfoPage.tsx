@@ -1,3 +1,4 @@
+import { technicalJsonEnabled } from '../../release-policy';
 import { APP_BUILD, APP_COPYRIGHT, APP_DEVELOPER, APP_LAST_UPDATED, APP_NAME, APP_SUPPORT_EMAIL, APP_VERSION } from '../../app-info';
 import { getDeviceInfo } from '../support/device-info';
 import { UpdateHistory } from '../support/UpdateHistory';
@@ -30,7 +31,7 @@ export function PublicInfoPage({ route }: { route: InfoRoute }) {
       {route === 'privacy' && <LegalDocument title="プライバシーポリシー"><Section title="1. 取得する情報">アカウント情報、園情報、職員情報、勤務情報、操作履歴など、サービス提供に必要な情報を取得します。</Section><Section title="2. 利用目的">本人確認、シフト管理、希望休管理、通知、サポート、安全性確保およびサービス改善のために利用します。</Section><Section title="3. テナント分離">園のデータはテナント単位で管理し、権限のない他園の利用者からアクセスできないよう制御します。</Section><Section title="4. 安全管理">不正アクセス、紛失、漏えい等を防ぐため、合理的な安全管理措置を講じます。</Section><Section title="5. お問い合わせ">個人情報の取扱いに関するお問い合わせは、お問い合わせ窓口へご連絡ください。</Section></LegalDocument>}
       {route === 'contact' && <ContactPage />}
       {route === 'support' && <SupportPage />}
-      {route === 'help' && <article><p className="text-sm font-semibold text-emerald-700">Help</p><h2 className="mt-1 text-2xl font-bold">よくあるご質問</h2><p className="mt-3 text-sm text-slate-600">よく利用する操作とモニター運用時の対応をまとめています。</p><div className="mt-6 space-y-3">{faq.map(([question, answer]) => <details key={question} className="group rounded-xl border bg-white p-4 shadow-sm"><summary className="min-h-11 cursor-pointer content-center font-semibold">{question}</summary><p className="mt-3 border-t pt-3 text-sm leading-6 text-slate-600">{answer}</p></details>)}</div></article>}
+      {route === 'help' && <article><p className="text-sm font-semibold text-emerald-700">Help</p><h2 className="mt-1 text-2xl font-bold">よくあるご質問</h2><p className="mt-3 text-sm text-slate-600">よく利用する操作とモニター運用時の対応をまとめています。</p><div className="mt-6 space-y-3">{(technicalJsonEnabled ? faq : [...faq.filter((item) => !item[1].includes('JSON')), ['バックアップや復旧について', '運用窓口へお問い合わせください。'], ['改善要望や不具合を報告したい', 'ログイン後の「お問い合わせ」で内容を整理し、運用窓口へご相談ください。']]).map(([question, answer]) => <details key={question} className="group rounded-xl border bg-white p-4 shadow-sm"><summary className="min-h-11 cursor-pointer content-center font-semibold">{question}</summary><p className="mt-3 border-t pt-3 text-sm leading-6 text-slate-600">{answer}</p></details>)}</div></article>}
       {route === 'updates' && <UpdateHistory />}
       {route === 'about' && <AboutPage />}
     </section>

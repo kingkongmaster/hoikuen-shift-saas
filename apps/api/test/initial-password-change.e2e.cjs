@@ -25,8 +25,8 @@ async function main() {
   const existing = await prisma.user.findUniqueOrThrow({ where: { email: process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local' }, select: { mustChangePassword: true, tokenVersion: true } });
   assert.deepEqual(existing, { mustChangePassword: false, tokenVersion: 0 }, 'migration defaults keep existing users unrestricted with valid tokens');
 
-  const bootstrap = spawnSync(process.execPath, ['scripts/bootstrap-admin.cjs'], {
-    cwd: require('node:path').join(__dirname, '..'), encoding: 'utf8', env: { ...process.env, DEPLOYMENT_ENV: 'e2e', INITIAL_TENANT_NAME: `初回変更園${run}`, INITIAL_TENANT_CODE: `initial-${run}`, INITIAL_ADMIN_EMAIL: email, INITIAL_ADMIN_PASSWORD: temporaryPassword, INITIAL_ADMIN_DISPLAY_NAME: `初期管理者${run}` },
+  const bootstrap = spawnSync(process.execPath, ['scripts/bootstrap-admin.cjs', '--apply'], {
+    cwd: require('node:path').join(__dirname, '..'), encoding: 'utf8', env: { ...process.env, DEPLOYMENT_ENV: 'e2e', INITIAL_ADMIN_TENANT_ID: randomUUID(), INITIAL_TENANT_NAME: `初回変更園${run}`, INITIAL_TENANT_CODE: `initial-${run}`, INITIAL_ADMIN_EMAIL: email, INITIAL_ADMIN_PASSWORD: temporaryPassword, INITIAL_ADMIN_DISPLAY_NAME: `初期管理者${run}` },
   });
   assert.equal(bootstrap.status, 0, bootstrap.stderr);
   assert.equal(`${bootstrap.stdout}${bootstrap.stderr}`.includes(temporaryPassword), false);
