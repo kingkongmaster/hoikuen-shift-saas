@@ -1,5 +1,5 @@
 import { technicalJsonEnabled } from '../../release-policy';
-import { APP_BUILD, APP_COPYRIGHT, APP_DEVELOPER, APP_LAST_UPDATED, APP_NAME, APP_SUPPORT_EMAIL, APP_VERSION } from '../../app-info';
+import { APP_RELEASE_ID, APP_GIT_SHA, APP_BUILD, APP_COPYRIGHT, APP_DEVELOPER, APP_LAST_UPDATED, APP_NAME, APP_SUPPORT_EMAIL, APP_VERSION } from '../../app-info';
 import { getDeviceInfo } from '../support/device-info';
 import { UpdateHistory } from '../support/UpdateHistory';
 
@@ -46,7 +46,7 @@ function SupportPage() {
 }
 function AboutPage() {
   const device = getDeviceInfo();
-  return <article className="mx-auto max-w-2xl rounded-2xl border bg-white p-6 text-center shadow-sm sm:p-10"><p className="text-sm font-semibold text-emerald-700">Application</p><h2 className="mt-2 text-4xl font-bold">{APP_NAME}</h2><p className="mt-3 text-slate-600">保育園・幼稚園・認定こども園向けシフト管理システム</p><p className="mt-1 font-semibold text-emerald-800">先生にゆとりを、園に安心を。</p><dl className="mt-8 grid gap-3 text-left sm:grid-cols-2"><Info label="Version" value={APP_VERSION} /><Info label="Build" value={APP_BUILD} /><Info label="最終更新日" value={APP_LAST_UPDATED} /><Info label="開発者" value={APP_DEVELOPER} /><Info label="Browser" value={device.browser} /><Info label="OS / 画面" value={`${device.operatingSystem} / ${device.viewport}`} /><Info label="Copyright" value={APP_COPYRIGHT} /></dl><a href="#updates" className="btn-secondary mt-6">更新履歴を見る</a></article>;
+  return <article className="mx-auto max-w-2xl rounded-2xl border bg-white p-6 text-center shadow-sm sm:p-10"><p className="text-sm font-semibold text-emerald-700">Application</p><h2 className="mt-2 text-4xl font-bold">{APP_NAME}</h2><p className="mt-3 text-slate-600">保育園・幼稚園・認定こども園向けシフト管理システム</p><p className="mt-1 font-semibold text-emerald-800">先生にゆとりを、園に安心を。</p><dl className="mt-8 grid gap-3 text-left sm:grid-cols-2"><Info label="Version" value={APP_VERSION} /><Info label="Release" value={APP_RELEASE_ID} /><Info label="Build" value={APP_BUILD} /><Info label="Git" value={APP_GIT_SHA} /><Info label="最終更新日" value={APP_LAST_UPDATED} /><Info label="開発者" value={APP_DEVELOPER} /><Info label="Browser" value={device.browser} /><Info label="OS / 画面" value={`${device.operatingSystem} / ${device.viewport}`} /><Info label="Copyright" value={APP_COPYRIGHT} /></dl><a href="#updates" className="btn-secondary mt-6">更新履歴を見る</a></article>;
 }
 function LegalDocument({ title, children }: { title: string; children: React.ReactNode }) {
   return <article><p className="text-sm font-semibold text-emerald-700">AeN Shift</p><h2 className="mt-1 text-2xl font-bold">{title}</h2><p className="mt-2 text-sm text-slate-500">制定日：2026年7月23日</p><div className="mt-6 max-h-[60vh] space-y-7 overflow-y-auto rounded-2xl border bg-white p-5 leading-7 shadow-sm sm:p-8">{children}<p className="text-sm text-slate-500">※本画面は製品準備用のプレースホルダーです。正式提供前に法務確認済みの内容へ更新します。</p></div></article>;

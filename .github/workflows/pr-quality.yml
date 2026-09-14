@@ -79,7 +79,16 @@ jobs:
 
       - name: Build Web
         working-directory: apps/web
-        run: npm run build
+        run: |
+          node ../../tools/release/create-metadata.mjs ci-review "$RUNNER_TEMP/aen-release-metadata.json"
+          AEN_RELEASE_METADATA="$(cat "$RUNNER_TEMP/aen-release-metadata.json")" npm run build
+
+      - name: Verify release metadata and image boundaries
+        run: |
+          node tools/release/metadata.test.mjs
+          node tools/release/image-boundaries.test.mjs
+          cd apps/web
+          node test/release-metadata.test.mjs
 
       - name: Run Web regression
         working-directory: apps/web

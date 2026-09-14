@@ -1,0 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { validateMetadata } from '../../apps/web/release-metadata.mjs';
+const [releaseId, output] = process.argv.slice(2);
+if (!releaseId || !output) throw new Error('Usage: create-metadata.mjs PUBLIC-release-id NEW-output.json');
+const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+const builtAt=new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
+const dirty=execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim() !== '';
+const metadata=validateMetadata({product:'AeN Shift',releaseId,buildId:builtAt.replace(/[-:]/g,'')+'-'+sha.slice(0,12)+(dirty?'-review':''),gitSha:sha.slice(0,12),builtAt});
+writeFileSync(output,JSON.stringify(metadata,null,2)+'\n',{flag:'wx'});

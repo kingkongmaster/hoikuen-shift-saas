@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
@@ -9,18 +9,18 @@ COPY scripts ./scripts
 COPY nest-cli.json tsconfig.json ./
 RUN npm run build
 
-FROM node:22-alpine AS production-dependencies
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS production-dependencies
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev --omit=optional && find node_modules -type d \( -name test -o -name tests -o -name fixtures -o -name __tests__ \) -prune -exec rm -rf {} +
 
-FROM node:22-alpine AS migration-dependencies
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS migration-dependencies
 WORKDIR /app
 COPY migration/package*.json ./
 RUN npm ci --omit=dev && find node_modules -type d \( -name test -o -name tests -o -name fixtures -o -name __tests__ \) -prune -exec rm -rf {} +
 
-FROM node:22-alpine AS runtime-tools
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS runtime-tools
 RUN rm -rf /usr/local/lib/node_modules/npm /opt/yarn-* && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
     && addgroup -g 20001 operations && adduser -D -u 20001 -G operations operations
 

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { validateMetadata, readMetadata, metadataLabels } from '../../apps/web/release-metadata.mjs';
+const m = {product:'AeN Shift', releaseId:'musubi-beta-review', buildId:'20260914-review', gitSha:'8f78fa9120d6', builtAt:'2026-09-14T00:00:00Z'};
+assert.deepEqual(readMetadata(JSON.stringify(m), true), m);
+for (const bad of [{...m, DATABASE_URL:'forbidden'}, {...m, product:'Other'}, {...m, buildId:'/Users/private'}, {...m, gitSha:'8f78fa9'}, {...m, builtAt:'invalid'}]) assert.throws(() => validateMetadata(bad));
+assert.throws(() => readMetadata('', true));
+assert.equal(metadataLabels(m)['jp.aen-shift.build-id'], m.buildId);
+assert.equal(metadataLabels(m)['org.opencontainers.image.revision'], m.gitSha);
+const source = readFileSync(new URL('../../apps/web/src/app-info.ts', import.meta.url), 'utf8');
+assert.ok(!source.includes('20260723.11A-RC1') && !source.includes('2026-07-23'));
+console.log('Release metadata validation PASS');
