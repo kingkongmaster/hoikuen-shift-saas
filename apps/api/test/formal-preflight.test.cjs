@@ -18,3 +18,18 @@ for (const change of [x => x.staff[1].displayName = x.staff[0].displayName, x =>
   assert.throws(() => derivePreflight(b, { ...binding, expectedParentHash: hash(b), approvalReference: 'test' }));
 }
 console.log('Formal preflight binding/source/identity negative tests PASS');
+
+const { deriveExecution, validateExecution } = require('../scripts/lib/formal-execution.cjs');
+for (const mode of ['DEFERRED', 'LINKED']) {
+  const envelope = deriveExecution(bytes, { ...binding, approvalReference: 'anonymous execution test', adminLinkMode: mode, ...(mode === 'LINKED' ? { adminEmployeeNumber: 'S001' } : {}) });
+  const result = validateExecution(envelope, binding);
+  assert.equal(result.data.adminLinkMode, mode);
+  assert.equal(result.data.tenantId, binding.targetTenantId);
+  assert.deepEqual(Buffer.from(envelope.parentPackageBase64, 'base64'), bytes);
+  for (const mutate of [x => delete x.adminLinkMode, x => x.adminLinkMode = 'invalid', x => x.extra = true, x => x.parentPackageSha256 = '0'.repeat(64), x => x.targetTenantId = randomUUID(), x => mode === 'DEFERRED' ? x.adminEmployeeNumber = 'S001' : delete x.adminEmployeeNumber]) {
+    const bad = structuredClone(envelope); mutate(bad); assert.throws(() => validateExecution(bad, binding));
+  }
+}
+assert.throws(() => deriveExecution(bytes, { ...binding, approvalReference: 'test' }));
+assert.deepEqual(Buffer.from(JSON.stringify(parent)), bytes);
+console.log('Execution envelope explicit mode / parent immutability / binding PASS');

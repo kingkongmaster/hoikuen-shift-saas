@@ -1,11 +1,13 @@
 const path = require('node:path');
 const { adaptFormalPackage } = require('./lib/formal-package-adapter.cjs');
+const execution = require('./lib/formal-execution.cjs');
+const executionMode = process.argv.includes('--execution-envelope');
 const { PrismaClient } = require('@prisma/client');
 const { assertEnvironment, assertDatabaseSafety, recordDryRun } = require('./lib/production-operation-guard.cjs');
 
 const { readRoster } = require('./lib/roster-file-security.cjs');
 const { readFormalPackage } = require('./lib/formal-package-file.cjs');
-const readInput = process.argv.includes('--formal-package') ? readFormalPackage : readRoster;
+const readInput = executionMode ? file => readFormalPackage(file, execution.TYPE) : process.argv.includes('--formal-package') ? readFormalPackage : readRoster;
 const prisma = new PrismaClient();
 const apply = process.argv.includes('--apply');
 const verifyOnly = process.argv.includes('--verify');
@@ -26,6 +28,11 @@ function loadInput() {
   const { bytes, checksum } = readInput(inputArg);
   let input;
   try { input = JSON.parse(bytes.toString('utf8')); } catch { stop('SYSTEM_SAFETY_BLOCK:ROSTER_JSON:invalid JSON'); }
+  if (executionMode) {
+    if (process.argv.includes('--admin-employee-number')) stop('Execution envelope owns the admin link policy.');
+    const value = flag => process.argv.includes(flag) ? process.argv[process.argv.indexOf(flag) + 1] : undefined;
+    input = execution.validateExecution(input, { targetTenantId: value('--tenant-id'), expectedParentHash: value('--parent-sha256') }).data;
+  } else if (input.adminLinkMode === 'DEFERRED') stop('DEFERRED requires an explicit execution envelope.');
   if (input.packageType === 'MUSUBI_FORMAL_INPUT_PACKAGE') input = adaptFormalPackage(input, { adminEmployeeNumber: process.argv[process.argv.indexOf('--admin-employee-number') + 1] });
   if (input.schemaVersion !== 1 || input.packageType !== 'MUSUBI_BETA_STAFF_IMPORT') stop('Unsupported import package.');
   if (input.productionUseApproved !== true && !(input.isolatedValidationOnly === true && process.env.TEST_DATABASE_ISOLATED === 'true' && process.env.DEPLOYMENT_ENV === 'test' && process.env.NODE_ENV !== 'production')) stop('productionUseApproved=true is required in the separately approved Git-external package.');
@@ -47,9 +54,11 @@ function loadInput() {
   });
   if (staff.filter((row) => row.generatorEligible).length !== 20) stop('Generator eligible count is not 20.');
   const food = staff.filter((row) => row.isFoodService); if (food.length !== 3 || food.some((row) => row.generatorEligible || row.departmentCode !== 'FOOD_SERVICE')) stop('Food service must contain exactly three generator-excluded staff.');
-  const adminEmployeeNumber = text(input.adminEmployeeNumber, 'adminEmployeeNumber', 50);
-  if (!seen.has(adminEmployeeNumber)) stop('Administrator employeeNumber must identify one of the 23 staff records.');
-  return { input, staff, adminEmployeeNumber, checksum };
+  const adminLinkMode = input.adminLinkMode ?? 'LINKED';
+  if (!['LINKED', 'DEFERRED'].includes(adminLinkMode) || (adminLinkMode === 'DEFERRED' && !executionMode)) stop('Invalid admin link mode.');
+  const adminEmployeeNumber = adminLinkMode === 'DEFERRED' ? undefined : text(input.adminEmployeeNumber, 'adminEmployeeNumber', 50);
+  if (adminLinkMode === 'LINKED' && !seen.has(adminEmployeeNumber)) stop('Administrator employeeNumber must identify one of the 23 staff records.');
+  return { input, staff, adminEmployeeNumber, adminLinkMode, checksum };
 }
 
 async function inspect(data) {
@@ -57,8 +66,9 @@ async function inspect(data) {
   if (!tenant) stop('Target tenant was not found.');
   const current = await prisma.staff.findMany({ where: { tenantId: tenant.id }, include: { attributeAssignments: { where: { isActive: true }, include: { attributeDefinition: true } }, departmentAssignments: { where: { isActive: true }, include: { department: true } } } });
   const byNumber = new Map(current.map((row) => [row.employeeNumber, row]));
-  const activeAdmins = await prisma.membership.findMany({ where: { tenantId: tenant.id, role: 'ADMIN', isActive: true }, select: { userId: true } });
-  if (activeAdmins.length !== 1) stop('Target tenant must have exactly one active administrator before import.');
+  const activeAdmins = await prisma.membership.findMany({ where: { tenantId: tenant.id, role: 'ADMIN', isActive: true }, select: { userId: true, user: { select: { isActive: true } } } });
+  if (activeAdmins.length !== 1 || !activeAdmins[0].user.isActive) stop('Target tenant must have exactly one active administrator before import.');
+  if (data.adminLinkMode === 'DEFERRED' && current.some(row => row.userId != null)) stop('Deferred import cannot alter existing Staff links.');
   const admin = current.find((row) => row.userId === activeAdmins[0].userId);
   if (admin && admin.employeeNumber !== data.adminEmployeeNumber) stop('Administrator is already linked to a different staff record.');
   const incoming = new Set(data.staff.map((row) => row.employeeNumber));
@@ -67,7 +77,7 @@ async function inspect(data) {
   const unchanged = (incoming, existing) => existing.displayName === incoming.displayName && existing.employmentType === incoming.employmentType && existing.assignedClass === incoming.assignedClass && existing.canWorkEarly === incoming.canWorkEarly && existing.canWorkRegular === incoming.canWorkRegular && existing.canWorkLate === incoming.canWorkLate && existing.earlyShiftOnly === incoming.earlyShiftOnly && existing.lateShiftOnly === incoming.lateShiftOnly && existing.canWorkSaturdays === incoming.canWorkSaturdays && existing.monthlyWorkHourLimit === incoming.monthlyWorkHourLimit && existing.monthlyTargetWorkDays === incoming.monthlyTargetWorkDays && Number(existing.monthlyTargetWorkHours) === Number(incoming.monthlyTargetWorkHours) && existing.weeklyAvailableDays === incoming.weeklyAvailableDays && existing.regularWorkStartTime === incoming.regularWorkStartTime && existing.regularWorkEndTime === incoming.regularWorkEndTime && existing.isActive && existing.departmentAssignments.some((item) => item.department.code === incoming.departmentCode) && existing.attributeAssignments.some((item) => item.attributeDefinition.code === 'GENERATOR_EXCLUDED') === !incoming.generatorEligible && (incoming.employeeNumber !== data.adminEmployeeNumber || existing.userId === activeAdmins[0].userId);
   const newRows = data.staff.filter((row) => !byNumber.has(row.employeeNumber));
   const skippedRows = data.staff.filter((row) => byNumber.has(row.employeeNumber) && unchanged(row, byNumber.get(row.employeeNumber)));
-  const summary = { mode: verifyOnly ? 'VERIFY' : apply ? 'APPLY' : 'DRY_RUN', checksum: data.checksum, anonymousCodesValid: true, new: newRows.length, update: data.staff.length - newRows.length - skippedRows.length, skip: skippedRows.length, errors: 0, displayed: data.staff.length, generatorEligible: data.staff.filter((row) => row.generatorEligible).length, foodService: data.staff.filter((row) => row.isFoodService).length, administratorLink: admin ? 'ALREADY_LINKED' : 'PENDING_LINK', resultingStaffLimit: Math.max(23, tenant.subscription?.staffLimit ?? 0) };
+  const summary = { mode: verifyOnly ? 'VERIFY' : apply ? 'APPLY' : 'DRY_RUN', checksum: data.checksum, anonymousCodesValid: true, new: newRows.length, update: data.staff.length - newRows.length - skippedRows.length, skip: skippedRows.length, errors: 0, displayed: data.staff.length, generatorEligible: data.staff.filter((row) => row.generatorEligible).length, foodService: data.staff.filter((row) => row.isFoodService).length, adminLinkMode: data.adminLinkMode, administratorLink: data.adminLinkMode === 'DEFERRED' ? 'DEFERRED' : admin ? 'ALREADY_LINKED' : 'PENDING_LINK', resultingStaffLimit: Math.max(23, tenant.subscription?.staffLimit ?? 0) };
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
   return { tenant, activeAdminUserId: activeAdmins[0].userId, byNumber };
 }
@@ -80,6 +90,9 @@ async function applyImport(data, state) {
     if (process.env.CONFIRM_MUSUBI_STAFF_COUNT !== '23') stop('Production staff count confirmation does not match.');
   } else if (!['test', 'development', 'staging'].includes(deployment)) stop('DEPLOYMENT_ENV must be explicit.');
   await prisma.$transaction(async (tx) => {
+    const admins = await tx.membership.findMany({ where: { tenantId: data.input.tenantId, role: 'ADMIN', isActive: true }, select: { userId: true, user: { select: { isActive: true } } } });
+    if (admins.length !== 1 || !admins[0].user.isActive || admins[0].userId !== state.activeAdminUserId) stop('Administrator changed after inspection.');
+    if (data.adminLinkMode === 'DEFERRED' && await tx.staff.count({ where: { tenantId: data.input.tenantId, userId: { not: null } } })) stop('Deferred import cannot alter existing Staff links.');
     await tx.tenantSubscription.update({ where: { tenantId: data.input.tenantId }, data: { staffLimit: Math.max(23, state.tenant.subscription?.staffLimit ?? 0) } });
     const excluded = await tx.staffAttributeDefinition.upsert({ where: { tenantId_code: { tenantId: data.input.tenantId, code: 'GENERATOR_EXCLUDED' } }, update: { name: '自動生成対象外', category: 'ASSIGNMENT', isActive: true }, create: { tenantId: data.input.tenantId, code: 'GENERATOR_EXCLUDED', name: '自動生成対象外', shortName: '対象外', category: 'ASSIGNMENT', description: '承認済み取込データにより自動生成対象外とする汎用属性', isSystem: true } });
     const departments = new Map();
@@ -101,7 +114,7 @@ async function applyImport(data, state) {
       const configuration = { ...(existing?.configuration ?? {}), release1SourceProvenance: data.input.formalSourceProvenance };
       await tx.tenantFeature.upsert({ where, update: { configuration }, create: { tenantId: data.input.tenantId, featureCode: 'TENANT_CUSTOM_RULES', enabled: true, source: 'FORMAL_SOURCE_PACKAGE', configuration } });
     }
-    await tx.auditLog.create({ data: { tenantId: data.input.tenantId, memberId: state.activeAdminUserId, action: 'MUSUBI_BETA_STAFF_IMPORTED', targetType: 'Tenant', targetId: data.input.tenantId, detail: { displayed: 23, generatorEligible: 20, foodService: 3, administratorLinkedToExistingStaff: true, inputSchemaVersion: 1 } } });
+    await tx.auditLog.create({ data: { tenantId: data.input.tenantId, memberId: state.activeAdminUserId, action: 'MUSUBI_BETA_STAFF_IMPORTED', targetType: 'Tenant', targetId: data.input.tenantId, detail: { displayed: 23, generatorEligible: 20, foodService: 3, administratorLinkedToExistingStaff: data.adminLinkMode === 'LINKED', adminLinkMode: data.adminLinkMode, adminStaffLinkPending: data.adminLinkMode === 'DEFERRED', inputSchemaVersion: 1 } } });
   });
   process.stdout.write('Import transaction committed. No names or credentials were logged.\n');
 }
@@ -111,9 +124,11 @@ async function verify(data) {
   const eligible = rows.filter((row) => !row.attributeAssignments.some((item) => item.attributeDefinition.code === 'GENERATOR_EXCLUDED')).length;
   const food = rows.filter((row) => row.departmentAssignments.some((item) => item.department.code === 'FOOD_SERVICE')).length;
   const admin = rows.filter((row) => row.userId != null).length;
-  const result = { displayed: rows.length, generatorEligible: eligible, foodService: food, linkedLoginAccounts: admin, pass: rows.length === 23 && eligible === 20 && food === 3 && admin === 1 };
+  const activeAdministrators = await prisma.membership.count({ where: { tenantId: data.input.tenantId, role: 'ADMIN', isActive: true } });
+  const totalLinks = await prisma.staff.count({ where: { tenantId: data.input.tenantId, userId: { not: null } } });
+  const result = { adminLinkMode: data.adminLinkMode, activeAdministrators, displayed: rows.length, generatorEligible: eligible, foodService: food, linkedLoginAccounts: admin, pass: rows.length === 23 && eligible === 20 && food === 3 && activeAdministrators === 1 && admin === (data.adminLinkMode === 'DEFERRED' ? 0 : 1) && (data.adminLinkMode !== 'DEFERRED' || totalLinks === 0) };
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`); if (!result.pass) process.exitCode = 1;
 }
 
-async function main() { const data = loadInput(); const mode=verifyOnly?'VERIFY':apply?'APPLY':'DRY_RUN'; const operation='musubi-roster'; const guard=assertEnvironment({tenantId:data.input.tenantId,operation,mode,packageDigest:data.checksum}); await assertDatabaseSafety(prisma,data.input.tenantId); const state = await inspect(data); if (verifyOnly) return verify(data); if (!apply) { recordDryRun(operation,data.input.tenantId,guard); return; } if (readInput(inputArg).checksum !== data.checksum) stop('SYSTEM_SAFETY_BLOCK:ROSTER_CHANGED:input changed after verification'); await applyImport(data, state); await verify(data); }
+async function main() { const data = loadInput(); const mode=verifyOnly?'VERIFY':apply?'APPLY':'DRY_RUN'; const operation='musubi-roster'; const guard=assertEnvironment({tenantId:data.input.tenantId,operation,mode,packageDigest:data.checksum,...(executionMode ? {adminLinkMode:data.adminLinkMode} : {})}); await assertDatabaseSafety(prisma,data.input.tenantId); const state = await inspect(data); if (verifyOnly) return verify(data); if (!apply) { recordDryRun(operation,data.input.tenantId,guard); return; } if (readInput(inputArg).checksum !== data.checksum) stop('SYSTEM_SAFETY_BLOCK:ROSTER_CHANGED:input changed after verification'); await applyImport(data, state); await verify(data); }
 main().catch((error) => { process.stderr.write(`${error instanceof Error && (error.safe === true || error.message.startsWith('SYSTEM_SAFETY_BLOCK:')) ? error.message : 'SYSTEM_SAFETY_BLOCK:ROSTER_IMPORT_FAILED:import failed'}\n`); process.exitCode = 1; }).finally(() => prisma.$disconnect());

@@ -61,13 +61,14 @@ function canonicalSections() {
   });
 }
 
-function adaptFormalPackage(input, { adminEmployeeNumber, purpose = 'IMPORT' } = {}) {
+function adaptFormalPackage(input, { adminEmployeeNumber, purpose = 'IMPORT', adminLinkMode = 'LINKED' } = {}) {
   if (!['IMPORT', 'PRODUCTION_PREFLIGHT'].includes(purpose)) fail('purpose', 'unsupported purpose');
   validateShape(input, schema);
   const refs = new Map(input.sourceRegistryReferences.map(row => [row.sourceId, row]));
   if (refs.size !== input.sourceRegistryReferences.length || refs.get(contract.sourceId)?.sha256 !== contract.sha256) fail('sourceRegistryReferences', 'Matrix 039 hash missing or mismatched');
   if (!input.tenantIdentity.tenantId) fail('tenantIdentity', 'explicit tenant UUID required');
-  if (purpose !== 'PRODUCTION_PREFLIGHT' && !master.staffCodes.includes(adminEmployeeNumber)) fail('adminEmployeeNumber', 'explicit administrator linkage required');
+  if (!['LINKED', 'DEFERRED'].includes(adminLinkMode) || (adminLinkMode === 'DEFERRED' && adminEmployeeNumber !== undefined)) fail('adminLinkMode', 'explicit valid link policy required');
+  if (purpose !== 'PRODUCTION_PREFLIGHT' && adminLinkMode === 'LINKED' && !master.staffCodes.includes(adminEmployeeNumber)) fail('adminEmployeeNumber', 'explicit administrator linkage required');
   if (input.tenantIdentity.environment === 'PRODUCTION' && (!input.productionApproval.approved || !input.productionApproval.reference?.trim())) fail('productionApproval', 'separate approval required');
   const provenance = (source, path) => {
     if (!refs.has(source.sourceId)) fail(path, 'unregistered source');
@@ -111,7 +112,7 @@ function adaptFormalPackage(input, { adminEmployeeNumber, purpose = 'IMPORT' } =
   });
   return { schemaVersion: 1, packageType: 'MUSUBI_BETA_STAFF_IMPORT', tenantId: input.tenantIdentity.tenantId,
     productionUseApproved: input.tenantIdentity.environment === 'PRODUCTION' && input.productionApproval.approved,
-    isolatedValidationOnly: input.tenantIdentity.environment === 'ISOLATED_DRY_RUN', adminEmployeeNumber,
+    adminLinkMode, isolatedValidationOnly: input.tenantIdentity.environment === 'ISOLATED_DRY_RUN', adminEmployeeNumber,
     expectedDisplayedStaff: 23, expectedGeneratorEligible: 20, expectedFoodService: 3, staff,
     formalSourceProvenance: { matrixSourceId: contract.sourceId, matrixSha256: contract.sha256, fieldSources, sectionSources,
       matrixFields: contract.staff, globalInputs: contract.globalInputs, productionApproval: input.productionApproval } };

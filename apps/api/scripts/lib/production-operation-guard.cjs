@@ -33,7 +33,8 @@ function productionMode() {
   return process.env.DEPLOYMENT_ENV?.trim().toLowerCase() === 'production';
 }
 
-function assertEnvironment({ tenantId, operation, mode, packageDigest = '' }) {
+function assertEnvironment({ tenantId, operation, mode, packageDigest = '', adminLinkMode }) {
+  if (adminLinkMode !== undefined && !['LINKED', 'DEFERRED'].includes(adminLinkMode)) fail('ADMIN_LINK_MODE_INVALID', 'invalid admin link mode');
   if (!productionMode()) {
     let local;
     try { local = new URL(process.env.DATABASE_URL); } catch { fail('DATABASE_URL_INVALID', 'an explicit isolated localhost database is required'); }
@@ -67,9 +68,9 @@ function assertEnvironment({ tenantId, operation, mode, packageDigest = '' }) {
     let receipt;
     try { receipt = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { fail('DRY_RUN_RECEIPT_INVALID', 'dry-run receipt cannot be read'); }
     const age = Date.now() - Date.parse(receipt.completedAt || '');
-    if (receipt.databaseIdentity !== databaseIdentity || receipt.operation !== operation || receipt.tenantId !== tenantId || receipt.databaseTargetId !== targetId || receipt.databaseName !== databaseName || receipt.packageDigest !== packageDigest || !Number.isFinite(age) || age < 0 || age > 24 * 60 * 60 * 1000) fail('DRY_RUN_RECEIPT_MISMATCH', 'dry-run receipt is stale or belongs to another target');
+    if (receipt.databaseIdentity !== databaseIdentity || receipt.operation !== operation || receipt.tenantId !== tenantId || receipt.databaseTargetId !== targetId || receipt.databaseName !== databaseName || receipt.packageDigest !== packageDigest || receipt.adminLinkMode !== adminLinkMode || !Number.isFinite(age) || age < 0 || age > 24 * 60 * 60 * 1000) fail('DRY_RUN_RECEIPT_MISMATCH', 'dry-run receipt is stale or belongs to another target');
   }
-  return { production: true, targetId, databaseName, databaseIdentity, packageDigest };
+  return { production: true, targetId, databaseName, databaseIdentity, packageDigest, adminLinkMode };
 }
 
 async function assertDatabaseSafety(prisma, tenantId, { requireTenant = true } = {}) {
@@ -98,7 +99,7 @@ function recordDryRun(operation, tenantId, context) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   fs.chmodSync(directory, 0o700);
   const file = receiptPath(operation, tenantId);
-  fs.writeFileSync(file, `${JSON.stringify({ version: 1, operation, tenantId, databaseTargetId: context.targetId, databaseName: context.databaseName, databaseIdentity: context.databaseIdentity, packageDigest: context.packageDigest, completedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+  fs.writeFileSync(file, `${JSON.stringify({ version: 1, operation, tenantId, databaseTargetId: context.targetId, databaseName: context.databaseName, databaseIdentity: context.databaseIdentity, packageDigest: context.packageDigest, ...(context.adminLinkMode ? { adminLinkMode: context.adminLinkMode } : {}), completedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
 }
 

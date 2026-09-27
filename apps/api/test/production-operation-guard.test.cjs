@@ -23,6 +23,13 @@ async function main() {
   recordDryRun('permanent-master', tenantId, dry);
   process.env.CONFIRM_PRODUCTION_APPLY = `APPLY_MUSUBI_PRODUCTION_${tenantId}`;
   assert.equal(assertEnvironment({ tenantId, operation: 'permanent-master', mode: 'APPLY', packageDigest: digest }).production, true);
+  for (const adminLinkMode of ['DEFERRED', 'LINKED']) {
+    const args = { tenantId, operation: 'formal-mode-test', packageDigest: digest, adminLinkMode };
+    recordDryRun(args.operation, tenantId, assertEnvironment({ ...args, mode: 'DRY_RUN' }));
+    assert.equal(assertEnvironment({ ...args, mode: 'APPLY' }).adminLinkMode, adminLinkMode);
+    blocked('DRY_RUN_RECEIPT_MISMATCH', () => assertEnvironment({ ...args, mode: 'APPLY', adminLinkMode: adminLinkMode === 'DEFERRED' ? 'LINKED' : 'DEFERRED' }));
+    blocked('DRY_RUN_RECEIPT_MISMATCH', () => assertEnvironment({ ...args, mode: 'APPLY', adminLinkMode: undefined }));
+  }
   const originalUrl = process.env.DATABASE_URL;
   for (const changedUrl of [
     originalUrl.replace('127.0.0.1', 'localhost'),
