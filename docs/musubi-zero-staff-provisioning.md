@@ -21,3 +21,9 @@ The original importer and its ADMIN requirement are unchanged. It rejects the pr
 Use only disposable local PostgreSQL with the existing 30 migrations and role-separated grants. `npm run test:tenant-zero-staff` covers Staff/User/Membership 0, common setup twice, preflight twice with production checks in isolated rehearsal, database-enforced read-only behavior, ADMIN-zero apply refusal, wrapper apply refusal, protected derivation, bootstrap with anonymous credentials and deferred staff linkage, 23-staff import, staff-dependent Master, bulk parity, rollback and other-Tenant preservation.
 
 Also run API lint/build, Release Gate, formal import isolated E2E, generator regressions, tenant DB constraints and DB role isolation. No Production connection, commit or push is part of this implementation task.
+
+## Administrator before staff identity confirmation
+
+`INITIAL_ADMIN_STAFF_MODE=deferred-link` allows `INITIAL_ADMIN_EMPLOYEE_NUMBER` to be omitted or blank when the administrator identity mapping is not yet confirmed. It creates only the User, ADMIN Membership and existing creation audit record. No Staff or guessed employee number is created. The audit retains `staffMode: deferred-link` and includes `pendingEmployeeNumber` only when explicitly supplied. Confirm the administrator-to-Staff mapping after the approved roster import before linking. Existing production confirmations, dry-run receipt, credential validation, duplicate protection, transaction rollback and mandatory initial password change remain unchanged.
+
+Run `node test/bootstrap-deferred-link.e2e.cjs` with a disposable isolated database and local API; it covers unspecified/blank/explicit deferred IDs, safe rejection, authentication and tenant boundaries.

@@ -63,9 +63,9 @@ async function main() {
     await tx.membership.upsert({ where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } }, update: { role: MembershipRole.ADMIN, isActive: true }, create: { tenantId: tenant.id, userId: user.id, role: MembershipRole.ADMIN } });
     const staffMode = process.env.INITIAL_ADMIN_STAFF_MODE?.trim() || 'create';
     if (!['create', 'deferred-link'].includes(staffMode)) throw new Error('INITIAL_ADMIN_STAFF_MODE must be create or deferred-link.');
-    if (staffMode === 'deferred-link' && !process.env.INITIAL_ADMIN_EMPLOYEE_NUMBER?.trim()) throw new Error('Deferred administrator linking requires INITIAL_ADMIN_EMPLOYEE_NUMBER.');
+    const pendingEmployeeNumber = process.env.INITIAL_ADMIN_EMPLOYEE_NUMBER?.trim();
     if (staffMode === 'create') await tx.staff.upsert({ where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } }, update: { displayName, email, isActive: true }, create: { tenantId: tenant.id, userId: user.id, employeeNumber: process.env.INITIAL_ADMIN_EMPLOYEE_NUMBER ?? 'ADMIN-001', displayName, email, jobTitle: '管理者', employmentType: EmploymentType.FULL_TIME } });
-    await tx.auditLog.create({ data: { tenantId: tenant.id, memberId: user.id, action: 'INITIAL_ADMIN_CREATED', targetType: 'User', targetId: user.id, detail: { source: 'bootstrap-admin-cli', mustChangePassword: true, ...(staffMode === 'deferred-link' ? { staffMode, pendingEmployeeNumber: process.env.INITIAL_ADMIN_EMPLOYEE_NUMBER.trim() } : {}) } } });
+    await tx.auditLog.create({ data: { tenantId: tenant.id, memberId: user.id, action: 'INITIAL_ADMIN_CREATED', targetType: 'User', targetId: user.id, detail: { source: 'bootstrap-admin-cli', mustChangePassword: true, ...(staffMode === 'deferred-link' ? { staffMode, ...(pendingEmployeeNumber ? { pendingEmployeeNumber } : {}) } : {}) } } });
   });
   process.stdout.write('Initial administrator created successfully. Credentials were not printed.\n');
 }
