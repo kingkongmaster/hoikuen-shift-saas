@@ -46,6 +46,23 @@ const base = () => ({
 console.log('generation preflight validator tests: PASS');
 
 {
+  const context: any = base(); context.fixedStaffIds.add('staff'); context.excludedStaffIds.add('staff');
+  context.staff[0].regularWorkStartTime = '08:30'; context.staff[0].regularWorkEndTime = '17:00';
+  context.workRules = [{ id: 'approved-time', staffId: 'staff', ruleType: 'AVAILABLE_TIME_RANGE', dayOfWeek: null, startDate: null, endDate: null,
+    startTime: '08:30', endTime: '17:00', isHardConstraint: true, sourceType: 'FORMAL_SOURCE_PACKAGE',
+    sourceReference: JSON.stringify({sourceId:'MUSUBI-2026-031',locator:'approved fixed time',approvalStatus:'APPROVED',decisionActorType:'RECORDED_ADMIN_ANSWER'}) }];
+  const unresolved = () => validateGenerationContext(context,'GENERATE').some(row=>row.code==='FIXED_CONTRACT_UNRESOLVED');
+  assert.equal(unresolved(),false,'no annual contract needed with approved times');
+  context.contracts = [{staffId:'staff',voidedAt:null},{staffId:'staff',voidedAt:null}];
+  assert.equal(unresolved(),true,'source fallback cannot bypass multiple existing contracts');
+  context.contracts = [{staffId:'staff',voidedAt:null}]; context.workRules=[];
+  assert.equal(unresolved(),false,'existing single-contract path retained');
+  context.contracts = []; assert.equal(unresolved(),true,'missing both sources must block');
+  context.features.TENANT_CUSTOM_RULES.configuration = {release1ProvisionalSoftRules:[{staffCode:'S999'}]};
+  assert.equal(validateGenerationContext(context,'PRECHECK').some(row=>row.code==='INVALID_PROVISIONAL_SOFT_RULE'&&!row.overrideAllowed),true);
+}
+
+{
   const diagnostic=classifyGenerationDiagnostic({severity:'ERROR',code:'GENERATION_CONTEXT_UNAVAILABLE',staffId:null,date:'2026-10-01',source:'MonthlyGenerationContext',reason:'取得不能',allowedActions:['DBを確認する']});
   assert.equal(diagnostic.category,'SYSTEM_SAFETY_BLOCK'); assert.equal(diagnostic.overrideAllowed,false); assert.equal(diagnostic.allowedActions.some((action)=>action.includes('承認')),false);
 }

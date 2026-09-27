@@ -8,7 +8,7 @@ export type GenerationFeatureState = { enabled: boolean; lookupFailed: boolean; 
 
 const staffSelect = { id: true, userId: true, employeeNumber: true, displayName: true, assignedClass: true, employmentType: true, canWorkEarly: true, canWorkRegular: true, canWorkLate: true, earlyShiftOnly: true, lateShiftOnly: true, canWorkSaturdays: true, monthlyWorkHourLimit: true, monthlyTargetWorkDays: true, monthlyTargetWorkHours: true, weeklyAvailableDays: true, regularWorkStartTime: true, regularWorkEndTime: true, isActive: true } as const;
 const patternSelect = { id: true, code: true, name: true, shortName: true, startTime: true, endTime: true, breakMinutes: true, isWorking: true, countsTowardStaffing: true, isActive: true, isSystem: true } as const;
-const workRuleSelect = { id: true, staffId: true, ruleType: true, dayOfWeek: true, startDate: true, endDate: true, startTime: true, endTime: true, numericValue: true, priority: true, isHardConstraint: true, workPattern: { select: patternSelect } } as const;
+const workRuleSelect = { sourceType: true, sourceReference: true, id: true, staffId: true, ruleType: true, dayOfWeek: true, startDate: true, endDate: true, startTime: true, endTime: true, numericValue: true, priority: true, isHardConstraint: true, workPattern: { select: patternSelect } } as const;
 
 @Injectable()
 export class MonthlyGenerationContextBuilder {

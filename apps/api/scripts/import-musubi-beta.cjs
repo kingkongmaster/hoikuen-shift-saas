@@ -1,8 +1,11 @@
 const path = require('node:path');
+const { adaptFormalPackage } = require('./lib/formal-package-adapter.cjs');
 const { PrismaClient } = require('@prisma/client');
 const { assertEnvironment, assertDatabaseSafety, recordDryRun } = require('./lib/production-operation-guard.cjs');
 
 const { readRoster } = require('./lib/roster-file-security.cjs');
+const { readFormalPackage } = require('./lib/formal-package-file.cjs');
+const readInput = process.argv.includes('--formal-package') ? readFormalPackage : readRoster;
 const prisma = new PrismaClient();
 const apply = process.argv.includes('--apply');
 const verifyOnly = process.argv.includes('--verify');
@@ -20,11 +23,12 @@ function boolean(value, field) { if (typeof value !== 'boolean') stop(`${field} 
 function loadInput() {
   if (!inputArg) stop('Usage: node scripts/import-musubi-beta.cjs <git-external-input.json> [--apply|--verify]');
   if (!outsideWorkspace(inputArg)) stop('Input must remain outside the Git workspace.');
-  const { bytes, checksum } = readRoster(inputArg);
+  const { bytes, checksum } = readInput(inputArg);
   let input;
   try { input = JSON.parse(bytes.toString('utf8')); } catch { stop('SYSTEM_SAFETY_BLOCK:ROSTER_JSON:invalid JSON'); }
+  if (input.packageType === 'MUSUBI_FORMAL_INPUT_PACKAGE') input = adaptFormalPackage(input, { adminEmployeeNumber: process.argv[process.argv.indexOf('--admin-employee-number') + 1] });
   if (input.schemaVersion !== 1 || input.packageType !== 'MUSUBI_BETA_STAFF_IMPORT') stop('Unsupported import package.');
-  if (input.productionUseApproved !== true) stop('productionUseApproved=true is required in the separately approved Git-external package.');
+  if (input.productionUseApproved !== true && !(input.isolatedValidationOnly === true && process.env.TEST_DATABASE_ISOLATED === 'true' && process.env.DEPLOYMENT_ENV === 'test' && process.env.NODE_ENV !== 'production')) stop('productionUseApproved=true is required in the separately approved Git-external package.');
   if (!/^[0-9a-f-]{36}$/i.test(input.tenantId || '')) stop('tenantId must be an explicit UUID.');
   if (!Array.isArray(input.staff) || input.staff.length !== 23) stop('Exactly 23 staff records are required.');
   if (input.expectedDisplayedStaff !== 23 || input.expectedGeneratorEligible !== 20 || input.expectedFoodService !== 3) stop('Expected counts must be 23 displayed, 20 generator eligible, and 3 food service.');
@@ -83,10 +87,19 @@ async function applyImport(data, state) {
     for (const row of data.staff) {
       const staff = await tx.staff.upsert({ where: { tenantId_employeeNumber: { tenantId: data.input.tenantId, employeeNumber: row.employeeNumber } }, update: { displayName: row.displayName, employmentType: row.employmentType, assignedClass: row.assignedClass, canWorkEarly: row.canWorkEarly, canWorkRegular: row.canWorkRegular, canWorkLate: row.canWorkLate, earlyShiftOnly: row.earlyShiftOnly, lateShiftOnly: row.lateShiftOnly, canWorkSaturdays: row.canWorkSaturdays, monthlyWorkHourLimit: row.monthlyWorkHourLimit, monthlyTargetWorkDays: row.monthlyTargetWorkDays, monthlyTargetWorkHours: row.monthlyTargetWorkHours, weeklyAvailableDays: row.weeklyAvailableDays, regularWorkStartTime: row.regularWorkStartTime, regularWorkEndTime: row.regularWorkEndTime, isActive: true, ...(row.employeeNumber === data.adminEmployeeNumber ? { userId: state.activeAdminUserId } : {}) }, create: { tenantId: data.input.tenantId, employeeNumber: row.employeeNumber, displayName: row.displayName, employmentType: row.employmentType, assignedClass: row.assignedClass, canWorkEarly: row.canWorkEarly, canWorkRegular: row.canWorkRegular, canWorkLate: row.canWorkLate, earlyShiftOnly: row.earlyShiftOnly, lateShiftOnly: row.lateShiftOnly, canWorkSaturdays: row.canWorkSaturdays, monthlyWorkHourLimit: row.monthlyWorkHourLimit, monthlyTargetWorkDays: row.monthlyTargetWorkDays, monthlyTargetWorkHours: row.monthlyTargetWorkHours, weeklyAvailableDays: row.weeklyAvailableDays, regularWorkStartTime: row.regularWorkStartTime, regularWorkEndTime: row.regularWorkEndTime, ...(row.employeeNumber === data.adminEmployeeNumber ? { userId: state.activeAdminUserId } : {}) } });
       await tx.staffDepartmentAssignment.updateMany({ where: { tenantId: data.input.tenantId, staffId: staff.id, isActive: true }, data: { isActive: false } });
-      await tx.staffDepartmentAssignment.create({ data: { tenantId: data.input.tenantId, staffId: staff.id, departmentId: departments.get(row.departmentCode).id, isPrimary: true } });
+      const departmentId = departments.get(row.departmentCode).id;
+      const priorDepartment = await tx.staffDepartmentAssignment.findFirst({ where: { tenantId: data.input.tenantId, staffId: staff.id, departmentId } });
+      if (priorDepartment) await tx.staffDepartmentAssignment.update({ where: { id: priorDepartment.id }, data: { isActive: true, isPrimary: true } });
+      else await tx.staffDepartmentAssignment.create({ data: { tenantId: data.input.tenantId, staffId: staff.id, departmentId, isPrimary: true } });
       const existing = await tx.staffAttributeAssignment.findFirst({ where: { tenantId: data.input.tenantId, staffId: staff.id, attributeDefinitionId: excluded.id, isActive: true } });
       if (!row.generatorEligible && !existing) await tx.staffAttributeAssignment.create({ data: { tenantId: data.input.tenantId, staffId: staff.id, attributeDefinitionId: excluded.id, notes: 'MUSUBI_BETA_APPROVED_IMPORT' } });
       if (row.generatorEligible && existing) await tx.staffAttributeAssignment.update({ where: { id: existing.id }, data: { isActive: false } });
+    }
+    if (data.input.formalSourceProvenance) {
+      const where = { tenantId_featureCode: { tenantId: data.input.tenantId, featureCode: 'TENANT_CUSTOM_RULES' } };
+      const existing = await tx.tenantFeature.findUnique({ where });
+      const configuration = { ...(existing?.configuration ?? {}), release1SourceProvenance: data.input.formalSourceProvenance };
+      await tx.tenantFeature.upsert({ where, update: { configuration }, create: { tenantId: data.input.tenantId, featureCode: 'TENANT_CUSTOM_RULES', enabled: true, source: 'FORMAL_SOURCE_PACKAGE', configuration } });
     }
     await tx.auditLog.create({ data: { tenantId: data.input.tenantId, memberId: state.activeAdminUserId, action: 'MUSUBI_BETA_STAFF_IMPORTED', targetType: 'Tenant', targetId: data.input.tenantId, detail: { displayed: 23, generatorEligible: 20, foodService: 3, administratorLinkedToExistingStaff: true, inputSchemaVersion: 1 } } });
   });
@@ -102,5 +115,5 @@ async function verify(data) {
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`); if (!result.pass) process.exitCode = 1;
 }
 
-async function main() { const data = loadInput(); const mode=verifyOnly?'VERIFY':apply?'APPLY':'DRY_RUN'; const operation='musubi-roster'; const guard=assertEnvironment({tenantId:data.input.tenantId,operation,mode,packageDigest:data.checksum}); await assertDatabaseSafety(prisma,data.input.tenantId); const state = await inspect(data); if (verifyOnly) return verify(data); if (!apply) { recordDryRun(operation,data.input.tenantId,guard); return; } if (readRoster(inputArg).checksum !== data.checksum) stop('SYSTEM_SAFETY_BLOCK:ROSTER_CHANGED:input changed after verification'); await applyImport(data, state); await verify(data); }
+async function main() { const data = loadInput(); const mode=verifyOnly?'VERIFY':apply?'APPLY':'DRY_RUN'; const operation='musubi-roster'; const guard=assertEnvironment({tenantId:data.input.tenantId,operation,mode,packageDigest:data.checksum}); await assertDatabaseSafety(prisma,data.input.tenantId); const state = await inspect(data); if (verifyOnly) return verify(data); if (!apply) { recordDryRun(operation,data.input.tenantId,guard); return; } if (readInput(inputArg).checksum !== data.checksum) stop('SYSTEM_SAFETY_BLOCK:ROSTER_CHANGED:input changed after verification'); await applyImport(data, state); await verify(data); }
 main().catch((error) => { process.stderr.write(`${error instanceof Error && (error.safe === true || error.message.startsWith('SYSTEM_SAFETY_BLOCK:')) ? error.message : 'SYSTEM_SAFETY_BLOCK:ROSTER_IMPORT_FAILED:import failed'}\n`); process.exitCode = 1; }).finally(() => prisma.$disconnect());

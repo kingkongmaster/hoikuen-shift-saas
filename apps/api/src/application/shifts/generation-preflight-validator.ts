@@ -1,3 +1,5 @@
+import { readProvisionalSoftRules } from './provisional-soft-rules';
+import { hasApprovedFixedTime } from './approved-fixed-time';
 import { ShiftRequestType, ShiftType, StaffingConstraintLevel, StaffWorkRuleType } from '@prisma/client';
 import type { MonthlyGenerationContext } from './monthly-generation-context-builder';
 import { jsonStrings } from './monthly-generation-context-builder';
@@ -14,7 +16,7 @@ const systemSafetyCodes = new Set([
   'INVALID_EXCEPTION_PROVENANCE',
   'FIXED_GENERATOR_DOUBLE_HANDLING', 'FIXED_CONTRACT_UNRESOLVED', 'INVALID_WORK_RULE_PERIOD',
   'EVENT_UNKNOWN_STAFF', 'EVENT_UNKNOWN_WORK_PATTERN',
-  'GENERATION_CONTEXT_UNAVAILABLE',
+  'GENERATION_CONTEXT_UNAVAILABLE', 'INVALID_PROVISIONAL_SOFT_RULE',
 ]);
 
 export function classifyGenerationDiagnostic(issue: DiagnosticInput): GenerationDiagnostic {
@@ -59,12 +61,17 @@ export function validateGenerationContext(context: MonthlyGenerationContext, pha
     }
   }
   const customConfig = context.features.TENANT_CUSTOM_RULES.configuration;
+  if (context.features.TENANT_CUSTOM_RULES.enabled) try {
+    readProvisionalSoftRules(customConfig.release1ProvisionalSoftRules, context.staff, context.workPatterns);
+  } catch {
+    add({ severity: 'ERROR', code: 'INVALID_PROVISIONAL_SOFT_RULE', staffId: null, date: month, source: 'TenantFeature:TENANT_CUSTOM_RULES', reason: '暫定SOFT条件の出典または職員・勤務パターン参照が不正です。', allowedActions: ['暫定条件の設定を確認する'] });
+  }
   if (Array.isArray(customConfig.approvedWeeklyThirdAssignmentExceptions) && customConfig.approvedWeeklyThirdAssignmentExceptions.length) add({ severity: 'WARNING', code: 'LEGACY_RULE_EXCEPTION_PRESENT', staffId: null, date: month, source: 'TenantFeature:TENANT_CUSTOM_RULES', reason: 'Feature設定に旧形式の承認例外があります。runtime条件には使用しません。', allowedActions: ['TenantRuleExceptionへ移行する', '旧設定を削除する'] });
 
   for (const staffId of context.fixedStaffIds) {
     const staff = staffById.get(staffId); const contracts = context.contracts.filter((row) => row.staffId === staffId && !row.voidedAt);
     if (!context.excludedStaffIds.has(staffId)) add({ severity: 'ERROR', code: 'FIXED_GENERATOR_DOUBLE_HANDLING', staffId, date: month, source: 'StaffAttributeAssignment', reason: '固定勤務対象がrotation除外になっていません。二重生成の可能性があります。', allowedActions: ['GENERATOR_EXCLUDED属性を設定する', 'FIXED_ASSIGNMENT属性を解除する'] });
-    if (contracts.length !== 1 || !staff?.regularWorkStartTime || !staff.regularWorkEndTime) add({ severity: 'ERROR', code: 'FIXED_CONTRACT_UNRESOLVED', staffId, date: month, source: 'StaffWorkContract', reason: '固定勤務に必要な有効契約または互換勤務時刻を一意に確定できません。', allowedActions: ['勤務契約を確認する', '固定勤務時刻を設定する'] });
+    if (!staff?.regularWorkStartTime || !staff.regularWorkEndTime || (contracts.length !== 1 && !(contracts.length === 0 && hasApprovedFixedTime(context.workRules, staffId, staff.regularWorkStartTime, staff.regularWorkEndTime, context.range)))) add({ severity: 'ERROR', code: 'FIXED_CONTRACT_UNRESOLVED', staffId, date: month, source: 'StaffWorkContract', reason: '固定勤務に必要な有効契約または互換勤務時刻を一意に確定できません。', allowedActions: ['勤務契約を確認する', '固定勤務時刻を設定する'] });
   }
 
   for (const request of context.approvedRequests.filter((row) => row.requestType === ShiftRequestType.HALF_DAY_AM || row.requestType === ShiftRequestType.HALF_DAY_PM)) {
@@ -90,7 +97,7 @@ export function validateGenerationContext(context: MonthlyGenerationContext, pha
       if (closed && working.has(assignment.shiftType)) add({ severity: 'ERROR', code: 'CLOSED_DATE_WORK_CONFLICT', staffId: assignment.staffId, date, source: 'TenantClosedDate/TenantShiftSetting', reason: '休園日または非営業の日曜日に勤務が割り当てられています。', allowedActions: ['勤務を休みに変更する', '休園日・日曜設定を確認する'] });
       if (request && fullLeave.has(request.requestType) && working.has(assignment.shiftType)) add({ severity: 'ERROR', code: 'APPROVED_REQUEST_CONFLICT', staffId: assignment.staffId, date, source: `ShiftRequest:${request.id}`, reason: '承認済み休暇と勤務Assignmentが競合しています。', allowedActions: ['勤務を休暇へ変更する', '申請承認を見直す'] });
       const type = assignment.workPattern?.code && Object.values(ShiftType).includes(assignment.workPattern.code as ShiftType) ? assignment.workPattern.code as ShiftType : assignment.shiftType;
-      const conflict = prohibitionConflict(context.workRules, assignment.staffId, assignment.workDate, type, assignment.startTime && assignment.endTime ? { startTime: assignment.startTime, endTime: assignment.endTime } : null);
+      const conflict = prohibitionConflict(context.workRules, assignment.staffId, assignment.workDate, type, assignment.startTime && assignment.endTime ? { startTime: assignment.startTime, endTime: assignment.endTime } : null, assignment.workPatternId ?? undefined);
       if (conflict?.isHardConstraint && !hardOverrideKey.has(`${assignment.staffId}:${date}`)) add({ severity: 'ERROR', code: 'HARD_WORK_RULE_CONFLICT', staffId: assignment.staffId, date, source: `StaffWorkRule:${conflict.id}`, reason: '確定予定の勤務がHARD勤務禁止条件に違反しています。', allowedActions: ['勤務を変更する', 'その日だけ例外として承認する', '条件を確認して再生成する', '保留して戻る'] });
       const fixed = fixedRule(context.workRules, assignment.staffId, assignment.workDate); const fixedType = fixed ? patternType(fixed) : null;
       if (!closed && fixed?.isHardConstraint && fixedType && fixedType !== type && !hardOverrideKey.has(`${assignment.staffId}:${date}`)) add({ severity: 'ERROR', code: 'HARD_FIXED_ASSIGNMENT_CONFLICT', staffId: assignment.staffId, date, source: `StaffWorkRule:${fixed.id}`, reason: '確定予定の勤務がHARD固定勤務と一致しません。', allowedActions: ['勤務を固定勤務へ変更する', 'その日だけ例外として承認する', '保留して戻る'] });

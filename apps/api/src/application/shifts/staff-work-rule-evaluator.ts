@@ -1,6 +1,8 @@
 import { ShiftType, StaffWorkRuleType } from '@prisma/client';
 
 export type GeneratorWorkRule = {
+  sourceType?: string | null;
+  sourceReference?: string | null;
   id: string;
   staffId: string;
   ruleType: StaffWorkRuleType;
@@ -34,21 +36,24 @@ export function applicableRules(rules: GeneratorWorkRule[], staffId: string, dat
 }
 
 export function fixedRule(rules: GeneratorWorkRule[], staffId: string, date: Date) {
-  return applicableRules(rules, staffId, date).find((rule) => rule.ruleType === StaffWorkRuleType.FIXED_WORK_PATTERN && rule.workPattern);
+  const rule = applicableRules(rules, staffId, date).find((rule) => rule.ruleType === StaffWorkRuleType.FIXED_WORK_PATTERN && rule.workPattern);
+  // A staff-specific fixed rule may override its times while retaining the shared pattern identity.
+  return rule?.workPattern && rule.startTime && rule.endTime
+    ? { ...rule, workPattern: { ...rule.workPattern, startTime: rule.startTime, endTime: rule.endTime } } : rule;
 }
 
 /** FIXED is checked only against higher-priority PROHIBITED rules. */
-export function prohibitionConflict(rules: GeneratorWorkRule[], staffId: string, date: Date, type: ShiftType, times: { startTime: string; endTime: string } | null) {
-  return applicableRules(rules, staffId, date).find((rule) => prohibited.has(rule.ruleType) && matches(rule, type, times)) ?? null;
+export function prohibitionConflict(rules: GeneratorWorkRule[], staffId: string, date: Date, type: ShiftType, times: { startTime: string; endTime: string } | null, workPatternId?: string) {
+  return applicableRules(rules, staffId, date).find((rule) => prohibited.has(rule.ruleType) && matches(rule, type, times, workPatternId)) ?? null;
 }
 
 /** ALLOWED limits only ordinary, non-FIXED candidate selection. */
-export function ruleEligibility(rules: GeneratorWorkRule[], staffId: string, date: Date, type: ShiftType, times: { startTime: string; endTime: string } | null) {
-  const denied = prohibitionConflict(rules, staffId, date, type, times);
+export function ruleEligibility(rules: GeneratorWorkRule[], staffId: string, date: Date, type: ShiftType, times: { startTime: string; endTime: string } | null, workPatternId?: string) {
+  const denied = prohibitionConflict(rules, staffId, date, type, times, workPatternId);
   if (denied) return { eligible: false, reason: denied };
 
   const availability = rules
-    .filter((rule) => rule.staffId === staffId && periodMatches(rule, date) && allowed.has(rule.ruleType))
+    .filter((rule) => rule.staffId === staffId && periodMatches(rule, date) && allowed.has(rule.ruleType) && (rule.ruleType === StaffWorkRuleType.AVAILABLE_DAY_OF_WEEK || rule.dayOfWeek == null || rule.dayOfWeek === date.getUTCDay()))
     .sort(compareRules);
   if (!availability.length) return { eligible: true, reason: null };
 
@@ -56,7 +61,7 @@ export function ruleEligibility(rules: GeneratorWorkRule[], staffId: string, dat
     eligible: availability.some((rule) => {
       if (rule.ruleType === StaffWorkRuleType.AVAILABLE_DAY_OF_WEEK) return rule.dayOfWeek === date.getUTCDay() && type !== ShiftType.OFF;
       if (rule.dayOfWeek != null && rule.dayOfWeek !== date.getUTCDay()) return false;
-      return matches(rule, type, times);
+      return matches(rule, type, times, workPatternId);
     }),
     reason: null,
   };
@@ -92,9 +97,9 @@ function periodMatches(rule: GeneratorWorkRule, date: Date) {
   return rule.startDate.getTime() <= value && value <= rule.endDate.getTime();
 }
 
-function matches(rule: GeneratorWorkRule, type: ShiftType, times: { startTime: string; endTime: string } | null) {
+function matches(rule: GeneratorWorkRule, type: ShiftType, times: { startTime: string; endTime: string } | null, workPatternId?: string) {
   if (rule.ruleType === StaffWorkRuleType.REQUIRED_DAY_OFF || rule.ruleType === StaffWorkRuleType.UNAVAILABLE_DAY_OF_WEEK) return type !== ShiftType.OFF;
-  if (rule.ruleType === StaffWorkRuleType.UNAVAILABLE_WORK_PATTERN || rule.ruleType === StaffWorkRuleType.AVAILABLE_WORK_PATTERN) return patternType(rule) === type;
+  if (rule.ruleType === StaffWorkRuleType.UNAVAILABLE_WORK_PATTERN || rule.ruleType === StaffWorkRuleType.AVAILABLE_WORK_PATTERN) return workPatternId ? rule.workPattern?.id === workPatternId : type !== ShiftType.OTHER && patternType(rule) === type;
   if (!times || !rule.startTime || !rule.endTime) return false;
   const within = rule.startTime <= times.startTime && times.endTime <= rule.endTime;
   const overlaps = times.startTime < rule.endTime && rule.startTime < times.endTime;

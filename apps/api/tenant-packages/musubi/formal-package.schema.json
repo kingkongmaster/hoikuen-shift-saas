@@ -1,0 +1,943 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aen:musubi:formal-package:v1",
+  "title": "Musubi Formal Package v1 - mapping design; adapter required",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "packageVersion",
+    "packageType",
+    "tenantIdentity",
+    "sourceRegistryReferences",
+    "staff",
+    "departmentAssignments",
+    "generatorEligibility",
+    "workPatterns",
+    "individualContracts",
+    "fixedRules",
+    "staffingRequirements",
+    "tenantFeatureSettings",
+    "provisionalValues",
+    "deferredValues",
+    "productionApproval"
+  ],
+  "properties": {
+    "packageVersion": {
+      "const": 1
+    },
+    "packageType": {
+      "const": "MUSUBI_FORMAL_INPUT_PACKAGE"
+    },
+    "tenantIdentity": {
+      "type": "object",
+      "required": [
+        "tenantCode",
+        "environment"
+      ],
+      "properties": {
+        "tenantCode": {
+          "const": "musubi-nursery"
+        },
+        "tenantId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "environment": {
+          "enum": [
+            "ISOLATED_DRY_RUN",
+            "PRODUCTION"
+          ]
+        }
+      }
+    },
+    "sourceRegistryReferences": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "sourceId",
+          "notionUrl",
+          "approvalScope"
+        ],
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "pattern": "^MUSUBI-2026-[0-9]{3}$"
+          },
+          "notionUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "driveUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "approvalScope": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "staff": {
+      "type": "array",
+      "minItems": 23,
+      "maxItems": 23,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "employeeNumber",
+          "displayName",
+          "isActive",
+          "departmentCode",
+          "employmentType",
+          "assignedClass",
+          "generatorEligible",
+          "isFoodService",
+          "canWorkEarly",
+          "canWorkRegular",
+          "canWorkLate",
+          "canWorkSaturdays",
+          "earlyShiftOnly",
+          "lateShiftOnly",
+          "regularWorkStartTime",
+          "regularWorkEndTime",
+          "monthlyTargetWorkHours",
+          "monthlyTargetWorkDays",
+          "monthlyWorkHourLimit",
+          "weeklyAvailableDays",
+          "provenance"
+        ],
+        "properties": {
+          "employeeNumber": {
+            "type": "string",
+            "pattern": "^S(00[1-9]|01[0-9]|02[0-3])$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "PII: restricted external payload only; excluded from matrix/logs"
+          },
+          "isActive": {
+            "const": true
+          },
+          "departmentCode": {
+            "enum": [
+              "CHILDCARE",
+              "CHILDCARE_SUPPORT",
+              "FOOD_SERVICE"
+            ]
+          },
+          "employmentType": {
+            "enum": [
+              "FULL_TIME",
+              "PART_TIME"
+            ]
+          },
+          "assignedClass": {
+            "enum": [
+              "AGE_0",
+              "AGE_1",
+              "AGE_2",
+              "AGE_3",
+              "AGE_4",
+              "AGE_5",
+              "FREE",
+              "SUPPORT"
+            ]
+          },
+          "generatorEligible": {
+            "type": "boolean"
+          },
+          "isFoodService": {
+            "type": "boolean"
+          },
+          "canWorkEarly": {
+            "type": "boolean"
+          },
+          "canWorkRegular": {
+            "type": "boolean"
+          },
+          "canWorkLate": {
+            "type": "boolean"
+          },
+          "canWorkSaturdays": {
+            "type": "boolean"
+          },
+          "earlyShiftOnly": {
+            "type": "boolean"
+          },
+          "lateShiftOnly": {
+            "type": "boolean"
+          },
+          "regularWorkStartTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "regularWorkEndTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "monthlyTargetWorkHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "monthlyTargetWorkDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "monthlyWorkHourLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "weeklyAvailableDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 7
+          },
+          "provenance": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sourceId",
+                "locator",
+                "approvalStatus",
+                "approvalAuthority"
+              ],
+              "properties": {
+                "sourceId": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                },
+                "locator": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "approvalStatus": {
+                  "enum": [
+                    "APPROVED",
+                    "DERIVED",
+                    "RELEASE1_OPERATIONAL_DEFAULT",
+                    "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                    "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                    "CURRENT_OPERATIONAL_RULE"
+                  ]
+                },
+                "approvalAuthority": {
+                  "enum": [
+                    "RECORDED_ADMIN_ANSWER",
+                    "USER_PRODUCT_OWNER_DECISION",
+                    "APPROVED_ITEM_SCOPE"
+                  ]
+                },
+                "approvedParents": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                  }
+                },
+                "effectiveFrom": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "effectiveTo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "productionApproval": {
+      "type": "object",
+      "required": [
+        "approved",
+        "reference"
+      ],
+      "properties": {
+        "approved": {
+          "type": "boolean"
+        },
+        "reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "departmentAssignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "generatorEligibility": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "workPatterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "individualContracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "fixedRules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "staffingRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tenantFeatureSettings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "provisionalValues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "deferredValues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "properties": {
+          "value": {},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "locator",
+              "approvalStatus",
+              "approvalAuthority"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^MUSUBI-2026-[0-9]{3}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalStatus": {
+                "enum": [
+                  "APPROVED",
+                  "DERIVED",
+                  "RELEASE1_OPERATIONAL_DEFAULT",
+                  "PROVISIONAL_PENDING_ADMIN_CONFIRMATION",
+                  "PROVISIONAL_SOFT_PENDING_ADMIN_CONFIRMATION",
+                  "CURRENT_OPERATIONAL_RULE"
+                ]
+              },
+              "approvalAuthority": {
+                "enum": [
+                  "RECORDED_ADMIN_ANSWER",
+                  "USER_PRODUCT_OWNER_DECISION",
+                  "APPROVED_ITEM_SCOPE"
+                ]
+              },
+              "approvedParents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^MUSUBI-2026-[0-9]{3}$"
+                }
+              },
+              "effectiveFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effectiveTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$comment": "Shape validation is insufficient: run semantic validator, exact field provenance coverage, temporal conflict checks, environment guard, implementation regression and isolated import checks. Do not insert annual targets when unavailable."
+}

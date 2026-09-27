@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { randomUUID, scryptSync } = require('node:crypto');
 const { AssignedClass, EmploymentType, MembershipRole, PrismaClient, StaffWorkRuleType, SubscriptionPlan, SubscriptionStatus, ShiftType } = require('@prisma/client');
 
+require('./helpers/isolated-database.cjs').resolveIsolatedDatabaseUrl();
 const prisma = new PrismaClient();
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:18080/api';
 let tenantId;
@@ -61,6 +62,8 @@ async function main() {
   assert.ok(!JSON.stringify(audit.detail).includes(second.id), 'AuditLogは件数サマリのみ');
 
   await prisma.staffWorkRule.updateMany({ where: { id: { in: [fixed.id, allowed.id, prohibited.id] } }, data: { isActive: false } });
+  const beforeFailure = await assignmentView(schedule.id);
+  const beforeFailureAuditId = audit.id;
   await prisma.$executeRawUnsafe(`CREATE FUNCTION pg_temp.fail_staff_work_rule_feature(value text) RETURNS boolean LANGUAGE plpgsql AS $$ BEGIN IF value = 'STAFF_WORK_RULES' THEN RAISE EXCEPTION 'simulated feature lookup failure'; END IF; RETURN true; END $$`);
   await prisma.$executeRawUnsafe('ALTER TABLE "TenantFeature" ENABLE ROW LEVEL SECURITY');
   await prisma.$executeRawUnsafe('ALTER TABLE "TenantFeature" FORCE ROW LEVEL SECURITY');
@@ -71,12 +74,11 @@ async function main() {
   await prisma.$executeRawUnsafe('ALTER TABLE "TenantFeature" NO FORCE ROW LEVEL SECURITY');
   await prisma.$executeRawUnsafe('ALTER TABLE "TenantFeature" DISABLE ROW LEVEL SECURITY');
   featureFailurePolicyEnabled = false;
-  assert.equal(generated.status, 201, 'Feature取得失敗でも生成継続');
-  assert.ok(generated.body.warnings.some((item) => item.code === 'STAFF_WORK_RULE_FEATURE_LOOKUP_FAILED' && item.level === 'WARNING'), '管理者向けWARNINGを返す');
-  assert.deepEqual(await assignmentView(schedule.id), baseline, 'Feature取得失敗時も勤務割当結果は従来方式と同一');
+  assert.equal(generated.status, 409, 'Feature取得失敗は現在の正式preflightで停止する');
+  assert.ok(generated.body.diagnostics.some((item) => item.code === 'FEATURE_LOOKUP_FAILED' && item.category === 'SYSTEM_SAFETY_BLOCK' && !item.overrideAllowed));
+  assert.deepEqual(await assignmentView(schedule.id), beforeFailure, '確認できない勤務条件を欠いた再生成をしない');
   audit = await prisma.auditLog.findFirstOrThrow({ where: { tenantId, action: 'SHIFT_GENERATED' }, orderBy: { createdAt: 'desc' } });
-  assert.equal(audit.detail.staffWorkRuleSummary.featureLookupFailed, true, 'AuditLogへフォールバック種別を要約');
-  assert.equal(audit.detail.staffWorkRuleSummary.ruleCount, 0);
+  assert.equal(audit.id, beforeFailureAuditId, '失敗時に生成完了監査を追加しない');
 
   console.log('StaffWorkRule generator API integration tests: PASS (Feature OFF/failure, fixed/allowed/prohibited priority, persistence, audit)');
 }
