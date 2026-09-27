@@ -9,7 +9,10 @@ COPY scripts ./scripts
 COPY nest-cli.json tsconfig.json ./
 RUN npm run build
 
-FROM build AS production-artifacts
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS production-artifacts
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 # Strip only source maps before artifacts enter any runtime image layer.
 RUN find dist node_modules/.prisma -type f -name '*.map' -delete
 
