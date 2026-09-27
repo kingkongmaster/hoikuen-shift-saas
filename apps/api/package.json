@@ -92,8 +92,9 @@
     "test:release-gate": "node test/pattern-preference-identity.test.cjs && node test/technical-json-guard.test.cjs && node test/staffing-requirement-generator.test.cjs && node test/fixed-assignment-materializer.test.cjs && node test/production-operation-guard.test.cjs && npm run test:formal-source",
     "test:release-gate:db": "node test/helpers/isolated-database.cjs && node test/release-role-isolation.e2e.cjs && node test/release-fixed-staff.e2e.cjs",
     "test:release-gate:beta-api": "node test/technical-json-api.e2e.cjs",
-    "test:formal-source": "node test/formal-package-adapter.test.cjs && node test/formal-package-file.test.cjs && node test/musubi-formal-runtime.test.cjs",
-    "test:formal-import:isolated-db": "node test/helpers/isolated-database.cjs && node test/formal-import-isolated.e2e.cjs"
+    "test:formal-source": "node test/formal-package-adapter.test.cjs && node test/formal-package-file.test.cjs && node test/musubi-formal-runtime.test.cjs && node test/formal-preflight.test.cjs",
+    "test:formal-import:isolated-db": "node test/helpers/isolated-database.cjs && node test/formal-import-isolated.e2e.cjs",
+    "test:tenant-zero-staff": "node test/tenant-zero-staff.e2e.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",

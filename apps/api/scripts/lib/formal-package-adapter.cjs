@@ -61,12 +61,13 @@ function canonicalSections() {
   });
 }
 
-function adaptFormalPackage(input, { adminEmployeeNumber } = {}) {
+function adaptFormalPackage(input, { adminEmployeeNumber, purpose = 'IMPORT' } = {}) {
+  if (!['IMPORT', 'PRODUCTION_PREFLIGHT'].includes(purpose)) fail('purpose', 'unsupported purpose');
   validateShape(input, schema);
   const refs = new Map(input.sourceRegistryReferences.map(row => [row.sourceId, row]));
   if (refs.size !== input.sourceRegistryReferences.length || refs.get(contract.sourceId)?.sha256 !== contract.sha256) fail('sourceRegistryReferences', 'Matrix 039 hash missing or mismatched');
   if (!input.tenantIdentity.tenantId) fail('tenantIdentity', 'explicit tenant UUID required');
-  if (!master.staffCodes.includes(adminEmployeeNumber)) fail('adminEmployeeNumber', 'explicit administrator linkage required');
+  if (purpose !== 'PRODUCTION_PREFLIGHT' && !master.staffCodes.includes(adminEmployeeNumber)) fail('adminEmployeeNumber', 'explicit administrator linkage required');
   if (input.tenantIdentity.environment === 'PRODUCTION' && (!input.productionApproval.approved || !input.productionApproval.reference?.trim())) fail('productionApproval', 'separate approval required');
   const provenance = (source, path) => {
     if (!refs.has(source.sourceId)) fail(path, 'unregistered source');

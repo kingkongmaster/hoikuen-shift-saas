@@ -50,7 +50,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --chown=operations:operations --from=production-artifacts /app/node_modules/.prisma ./node_modules/.prisma
-COPY --chown=operations:operations scripts/bootstrap-admin.cjs scripts/import-musubi-beta.cjs scripts/apply-musubi-tenant-master.cjs scripts/apply-tenant-monthly-package.cjs scripts/verify-musubi-provisioning.cjs ./scripts/
+COPY --chown=operations:operations scripts/bootstrap-admin.cjs scripts/preflight-musubi-formal-package.cjs scripts/import-musubi-beta.cjs scripts/apply-musubi-tenant-master.cjs scripts/apply-tenant-monthly-package.cjs scripts/verify-musubi-provisioning.cjs ./scripts/
 COPY --chown=operations:operations scripts/lib ./scripts/lib
 COPY --chown=operations:operations tenant-packages ./tenant-packages
 RUN mkdir -p /var/lib/aen-shift/provisioning && chown operations:operations /var/lib/aen-shift/provisioning
