@@ -7,6 +7,7 @@ import {
   type SetupState,
   type ShiftSetting,
 } from '../../api/client';
+import { profileDraft, profilePatch, hasProfile } from './profile-mapping.js';
 import { moveSetupStep, resumeSetupStep, validateSetupStep } from './setup-wizard-state.js';
 
 const steps = ['園情報', '勤務設定', 'クラス設定', '利用規約', '完了'];
@@ -45,10 +46,12 @@ const defaultSettings: ShiftSetting = {
 type TenantDraft = {
   name: string;
   postalCode: string;
+  prefecture: string;
+  city: string;
   addressLine: string;
   phone: string;
   contactEmail: string;
-  directorName: string;
+  contactName: string;
 };
 type RequirementDraft = Pick<ClassRequirement, 'classType' | 'weekdayRequired' | 'saturdayRequired' | 'isActive'>;
 type Draft = {
@@ -85,14 +88,7 @@ function createDraft(setup: SetupState): Draft {
       }
     : defaultSettings;
   return {
-    tenant: {
-      name: setup.name ?? '',
-      postalCode: setup.postalCode ?? '',
-      addressLine: [setup.prefecture, setup.city, setup.addressLine].filter(Boolean).join(''),
-      phone: setup.phone ?? '',
-      contactEmail: setup.contactEmail ?? '',
-      directorName: setup.contactName ?? '',
-    },
+    tenant: profileDraft(setup),
     workSettings: settings,
     saturdayCareEnabled: settings.saturdayOperationEnabled,
     classRequirements: classes.map(({ classType }) => {
@@ -135,16 +131,8 @@ export function SetupWizard({
 
   async function saveCurrentStep() {
     if (step === 1) {
-      return api.updateSetupTenant(session.accessToken, {
-        name: draft.tenant.name.trim(),
-        postalCode: draft.tenant.postalCode.trim(),
-        prefecture: '',
-        city: '',
-        addressLine: draft.tenant.addressLine.trim(),
-        phone: draft.tenant.phone.trim(),
-        contactName: draft.tenant.directorName.trim(),
-        contactEmail: draft.tenant.contactEmail.trim(),
-      });
+      const patch = profilePatch(setup, draft.tenant);
+      return patch ? api.updateSetupTenant(session.accessToken, patch) : setup;
     }
     if (step === 2) {
       const settings = draft.workSettings;
@@ -192,10 +180,11 @@ export function SetupWizard({
     try {
       const saved = await saveCurrentStep();
       const nextStep = moveSetupStep(step, 1, initialSetup);
+      setSetup(saved);
       const progressed = await api.updateSetupProgress(session.accessToken, nextStep);
       setSetup(progressed);
       setStep(nextStep);
-      setToast({ kind: 'success', text: `${steps[step - 1]}を保存しました。` });
+      setToast({ kind: 'success', text: `${steps[step - 1]}を確認しました。` });
       if (step === 4) setDraft((current) => ({ ...current, accepted: saved.termsVersionCurrent && saved.privacyVersionCurrent }));
     } catch (error) {
       setToast({ kind: 'error', text: error instanceof Error ? error.message : '設定を保存できませんでした。入力内容を確認して、もう一度お試しください。' });
@@ -263,7 +252,7 @@ export function SetupWizard({
       </nav>
 
       <section className="mt-5 rounded-2xl border bg-white p-4 shadow-sm sm:p-7">
-        {step === 1 && <TenantStep value={draft.tenant} onChange={setTenant} />}
+        {step === 1 && <TenantStep confirmation={hasProfile(setup)} value={draft.tenant} onChange={setTenant} />}
         {step === 2 && <WorkStep draft={draft} setDraft={setDraft} setSetting={setSetting} />}
         {step === 3 && <ClassStep rows={draft.classRequirements} setDraft={setDraft} />}
         {step === 4 && <ConsentStep accepted={draft.accepted} setAccepted={(accepted) => setDraft((current) => ({ ...current, accepted }))} setup={setup} />}
@@ -271,7 +260,7 @@ export function SetupWizard({
         <div className="mt-8 flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-between">
           <button type="button" onClick={back} disabled={busy || step === 1} className="min-h-12 rounded-lg border border-slate-300 px-6 font-semibold disabled:opacity-40">戻る</button>
           {step < 5
-            ? <button type="button" onClick={next} disabled={busy || (step === 4 && !draft.accepted)} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : '保存して次へ'}</button>
+            ? <button type="button" onClick={next} disabled={busy || (step === 4 && !draft.accepted)} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
             : <button type="button" onClick={complete} disabled={busy} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '完了処理中…' : '初期設定を完了'}</button>}
         </div>
       </section>
@@ -286,14 +275,16 @@ function SectionTitle({ title, description }: { title: string; description: stri
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return <label className="grid gap-1.5 text-sm font-medium">{label}{required && <span className="sr-only">（必須）</span>}{required && <span aria-hidden="true" className="-mt-6 ml-auto rounded bg-rose-50 px-2 py-0.5 text-xs text-rose-700">必須</span>}{children}</label>;
 }
-function TenantStep({ value, onChange }: { value: TenantDraft; onChange: (key: keyof TenantDraft, value: string) => void }) {
-  return <div><SectionTitle title="園情報" description="園の基本情報を入力してください。" /><div className="mt-6 grid gap-5 sm:grid-cols-2">
+function TenantStep({ value, onChange, confirmation }: { confirmation: boolean; value: TenantDraft; onChange: (key: keyof TenantDraft, value: string) => void }) {
+  return <div><SectionTitle title="園情報" description={confirmation ? '園情報をご確認ください。変更がなければ、そのまま次へ進めます。' : '園の基本情報を入力してください。'} /><div className="mt-6 grid gap-5 sm:grid-cols-2">
     <Field label="園名" required><input className="input" maxLength={120} required value={value.name} onChange={(event) => onChange('name', event.target.value)} /></Field>
     <Field label="メールアドレス" required><input className="input" type="email" maxLength={254} required value={value.contactEmail} onChange={(event) => onChange('contactEmail', event.target.value)} /></Field>
     <Field label="郵便番号"><input className="input" inputMode="numeric" maxLength={16} placeholder="123-4567" value={value.postalCode} onChange={(event) => onChange('postalCode', event.target.value)} /></Field>
     <Field label="電話番号"><input className="input" type="tel" maxLength={40} placeholder="03-1234-5678" value={value.phone} onChange={(event) => onChange('phone', event.target.value)} /></Field>
-    <div className="sm:col-span-2"><Field label="住所"><input className="input" maxLength={160} value={value.addressLine} onChange={(event) => onChange('addressLine', event.target.value)} /></Field></div>
-    <div className="sm:col-span-2"><Field label="園長氏名"><input className="input" maxLength={120} value={value.directorName} onChange={(event) => onChange('directorName', event.target.value)} /></Field></div>
+    <Field label="都道府県"><input className="input" maxLength={60} value={value.prefecture} onChange={(event) => onChange('prefecture', event.target.value)} /></Field>
+    <Field label="市区町村"><input className="input" maxLength={80} value={value.city} onChange={(event) => onChange('city', event.target.value)} /></Field>
+    <div className="sm:col-span-2"><Field label="町名・番地・建物名"><input className="input" maxLength={160} value={value.addressLine} onChange={(event) => onChange('addressLine', event.target.value)} /></Field></div>
+    <div className="sm:col-span-2"><Field label="園長氏名"><input className="input" maxLength={120} value={value.contactName} onChange={(event) => onChange('contactName', event.target.value)} /></Field></div>
   </div></div>;
 }
 function TimeRange({ label, start, end, onStart, onEnd }: { label: string; start: string; end: string; onStart: (value: string) => void; onEnd: (value: string) => void }) {

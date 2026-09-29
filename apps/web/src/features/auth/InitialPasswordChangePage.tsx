@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useRef, useState } from 'react';
+import { FormEvent, useId, useMemo, useRef, useState } from 'react';
 import { api, type Session } from '../../api/client';
 
 export function InitialPasswordChangePage({ session, onCompleted }: { session: Session; onCompleted: () => void }) {
@@ -45,5 +45,6 @@ export function InitialPasswordChangePage({ session, onCompleted }: { session: S
 }
 
 function PasswordField({ label, value, onChange, visible, onVisibilityChange, autoComplete, isNew = false }: { label: string; value: string; onChange: (value: string) => void; visible: boolean; onVisibilityChange: (value: boolean) => void; autoComplete: 'current-password' | 'new-password'; isNew?: boolean }) {
-  return <div className="mt-4"><label className="block text-sm font-bold">{label}<input value={value} onChange={(event) => onChange(event.target.value)} type={visible ? 'text' : 'password'} autoComplete={autoComplete} minLength={isNew ? 12 : undefined} maxLength={128} required className="input mt-2" /></label><label className="mt-1 flex min-h-10 items-center gap-2 text-xs font-bold text-[var(--ink-muted)]"><input type="checkbox" checked={visible} onChange={(event) => onVisibilityChange(event.target.checked)} className="size-4" />{label}を表示</label></div>;
+  const id = useId();
+  return <div className="mt-4"><label htmlFor={id} className="block text-sm font-bold">{label}</label><input key={visible ? 'visible' : 'hidden'} id={id} name={id} value={value} onChange={(event) => onChange(event.target.value)} type={visible ? 'text' : 'password'} autoComplete={autoComplete} minLength={isNew ? 12 : undefined} maxLength={128} required autoCapitalize="none" autoCorrect="off" spellCheck={false} className="input mt-2" /><label htmlFor={`${id}-visibility`} className="mt-1 flex min-h-11 items-center gap-2 text-xs font-bold text-[var(--ink-muted)]"><input id={`${id}-visibility`} aria-controls={id} type="checkbox" checked={visible} onChange={(event) => onVisibilityChange(event.target.checked)} className="size-4" />{label}を表示</label></div>;
 }
