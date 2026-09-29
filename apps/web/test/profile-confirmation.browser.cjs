@@ -76,7 +76,7 @@ async function main(){
     }
     await mobileLayout(tab);
     await tab.getByRole('button',{name:scenario==='unchanged'?'確認して次へ':'保存して次へ',exact:true}).click();
-    await tab.getByRole('heading',{name:'利用規約',exact:true}).waitFor();
+    await tab.getByRole('heading',{name:'勤務設定をご確認ください',exact:true}).waitFor();
     const after=await tenantProfile();
     if(scenario==='unchanged'){assert.equal(patches.length,0);assert.deepEqual(after,before)}
     else {

@@ -7,6 +7,7 @@ import {
   type SetupState,
   type ShiftSetting,
 } from '../../api/client';
+import { WorkforceReviewStep } from './WorkforceReviewStep';
 import { profileDraft, profilePatch, hasProfile } from './profile-mapping.js';
 import { hasExistingWorkforceSetup, workforceSetupNeedsReview, moveSetupStep, resumeSetupStep, validateSetupStep } from './setup-wizard-state.js';
 
@@ -138,6 +139,7 @@ export function SetupWizard({
       const patch = profilePatch(setup, draft.tenant);
       return patch ? api.updateSetupTenant(session.accessToken, patch) : setup;
     }
+    if (existingWorkforce && (step === 2 || step === 3)) return setup;
     if (step === 2) {
       const settings = draft.workSettings;
       return api.updateSetupWorkSettings(session.accessToken, {
@@ -175,7 +177,7 @@ export function SetupWizard({
 
   async function next() {
     if (needsReview || (step === 4 && !legalConsentAvailable(setup))) return;
-    const errors = validateSetupStep(step, draft);
+    const errors = existingWorkforce && (step === 2 || step === 3) ? [] : validateSetupStep(step, draft);
     if (errors.length) {
       setToast({ kind: 'error', text: errors[0] });
       return;
@@ -186,7 +188,7 @@ export function SetupWizard({
       const saved = await saveCurrentStep();
       const nextStep = moveSetupStep(step, 1, saved);
       setSetup(saved);
-      const progressed = await api.updateSetupProgress(session.accessToken, nextStep);
+      const progressed = await api.updateSetupProgress(session.accessToken, nextStep, existingWorkforce && (step === 2 || step === 3) ? {confirmedSection: step === 2 ? 'WORK_SETTINGS' : 'STAFF_CLASSES', reviewDigest: setup.workforceReview!.digest} : undefined);
       setSetup(progressed);
       setStep(nextStep);
       setToast({ kind: 'success', text: `${steps[step - 1]}を確認しました。` });
@@ -238,7 +240,7 @@ export function SetupWizard({
     <section className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
       <p className="text-sm font-semibold text-emerald-700">初回セットアップ</p>
       <h1 className="mt-1 text-2xl font-bold sm:text-3xl">園の初期設定</h1>
-      <p className="mt-2 text-sm leading-6 text-slate-600">入力内容はステップごとに保存され、次回ログイン時に続きから再開できます。</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{existingWorkforce ? '登録済みの設定を順番にご確認ください。確認操作で勤務設定を保存し直すことはありません。' : '入力内容はステップごとに保存され、次回ログイン時に続きから再開できます。'}</p>
 
       <nav aria-label="初期設定の進捗" className="mt-6 overflow-hidden rounded-2xl border bg-white p-4 shadow-sm sm:p-5">
         <ol className="grid grid-cols-5 gap-1 sm:gap-3">
@@ -246,10 +248,10 @@ export function SetupWizard({
             const number = index + 1;
             const active = number === step;
             const configured = existingWorkforce && (number === 2 || number === 3);
-            const done = configured || number < step;
+            const done = configured ? (number === 2 ? setup.workforceReview?.workConfirmed : setup.workforceReview?.staffConfirmed) : number < step;
             return <li key={label} aria-current={active ? 'step' : undefined} className="min-w-0 text-center">
               <span className={`mx-auto grid size-8 place-items-center rounded-full text-sm font-bold ${active ? 'bg-emerald-700 text-white ring-4 ring-emerald-100' : done ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{done ? '✓' : number}</span>
-              <span className={`mt-2 block truncate text-[10px] font-medium sm:text-sm ${active ? 'text-emerald-800' : 'text-slate-500'}`}>{label}{configured && <span className="block">設定済み</span>}</span>
+              <span className={`mt-2 block truncate text-[10px] font-medium sm:text-sm ${active ? 'text-emerald-800' : 'text-slate-500'}`}>{configured ? (number === 2 ? '勤務確認' : '職員・クラス確認') : label}{configured && <span className="block">{done ? '確認済み' : '要確認'}</span>}</span>
             </li>;
           })}
         </ol>
@@ -258,16 +260,17 @@ export function SetupWizard({
       </nav>
 
       <section className="mt-5 rounded-2xl border bg-white p-4 shadow-sm sm:p-7">
-        {needsReview && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm">既存設定の確認が必要です。勤務・クラス設定を上書きせず停止しています。サポートへお問い合わせください。</p>}
-        {step === 1 && <TenantStep confirmation={hasProfile(setup)} value={draft.tenant} onChange={setTenant} />}
+        {needsReview && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm">既存設定の確認が必要です。勤務・クラス設定を上書きせず停止しています。サポートへお問い合わせください。未確認項目：{Object.entries(setup.workforceSetupEvidence ?? {}).filter(([, ok]) => !ok).map(([key]) => ({shiftSettings: '勤務基本設定', classes: 'クラス構成', staff: '在籍職員', patterns: '勤務パターン', rules: '個別勤務条件', departments: '部署', departmentCoverage: '職員の部署対応', requirements: '必要人数'}[key] ?? key)).join('、') || '設定状態の取得'}</p>}
+        {step === 1 && !needsReview && <TenantStep confirmation={hasProfile(setup)} value={draft.tenant} onChange={setTenant} />}
+        {existingWorkforce && !needsReview && (step === 2 || step === 3) && <WorkforceReviewStep setup={setup} step={step} />}
         {step === 2 && !needsReview && !existingWorkforce && <WorkStep draft={draft} setDraft={setDraft} setSetting={setSetting} />}
         {step === 3 && !needsReview && !existingWorkforce && <ClassStep rows={draft.classRequirements} setDraft={setDraft} />}
-        {step === 4 && <ConsentStep accepted={draft.accepted} setAccepted={(accepted) => setDraft((current) => ({ ...current, accepted }))} setup={setup} />}
-        {step === 5 && <CompleteStep setup={setup} />}
+        {step === 4 && !needsReview && <ConsentStep accepted={draft.accepted} setAccepted={(accepted) => setDraft((current) => ({ ...current, accepted }))} setup={setup} />}
+        {step === 5 && !needsReview && <CompleteStep setup={setup} />}
         <div className="mt-8 flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-between">
           <button type="button" onClick={back} disabled={busy || step === 1} className="min-h-12 rounded-lg border border-slate-300 px-6 font-semibold disabled:opacity-40">戻る</button>
           {step < 5
-            ? <button type="button" onClick={next} disabled={busy || needsReview || (step === 4 && (!draft.accepted || !legalConsentAvailable(setup)))} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
+            ? <button type="button" onClick={next} disabled={busy || needsReview || (step === 4 && (!draft.accepted || !legalConsentAvailable(setup)))} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : existingWorkforce && step === 2 ? '勤務設定を確認しました' : existingWorkforce && step === 3 ? '職員・クラス設定を確認しました' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
             : <button type="button" onClick={complete} disabled={busy || needsReview} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '完了処理中…' : '初期設定を完了'}</button>}
         </div>
       </section>

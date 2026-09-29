@@ -97,7 +97,16 @@ export type AuditLog = { id:string; memberId:string; action:string; targetType:s
 export type PrintShiftData = { tenantName:string; month:string; status:MonthlyShiftStatus; printedAt:string; ownOnly:boolean; closedDates:Array<{date:string;name:string}>; assignments:Array<{employeeNumber:string;staffName:string;date:string;weekday:string;shiftType:string;assignedClass:string;startTime:string|null;endTime:string|null;breakMinutes:number|null;note:string|null}> };
 export type BackupValidation = { valid:boolean; errors:string[]; warnings:string[]; metadata:{format:string;version:number;exportedAt:string;tenantName:string;integrity:{algorithm:string;checksum:string}}; counts:Record<string,number> };
 export type SetupStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+export type WorkforceReview = {
+  digest: string; workConfirmed: boolean; staffConfirmed: boolean; fiscalYearStartMonth: number;
+  staffCount: number; generatorCount: number; excludedCount: number; fixedAttributeCount: number;
+  patterns: Array<{code: string; name: string; startTime: string | null; endTime: string | null; isWorking: boolean}>;
+  requirements: Array<{workPattern: {name: string} | null; attributeDefinition: {name: string}; classType: string | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; requiredCount: number; constraintLevel: string}>;
+  rules: Array<{ruleType: string; workPattern: {name: string} | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; startTime: string | null; endTime: string | null; numericValue: number | null; isHardConstraint: boolean; staffCount: number}>;
+  departments: Array<{name: string; staffCount: number; fixedCount: number; excludedCount: number}>;
+};
 export type SetupState = {
+  workforceReview?: WorkforceReview | null;
   preserveWorkforceSetup?: boolean;
   workforceSetupState?: 'NEW' | 'COMPLETE' | 'PARTIAL';
   workforceSetupEvidence?: Record<string, boolean>;
@@ -289,7 +298,7 @@ export const api = {
   updateSetupTenant(token:string,input:SetupTenantInput){return request<SetupState>('/setup/tenant',{method:'PATCH',body:JSON.stringify(input)},token);},
   updateSetupWorkSettings(token:string,input:Partial<ShiftSetting>){return request<SetupState>('/setup/work-settings',{method:'PATCH',body:JSON.stringify(input)},token);},
   updateSetupClassRequirements(token:string,requirements:Array<Pick<ClassRequirement,'classType'|'weekdayRequired'|'saturdayRequired'|'isActive'>>){return request<SetupState>('/setup/class-requirements',{method:'PATCH',body:JSON.stringify({requirements})},token);},
-  updateSetupProgress(token:string,currentStep:number){return request<SetupState>('/setup/progress',{method:'PATCH',body:JSON.stringify({currentStep})},token);},
+  updateSetupProgress(token:string,currentStep:number,review?:{confirmedSection:'WORK_SETTINGS'|'STAFF_CLASSES';reviewDigest:string}){return request<SetupState>('/setup/progress',{method:'PATCH',body:JSON.stringify({currentStep,...review})},token);},
   updateSetupConsents(token:string,input:{acceptTerms:boolean;acceptPrivacy:boolean;termsVersion:string;privacyVersion:string;termsHash:string;privacyHash:string}){return request<SetupState>('/setup/consents',{method:'PATCH',body:JSON.stringify(input)},token);},
   completeSetup(token:string){return request<SetupState>('/setup/complete',{method:'POST'},token);},
   subscription(token:string){return request<SubscriptionInfo>('/subscription',{},token);},

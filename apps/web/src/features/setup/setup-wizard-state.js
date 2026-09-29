@@ -13,7 +13,7 @@ export function hasExistingWorkforceSetup(setup) {
 }
 
 export function workforceSetupNeedsReview(setup) {
-  return setup?.workforceSetupState === 'NEW' ? false : !hasExistingWorkforceSetup(setup);
+  return setup?.workforceSetupState === 'NEW' ? false : (!hasExistingWorkforceSetup(setup) || !setup?.workforceReview);
 }
 
 export function resumeSetupStep(setup) {
@@ -21,14 +21,14 @@ export function resumeSetupStep(setup) {
   if ((setup?.setupStatus === 'COMPLETED' || setup?.setupCompletedAt) && (setup?.termsVersionCurrent === false || setup?.privacyVersionCurrent === false)) return 4;
   const step = Number(setup?.setupCurrentStep ?? 1);
   const normalized = Math.min(SETUP_STEP_COUNT, Math.max(1, Number.isInteger(step) ? step : 1));
-  return hasExistingWorkforceSetup(setup) && (normalized === 2 || normalized === 3) ? 1 : normalized;
+  if (hasExistingWorkforceSetup(setup) && normalized > 1) {
+    if (!setup.workforceReview?.workConfirmed) return 2;
+    if (normalized > 2 && !setup.workforceReview?.staffConfirmed) return 3;
+  }
+  return normalized;
 }
 
 export function moveSetupStep(step, direction, setup) {
-  if (hasExistingWorkforceSetup(setup)) {
-    if (step === 1 && direction > 0) return 4;
-    if (step === 4 && direction < 0) return 1;
-  }
   return Math.min(SETUP_STEP_COUNT, Math.max(1, step + direction));
 }
 

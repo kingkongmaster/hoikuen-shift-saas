@@ -68,9 +68,9 @@ assert.ok(wizardSource.includes('onComplete(completed)'), '完了後にDashboard
 console.log('Sprint 9-B2 Web tests: PASS (Step遷移・保存契約・途中再開・完了・完了済みスキップ・権限制御・390px・入力検証)');
 
 const existing = { workforceSetupState: 'COMPLETE', preserveWorkforceSetup: true, shiftSettings: {}, classRequirements: [{}], activeStaffCount: 23, setupCurrentStep: 2 };
-assert.equal(moveSetupStep(1, 1, existing), 4, '既存勤務・クラス設定を保存し直さない');
-assert.equal(moveSetupStep(4, -1, existing), 1, '戻る時も既存設定を保護');
-assert.equal(resumeSetupStep(existing), 1, '旧途中ステップから園情報へ安全に復帰');
+assert.equal(moveSetupStep(1, 1, existing), 2, '既存勤務・クラス設定を保存し直さない');
+assert.equal(moveSetupStep(4, -1, existing), 3, '戻る時も既存設定を保護');
+assert.equal(resumeSetupStep(existing), 2, '旧途中ステップから園情報へ安全に復帰');
 assert.deepEqual(validateSetupStep(1, { ...validDraft, tenant: { name: 'Anonymous Nursery', contactEmail: 'contact@example.invalid', postalCode: '', phone: '', addressLine: '', directorName: '' } }), []);
 
 assert.equal(moveSetupStep(1, 1, { ...existing, preserveWorkforceSetup: false }), 2, '正式投入根拠のない園は通常の勤務設定へ進む');
@@ -81,3 +81,6 @@ assert.equal(workforceSetupNeedsReview({ workforceSetupState: 'NEW' }), false);
 
 assert.equal(isSetupComplete({setupStatus:'COMPLETED',termsVersionCurrent:false,privacyVersionCurrent:true}),false,'新版への管理者再確認');
 assert.equal(resumeSetupStep({setupStatus:'COMPLETED',setupCurrentStep:7,termsVersionCurrent:false,privacyVersionCurrent:true}),4,'完了済みでも旧版なら同意画面へ');
+
+assert.equal(resumeSetupStep({...existing,setupCurrentStep:4,workforceReview:{workConfirmed:false,staffConfirmed:false}}),2);
+assert.equal(resumeSetupStep({...existing,setupCurrentStep:4,workforceReview:{workConfirmed:true,staffConfirmed:false}}),3);

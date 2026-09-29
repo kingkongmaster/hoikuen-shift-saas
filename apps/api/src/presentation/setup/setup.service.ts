@@ -5,6 +5,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { UpdateClassRequirementsDto, UpdateShiftSettingDto } from '../settings/settings.dto';
 import { LEGAL_RELEASE, PRIVACY_VERSION, TERMS_VERSION } from './setup.constants';
+import { workforceReview } from './workforce-review';
 import { UpdateConsentsDto, UpdateProgressDto, UpdateTenantDto } from './setup.dto';
 
 @Injectable()
@@ -33,8 +34,10 @@ export class SetupService {
     const preserveWorkforceSetup = Object.values(workforceSetupEvidence).every(Boolean);
     const managedDataExists = Boolean(provenance?.matrixSourceId || patternCount || ruleCount || departmentCount || requirementCount);
     const workforceSetupState = preserveWorkforceSetup ? 'COMPLETE' : managedDataExists ? 'PARTIAL' : 'NEW';
+    const review = workforceSetupState === 'COMPLETE' ? await workforceReview(this.prisma, user.tenantId, shiftSettings!.fiscalYearStartMonth) : null;
     const result = this.evaluateSetupRequirements({ tenant, shiftSettings, classRequirements, activeStaffCount });
-    return { ...tenant, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, workforceSetupState, workforceSetupEvidence, legalRelease: LEGAL_RELEASE, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
+    if (review && tenant.setupStatus !== 'COMPLETED' && (!review.workConfirmed || !review.staffConfirmed)) { result.canComplete = false; result.missingRequirements.push('WORKFORCE_REVIEW_REQUIRED'); }
+    return { ...tenant, workforceReview: review, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, workforceSetupState, workforceSetupEvidence, legalRelease: LEGAL_RELEASE, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
   }
 
   evaluateSetupRequirements(data: any) {
@@ -90,19 +93,30 @@ export class SetupService {
   async updateProgress(user: AuthenticatedUser, input: UpdateProgressDto) {
     const state = await this.get(user);
     if (state.workforceSetupState === 'PARTIAL' && input.currentStep > 1) throw new ConflictException('既存設定の確認が必要です。');
-    const currentStep = state.preserveWorkforceSetup && [2, 3].includes(input.currentStep) ? 4 : input.currentStep;
+    const currentStep = input.currentStep;
+    const review = state.workforceReview;
+    if (input.confirmedSection && (!review || input.reviewDigest !== review.digest)) throw new ConflictException('設定が更新されています。再読込して確認してください。');
+    if (input.confirmedSection === 'WORK_SETTINGS' && currentStep !== 3) throw new BadRequestException('勤務設定確認の遷移が不正です。');
+    if (input.confirmedSection === 'STAFF_CLASSES' && (currentStep !== 4 || !review?.workConfirmed)) throw new ConflictException('勤務設定から順番に確認してください。');
+    if (review && state.setupStatus !== 'COMPLETED') {
+      if (currentStep > 2 && !review.workConfirmed && input.confirmedSection !== 'WORK_SETTINGS') throw new ConflictException('勤務設定をご確認ください。');
+      if (currentStep > 3 && !review.staffConfirmed && input.confirmedSection !== 'STAFF_CLASSES') throw new ConflictException('職員・クラス設定をご確認ください。');
+    }
+    const newConfirmation = Boolean(input.confirmedSection && !(input.confirmedSection === 'WORK_SETTINGS' ? review?.workConfirmed : review?.staffConfirmed));
     await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { setupStatus: true, setupCurrentStep: true } });
       await this.startIfNeeded(user, tx);
-      if (tenant.setupCurrentStep !== currentStep && tenant.setupStatus !== 'COMPLETED') {
+      if ((tenant.setupCurrentStep !== currentStep || newConfirmation) && tenant.setupStatus !== 'COMPLETED') {
         await tx.tenant.update({ where: { id: user.tenantId }, data: { setupCurrentStep: currentStep } });
-        await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'SETUP_STEP_UPDATED', targetType: 'Tenant', targetId: user.tenantId, detail: { from: tenant.setupCurrentStep, to: currentStep } } });
+        await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'SETUP_STEP_UPDATED', targetType: 'Tenant', targetId: user.tenantId, detail: { from: tenant.setupCurrentStep, to: currentStep, ...(input.confirmedSection ? { confirmedSection: input.confirmedSection, reviewDigest: input.reviewDigest } : {}) } } });
       }
     });
     return this.get(user);
   }
 
   async updateConsents(user: AuthenticatedUser, input: UpdateConsentsDto) {
+    const state = await this.get(user);
+    if (state.workforceSetupState === 'PARTIAL' || (state.workforceReview && state.setupStatus !== 'COMPLETED' && (!state.workforceReview.workConfirmed || !state.workforceReview.staffConfirmed))) throw new ConflictException('既存設定を順番に確認してください。');
     if (!LEGAL_RELEASE.approved || !LEGAL_RELEASE.effectiveDate) throw new ConflictException({ code: 'LEGAL_RELEASE_NOT_APPROVED', message: '正式文面は確認中です。まだ同意を取得できません。' });
     if (input.termsVersion !== TERMS_VERSION || input.privacyVersion !== PRIVACY_VERSION || input.termsHash !== LEGAL_RELEASE.termsHash || input.privacyHash !== LEGAL_RELEASE.privacyHash) throw new ConflictException({ code: 'LEGAL_VERSION_CHANGED', message: '文書が更新されています。再読込して全文を確認してください。' });
     if (input.acceptTerms !== true || input.acceptPrivacy !== true) throw new BadRequestException('両方の文書への明示的な同意が必要です。');

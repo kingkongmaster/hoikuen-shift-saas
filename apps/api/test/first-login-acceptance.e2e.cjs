@@ -62,7 +62,7 @@ async function main() {
   for (const [key,value] of Object.entries(form)) assert.equal(saved.body[key], value);
   assert.notEqual(saved.body.contactEmail, email);
   const missing = await req('/setup', token); assert.equal(missing.body.activeStaffCount, 23); assert.equal(missing.body.preserveWorkforceSetup, true);
-  assert.equal((await req('/setup/progress', token, { currentStep: 4 }, 'PATCH')).status, 200);
+  for (const [currentStep,confirmedSection] of [[3,'WORK_SETTINGS'],[4,'STAFF_CLASSES']]) assert.equal((await req('/setup/progress', token, { currentStep,confirmedSection,reviewDigest:missing.body.workforceReview.digest }, 'PATCH')).status, 200);
   const legal = missing.body;
   const consent = { acceptTerms: true, acceptPrivacy: true, termsVersion: legal.currentTermsVersion, privacyVersion: legal.currentPrivacyVersion, termsHash: legal.legalRelease.termsHash, privacyHash: legal.legalRelease.privacyHash };
   if (legal.legalRelease.approved) {
