@@ -112,5 +112,5 @@ async function main(){
    console.log(engine.name()+': PASS toggles independent/all ON-OFF, masking, client-only, 390px, structured profile A/B/C, protected data');
   } finally {await context.close();await browser.close()}
  }
-} 
+}
 main().catch(e=>{console.error('PROFILE_BROWSER_HOLD',e.name, String(e.message).replace(/Synthetic[^\s]*/g,'[synthetic]').slice(0,250));process.exitCode=1}).finally(()=>p.$disconnect());
