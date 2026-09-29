@@ -30,7 +30,7 @@ export function InitialPasswordChangePage({ session, onCompleted }: { session: S
 
   if (completed) return <main className="grid min-h-screen place-items-center bg-[var(--canvas)] p-5"><section className="card w-full max-w-md text-center"><span className="empty-symbol mx-auto" aria-hidden="true">完</span><h1 className="mt-4 text-2xl font-black">パスワードを変更しました</h1><p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">安全のため、本人用の新しいパスワードでもう一度ログインしてください。</p><button type="button" className="btn-primary mt-6 w-full" onClick={onCompleted}>ログイン画面へ</button></section></main>;
 
-  return <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,_#e7f1ec,_#f6f7f2_48%)] p-4 sm:p-5">
+  return <main className="grid min-h-screen place-items-center bg-[var(--canvas)] p-4 sm:p-5">
     <form onSubmit={submit} className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl shadow-emerald-950/10 sm:p-8">
       <p className="eyebrow">初回ログイン</p><h1 className="mt-1 text-2xl font-black">本人用パスワードへ変更</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">仮パスワードのままではAeN Shiftの機能を利用できません。ご本人だけが知っているパスワードへ変更してください。</p>

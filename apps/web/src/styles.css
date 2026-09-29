@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --brand: #2f6b57;
-  --brand-deep: #214e41;
-  --brand-soft: #e7f1ec;
-  --canvas: #f6f7f2;
-  --surface: #fffdf8;
+  --brand: #568127;
+  --brand-deep: #3c5e1a;
+  --brand-soft: #edf4e5;
+  --canvas: #F3F8EE;
+  --surface: #ffffff;
   --surface-strong: #ffffff;
   --ink: #1e2b27;
   --ink-muted: #5d6b66;
@@ -32,7 +32,7 @@ button:disabled { cursor: not-allowed; }
   .btn-primary { @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-bold text-white shadow-sm disabled:opacity-50; background: var(--brand); }
   .btn-primary:hover { background: var(--brand-deep); }
   .btn-secondary { @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border bg-white px-5 py-2.5 font-bold shadow-sm disabled:opacity-50; border-color: var(--border); color: var(--ink); }
-  .btn-secondary:hover { background: var(--canvas); border-color: var(--brand); }
+  .btn-secondary:hover { background: var(--canvas); border-color: var(--brand-deep); }
   .btn-danger { @apply inline-flex min-h-12 items-center justify-center rounded-xl px-5 py-2.5 font-bold text-white shadow-sm disabled:opacity-50; background: var(--coral); }
   .btn-quiet { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 font-bold; color: var(--ink-muted); }
   .btn-quiet:hover { background: var(--brand-soft); color: var(--brand-deep); }
@@ -47,7 +47,7 @@ button:disabled { cursor: not-allowed; }
   .message-error { @apply border-rose-200 bg-rose-50 text-rose-700; }
   .message-info { @apply border-blue-200 bg-blue-50 text-blue-800; }
   .message-warning { @apply border-amber-200 bg-amber-50 text-amber-800; }
-  .eyebrow { @apply text-xs font-black uppercase tracking-[0.14em]; color: var(--brand); }
+  .eyebrow { @apply text-xs font-black uppercase tracking-[0.14em]; color: var(--brand-deep); }
   .page-heading { @apply mb-1 border-b pb-6; border-color: var(--border); }
   .today-card { @apply relative overflow-hidden rounded-3xl border p-5 shadow-sm sm:p-7; border-color: #b9d3c7; background: linear-gradient(145deg, #edf6f1 0%, #fffdf8 70%); }
   .today-card::after { content: ""; position: absolute; width: 150px; height: 150px; right: -55px; top: -65px; border: 24px solid rgb(47 107 87 / 8%); border-radius: 9999px; pointer-events: none; }
@@ -74,7 +74,7 @@ button:disabled { cursor: not-allowed; }
   .bottom-nav-button { @apply flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-bold; color: var(--ink-muted); }
   .bottom-nav-button.is-active { color: var(--brand-deep); background: var(--brand-soft); }
   .bottom-symbol { @apply grid size-7 place-items-center rounded-lg border text-xs font-black; border-color: var(--border); background: #fff; }
-  .bottom-nav-button.is-active .bottom-symbol { background: var(--brand); color: white; border-color: var(--brand); }
+  .bottom-nav-button.is-active .bottom-symbol { background: var(--brand); color: white; border-color: var(--brand-deep); }
   .bottom-badge { @apply absolute -right-2 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full border border-white px-1 text-[10px] font-black text-white; background: var(--coral); }
   .onboarding-screen { @apply fixed inset-0 z-[80] grid overflow-y-auto p-4; place-items: center; background: radial-gradient(circle at top, #edf6f1 0%, var(--canvas) 48%, #f5efe3 100%); }
   .onboarding-card { @apply my-auto w-full max-w-lg rounded-3xl border p-6 shadow-xl sm:p-9; border-color: #bed3c9; background: var(--surface); }
@@ -125,3 +125,7 @@ button:disabled { cursor: not-allowed; }
   .shift-cell { border-width: 2px; color: #111 !important; opacity: 1 !important; }
   .shift-cell.is-working { box-shadow: inset 0 0 0 2px #111 !important; }
 }
+
+/* PWA form boundaries and hints remain visible on the pale delivery palette. */
+.input { border-color: #75856b; }
+.input::placeholder { color: var(--ink-muted); opacity: 1; }

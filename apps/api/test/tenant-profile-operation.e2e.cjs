@@ -1,0 +1,33 @@
+const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
+const { PrismaClient } = require('@prisma/client');
+const { main, FIELDS, ACTION } = require('../scripts/update-tenant-profile.cjs');
+const url = new URL(process.env.DATABASE_URL);
+assert(['127.0.0.1','localhost'].includes(url.hostname) && url.pathname === '/aen_profile_pwa_test');
+const p = new PrismaClient();
+async function run() {
+  const tenant = await p.tenant.create({ data: {name:'Anonymous Before',displayName:'Anonymous Before',code:'profile-'+randomUUID(),setupStatus:'NOT_STARTED',setupCurrentStep:1} });
+  const other = await p.tenant.create({data:{name:'Anonymous Other'}});
+  const user = await p.user.create({data:{displayName:'Anonymous Admin',email:randomUUID()+'@example.invalid',passwordHash:'synthetic-not-a-credential',mustChangePassword:true,tokenVersion:7}});
+  await p.membership.create({data:{tenantId:tenant.id,userId:user.id,role:'ADMIN'}});
+  await p.staff.createMany({data:Array.from({length:23},(_,i)=>({tenantId:tenant.id,employeeNumber:'T'+i,displayName:'Anonymous '+i}))});
+  const input = {tenantId:tenant.id,tenantCode:tenant.code,approvalReference:'ANONYMOUS-TEST',sourceIds:['ANONYMOUS-SOURCE'],expected:Object.fromEntries(FIELDS.map(k=>[k,tenant[k]])),values:{name:'Anonymous After',displayName:'Anonymous After',postalCode:'000-0000',prefecture:'Test',city:'Test',addressLine:'Test',phone:'000-0000-0000',contactName:'Anonymous Contact',contactEmail:'public@example.invalid'}};
+  const snapshot = async()=>JSON.stringify(await Promise.all([p.tenant.findMany({orderBy:{id:'asc'}}),p.user.findMany(),p.membership.findMany(),p.staff.findMany({orderBy:{id:'asc'}}),p.auditLog.findMany()]));
+  const before=await snapshot();
+  await assert.rejects(()=>main({...input,values:{...input.values,mustChangePassword:false}}));
+  await assert.rejects(()=>main({...input,tenantId:other.id}));
+  await main(input); assert.equal(await snapshot(),before);
+  await assert.rejects(()=>main(input,{apply:true,injectFailure:true})); assert.equal(await snapshot(),before);
+  const result=await main(input,{apply:true}); assert.equal(result.auditAdded,1);
+  assert.deepEqual(await p.user.findUnique({where:{id:user.id}}),user);
+  const after=await p.tenant.findUnique({where:{id:tenant.id}});
+  for(const [key,value] of Object.entries(tenant)) if(!FIELDS.includes(key)) assert.deepEqual(after[key],value);
+  assert.deepEqual(await p.tenant.findUnique({where:{id:other.id}}),other);
+  assert.equal(await p.staff.count({where:{tenantId:tenant.id}}),23);
+  const audit=await p.auditLog.findFirst({where:{action:ACTION,tenantId:tenant.id}});
+  assert.equal(audit.detail.credentialOperation,false); assert(!JSON.stringify(audit.detail).includes(input.values.contactEmail));
+  await assert.rejects(()=>main(input,{apply:true})); assert.equal(await p.auditLog.count({where:{action:ACTION,tenantId:tenant.id}}),1);
+  await p.tenant.deleteMany({where:{id:{in:[tenant.id,other.id]}}}); await p.user.delete({where:{id:user.id}});
+  console.log('PROFILE_ISOLATED_PASS: 9 fields, dry-run rollback, injected rollback, stale repeat rejected, wrong tenant rejected, auth/setup/staff/other tenant unchanged, PII-free audit');
+}
+run().catch(()=>{console.error('PROFILE_ISOLATED_HOLD');process.exitCode=1;}).finally(()=>p.$disconnect());

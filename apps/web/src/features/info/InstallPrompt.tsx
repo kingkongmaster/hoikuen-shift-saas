@@ -14,7 +14,7 @@ export function InstallPrompt() {
     return () => { window.removeEventListener('beforeinstallprompt', beforeInstall); window.removeEventListener('appinstalled', installedEvent); };
   }, []);
   if (installed) return null;
-  if (prompt) return <button type="button" onClick={() => { void prompt.prompt().then(() => prompt.userChoice).then((choice) => { if (choice.outcome === 'accepted') setPrompt(null); }); }} className="min-h-11 rounded-lg border border-slate-600 px-3 text-slate-100 hover:border-slate-300">アプリをインストール</button>;
-  if (isiOS) return <span className="max-w-xs text-center text-xs text-slate-400 md:text-right">iPhone/iPad：Safariの共有から「ホーム画面に追加」</span>;
+  if (prompt) return <button type="button" onClick={() => { void prompt.prompt().then(() => prompt.userChoice).then((choice) => { if (choice.outcome === 'accepted') setPrompt(null); }); }} className="btn-primary px-3">アプリをインストール</button>;
+  if (isiOS) return <span className="max-w-xs text-center text-xs text-[var(--ink-muted)] md:text-right">iPhone/iPad：Safariの共有から「ホーム画面に追加」</span>;
   return null;
 }

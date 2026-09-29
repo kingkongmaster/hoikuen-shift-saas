@@ -7,9 +7,12 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f8fafc",
-  "theme_color": "#047857",
-  "categories": ["business", "productivity"],
+  "background_color": "#F3F8EE",
+  "theme_color": "#568127",
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "/icons/aen-shift-icon-192.png",
@@ -21,7 +24,14 @@
       "src": "/icons/aen-shift-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/aen-shift-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "id": "/"
 }
