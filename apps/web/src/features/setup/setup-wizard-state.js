@@ -8,13 +8,22 @@ export function isSetupComplete(setup) {
   return setup?.setupStatus === 'COMPLETED' || Boolean(setup?.setupCompletedAt);
 }
 
+export function hasExistingWorkforceSetup(setup) {
+  return Boolean(setup?.preserveWorkforceSetup && setup?.shiftSettings && setup?.classRequirements?.length && setup?.activeStaffCount > 0);
+}
+
 export function resumeSetupStep(setup) {
   if (isSetupComplete(setup)) return SETUP_STEP_COUNT;
   const step = Number(setup?.setupCurrentStep ?? 1);
-  return Math.min(SETUP_STEP_COUNT, Math.max(1, Number.isInteger(step) ? step : 1));
+  const normalized = Math.min(SETUP_STEP_COUNT, Math.max(1, Number.isInteger(step) ? step : 1));
+  return hasExistingWorkforceSetup(setup) && (normalized === 2 || normalized === 3) ? 1 : normalized;
 }
 
-export function moveSetupStep(step, direction) {
+export function moveSetupStep(step, direction, setup) {
+  if (hasExistingWorkforceSetup(setup)) {
+    if (step === 1 && direction > 0) return 4;
+    if (step === 4 && direction < 0) return 1;
+  }
   return Math.min(SETUP_STEP_COUNT, Math.max(1, step + direction));
 }
 

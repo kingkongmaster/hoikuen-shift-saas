@@ -15,6 +15,14 @@ export function App() {
   const [notFound, setNotFound] = useState(() => isUnknownHash());
   useEffect(() => { const token = sessionStorage.getItem('enshift.accessToken'); if (!token) { setRestoringSession(false); return; } api.me(token).then((data) => setSession({ ...data, accessToken: token })).catch(() => sessionStorage.removeItem('enshift.accessToken')).finally(() => setRestoringSession(false)); }, []);
   useEffect(() => { const update = () => { setInfoRoute(routeFromHash()); setNotFound(isUnknownHash()); }; window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update); }, []);
+  useEffect(() => {
+    const requirePasswordChange = (event: Event) => {
+      const token = (event as CustomEvent<{ token?: string }>).detail?.token;
+      setSession((current) => current && current.accessToken === token ? { ...current, mustChangePassword: true } : current);
+    };
+    window.addEventListener('enshift:password-change-required', requirePasswordChange);
+    return () => window.removeEventListener('enshift:password-change-required', requirePasswordChange);
+  }, []);
   const content = restoringSession
     ? <main className="grid min-h-screen place-items-center bg-[var(--canvas)]"><p role="status" className="font-semibold">認証状態を確認しています…</p></main>
     : session?.mustChangePassword

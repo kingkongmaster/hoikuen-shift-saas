@@ -12,17 +12,21 @@ export class SetupService {
   constructor(private readonly prisma: PrismaService, private readonly settings: SettingsService) {}
 
   async get(user: AuthenticatedUser) {
-    const [tenant, shiftSettings, classRequirements, activeStaffCount] = await Promise.all([
+    const [tenant, shiftSettings, classRequirements, activeStaffCount, formalFeature] = await Promise.all([
       this.prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { id: true, name: true, code: true, phone: true, postalCode: true, prefecture: true, city: true, addressLine: true, contactName: true, contactEmail: true, timezone: true, setupStatus: true, setupCurrentStep: true, setupCompletedAt: true, termsAcceptedAt: true, privacyAcceptedAt: true, termsVersion: true, privacyVersion: true } }),
       this.prisma.tenantShiftSetting.findUnique({ where: { tenantId: user.tenantId } }), this.prisma.classStaffingRequirement.findMany({ where: { tenantId: user.tenantId } }), this.prisma.staff.count({ where: { tenantId: user.tenantId, isActive: true } }),
+      this.prisma.tenantFeature.findUnique({ where: { tenantId_featureCode: { tenantId: user.tenantId, featureCode: 'TENANT_CUSTOM_RULES' } }, select: { configuration: true } }),
     ]);
+    const provenance = (formalFeature?.configuration as { release1SourceProvenance?: { matrixSourceId?: string } } | null)?.release1SourceProvenance;
+    const preserveWorkforceSetup = Boolean(provenance?.matrixSourceId && shiftSettings && classRequirements.length && activeStaffCount);
     const result = this.evaluateSetupRequirements({ tenant, shiftSettings, classRequirements, activeStaffCount });
-    return { ...tenant, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
+    return { ...tenant, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
   }
 
   evaluateSetupRequirements(data: any) {
     const missing: string[] = [];
     if (!data.tenant.name?.trim()) missing.push('TENANT_NAME_REQUIRED');
+    if (!data.tenant.contactEmail?.trim()) missing.push('TENANT_CONTACT_EMAIL_REQUIRED');
     if (!data.shiftSettings) missing.push('SHIFT_SETTINGS_REQUIRED');
     if (!data.classRequirements?.length) missing.push('CLASS_REQUIREMENTS_REQUIRED');
     if (!data.activeStaffCount) missing.push('ACTIVE_STAFF_REQUIRED');

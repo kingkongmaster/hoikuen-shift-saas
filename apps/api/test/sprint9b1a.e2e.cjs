@@ -25,7 +25,7 @@ async function main() {
   const externalAdmin = await prisma.user.create({ data: { email: `s9b1a-external-${run}@e2e.local`, displayName: '別園管理者', passwordHash: hash(password), isPlatformAdmin: true } });
   userIds = [admin.id, director.id, staffUser.id, otherUser.id, externalAdmin.id];
   const consentAt = new Date();
-  const tenant = await prisma.tenant.create({ data: { name: `Sprint 9-B1a 園 ${run}`, setupStatus: 'NOT_STARTED', setupCurrentStep: 1, termsAcceptedAt: consentAt, privacyAcceptedAt: consentAt, termsVersion: '2026-07-draft', privacyVersion: '2026-07-draft' } });
+  const tenant = await prisma.tenant.create({ data: { name: `Sprint 9-B1a 園 ${run}`, contactEmail: 'contact@example.invalid', setupStatus: 'NOT_STARTED', setupCurrentStep: 1, termsAcceptedAt: consentAt, privacyAcceptedAt: consentAt, termsVersion: '2026-07-draft', privacyVersion: '2026-07-draft' } });
   tenantId = tenant.id;
   const other = await prisma.tenant.create({ data: { name: `別園 ${run}` } }); otherTenantId = other.id;
   await prisma.membership.createMany({ data: [

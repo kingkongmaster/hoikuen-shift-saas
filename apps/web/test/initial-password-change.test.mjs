@@ -17,3 +17,8 @@ assert.match(page, /catch \(reason\) \{ setCurrentPassword\(''\)/, 'API失敗時
 assert.doesNotMatch(page, /setItem\([^)]*[Pp]assword/, 'パスワードをstorageへ保存しない');
 assert.match(client, /changeInitialPassword/); assert.match(client, /mustChangePassword: boolean/);
 console.log('Initial password change web tests: PASS (routing, validation, storage and re-login)');
+const login = await readFile(new URL('../src/features/auth/LoginPage.tsx', import.meta.url), 'utf8');
+assert.ok(login.indexOf('await api.me(session.accessToken)') < login.indexOf('onSuccess({'), '最新のpassword状態を確認してから画面遷移');
+assert.match(client, /INITIAL_PASSWORD_CHANGE_REQUIRED[\s\S]*enshift:password-change-required/);
+assert.match(app, /current.accessToken === token/, '別セッションの遅延エラーで遷移しない');
+assert.ok(app.indexOf(': session?.mustChangePassword') < app.indexOf(': notFound'), 'password優先を維持');

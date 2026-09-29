@@ -191,7 +191,7 @@ export function SetupWizard({
     setToast(null);
     try {
       const saved = await saveCurrentStep();
-      const nextStep = moveSetupStep(step, 1);
+      const nextStep = moveSetupStep(step, 1, initialSetup);
       const progressed = await api.updateSetupProgress(session.accessToken, nextStep);
       setSetup(progressed);
       setStep(nextStep);
@@ -205,7 +205,7 @@ export function SetupWizard({
   }
 
   async function back() {
-    const previous = moveSetupStep(step, -1);
+    const previous = moveSetupStep(step, -1, initialSetup);
     if (previous === step) return;
     setBusy(true);
     setToast(null);

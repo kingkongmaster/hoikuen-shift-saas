@@ -98,6 +98,7 @@ export type PrintShiftData = { tenantName:string; month:string; status:MonthlySh
 export type BackupValidation = { valid:boolean; errors:string[]; warnings:string[]; metadata:{format:string;version:number;exportedAt:string;tenantName:string;integrity:{algorithm:string;checksum:string}}; counts:Record<string,number> };
 export type SetupStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type SetupState = {
+  preserveWorkforceSetup?: boolean;
   id: string;
   name: string;
   code: string | null;
@@ -210,6 +211,9 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
     }
     if (!response.ok) {
       const body = await response.json().catch(() => null);
+      if (response.status === 403 && body?.code === 'INITIAL_PASSWORD_CHANGE_REQUIRED') {
+        emit('enshift:password-change-required', { token });
+      }
       const message = responseMessage(body, response.status, path);
       emit('enshift:api-error', { message }); throw new ApiResponseError(message, response.status, body);
     }

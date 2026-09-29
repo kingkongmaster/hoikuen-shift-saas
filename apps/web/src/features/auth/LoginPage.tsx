@@ -13,7 +13,8 @@ export function LoginPage({ onSuccess }: { onSuccess: (session: Session) => void
       const session = await api.login(nextEmail, nextPassword);
       setError('');
       window.dispatchEvent(new CustomEvent('enshift:clear-error'));
-      onSuccess(session);
+      const current = await api.me(session.accessToken);
+      onSuccess({ ...current, accessToken: session.accessToken });
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'ログインできませんでした。ログインIDとパスワードをご確認ください。'); }
     finally { setLoading(false); }

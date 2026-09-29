@@ -65,3 +65,11 @@ assert.ok(wizardSource.includes('setStep(nextStep)'), '保存後にStep遷移す
 assert.ok(wizardSource.includes('onComplete(completed)'), '完了後にDashboardへ進める');
 
 console.log('Sprint 9-B2 Web tests: PASS (Step遷移・保存契約・途中再開・完了・完了済みスキップ・権限制御・390px・入力検証)');
+
+const existing = { preserveWorkforceSetup: true, shiftSettings: {}, classRequirements: [{}], activeStaffCount: 23, setupCurrentStep: 2 };
+assert.equal(moveSetupStep(1, 1, existing), 4, '既存勤務・クラス設定を保存し直さない');
+assert.equal(moveSetupStep(4, -1, existing), 1, '戻る時も既存設定を保護');
+assert.equal(resumeSetupStep(existing), 1, '旧途中ステップから園情報へ安全に復帰');
+assert.deepEqual(validateSetupStep(1, { ...validDraft, tenant: { name: 'Anonymous Nursery', contactEmail: 'contact@example.invalid', postalCode: '', phone: '', addressLine: '', directorName: '' } }), []);
+
+assert.equal(moveSetupStep(1, 1, { ...existing, preserveWorkforceSetup: false }), 2, '正式投入根拠のない園は通常の勤務設定へ進む');
