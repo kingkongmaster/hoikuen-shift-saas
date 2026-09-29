@@ -78,3 +78,6 @@ assert.equal(moveSetupStep(1, 1, { ...existing, preserveWorkforceSetup: false })
 assert.equal(workforceSetupNeedsReview({}), true, '旧APIの判定欠落は入力許可にしない');
 assert.equal(workforceSetupNeedsReview({ workforceSetupState: 'PARTIAL' }), true);
 assert.equal(workforceSetupNeedsReview({ workforceSetupState: 'NEW' }), false);
+
+assert.equal(isSetupComplete({setupStatus:'COMPLETED',termsVersionCurrent:false,privacyVersionCurrent:true}),false,'新版への管理者再確認');
+assert.equal(resumeSetupStep({setupStatus:'COMPLETED',setupCurrentStep:7,termsVersionCurrent:false,privacyVersionCurrent:true}),4,'完了済みでも旧版なら同意画面へ');

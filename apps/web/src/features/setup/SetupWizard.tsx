@@ -10,6 +10,8 @@ import {
 import { profileDraft, profilePatch, hasProfile } from './profile-mapping.js';
 import { hasExistingWorkforceSetup, workforceSetupNeedsReview, moveSetupStep, resumeSetupStep, validateSetupStep } from './setup-wizard-state.js';
 
+import { LegalConsent, legalConsentAvailable } from '../legal/LegalDocument';
+
 const steps = ['園情報', '勤務設定', 'クラス設定', '利用規約', '完了'];
 const classes: Array<{ classType: AssignedClass; label: string }> = [
   { classType: 'AGE_0', label: '0歳' },
@@ -168,11 +170,11 @@ export function SetupWizard({
         })),
       );
     }
-    return api.updateSetupConsents(session.accessToken, { acceptTerms: true, acceptPrivacy: true });
+    return api.updateSetupConsents(session.accessToken, { acceptTerms: true, acceptPrivacy: true, termsVersion: setup.currentTermsVersion, privacyVersion: setup.currentPrivacyVersion, termsHash: setup.legalRelease!.termsHash, privacyHash: setup.legalRelease!.privacyHash });
   }
 
   async function next() {
-    if (needsReview) return;
+    if (needsReview || (step === 4 && !legalConsentAvailable(setup))) return;
     const errors = validateSetupStep(step, draft);
     if (errors.length) {
       setToast({ kind: 'error', text: errors[0] });
@@ -265,7 +267,7 @@ export function SetupWizard({
         <div className="mt-8 flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-between">
           <button type="button" onClick={back} disabled={busy || step === 1} className="min-h-12 rounded-lg border border-slate-300 px-6 font-semibold disabled:opacity-40">戻る</button>
           {step < 5
-            ? <button type="button" onClick={next} disabled={busy || needsReview || (step === 4 && !draft.accepted)} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
+            ? <button type="button" onClick={next} disabled={busy || needsReview || (step === 4 && (!draft.accepted || !legalConsentAvailable(setup)))} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
             : <button type="button" onClick={complete} disabled={busy || needsReview} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '完了処理中…' : '初期設定を完了'}</button>}
         </div>
       </section>
@@ -320,12 +322,9 @@ function ClassStep({ rows, setDraft }: { rows: RequirementDraft[]; setDraft: Rea
   </div></div>;
 }
 function ConsentStep({ accepted, setAccepted, setup }: { accepted: boolean; setAccepted: (value: boolean) => void; setup: SetupState }) {
-  return <div><SectionTitle title="利用規約" description="内容をご確認のうえ、同意してください。" /><div className="mt-6 grid gap-4">
-    <article className="max-h-40 overflow-y-auto rounded-xl border bg-slate-50 p-4 text-sm leading-6"><h3 className="font-bold">利用規約（{setup.currentTermsVersion}）</h3><p className="mt-2 text-slate-600">AeN Shiftを園内のシフト管理目的で適切に利用し、アカウント情報を安全に管理してください。登録内容の正確性は利用者が確認するものとします。</p></article>
-    <article className="max-h-40 overflow-y-auto rounded-xl border bg-slate-50 p-4 text-sm leading-6"><h3 className="font-bold">プライバシーポリシー（{setup.currentPrivacyVersion}）</h3><p className="mt-2 text-slate-600">サービス提供、本人確認、勤務管理および安全性確保のために必要な情報を取り扱います。園のデータはテナント単位で管理されます。</p></article>
-    <label className="flex min-h-14 items-start gap-3 rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4 font-semibold"><input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-emerald-700" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />利用規約およびプライバシーポリシーに同意する</label>
-  </div></div>;
+  return <LegalConsent accepted={accepted} setAccepted={setAccepted} setup={setup} />;
 }
+
 function CompleteStep({ setup }: { setup: SetupState }) {
   return <div className="py-8 text-center"><span aria-hidden="true" className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-100 text-3xl text-emerald-700">✓</span><h2 className="mt-5 text-2xl font-bold">初期設定が完了しました</h2><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-600">「初期設定を完了」を押すと設定を確定し、ダッシュボードへ移動します。</p>{!setup.canComplete && <p role="alert" className="mx-auto mt-5 max-w-lg rounded-lg bg-amber-50 p-3 text-sm text-amber-800">完了条件を確認しています。完了できない場合は前のステップの入力内容をご確認ください。</p>}</div>;
 }

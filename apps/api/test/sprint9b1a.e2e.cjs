@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { randomUUID, scryptSync } = require('node:crypto');
 const { PrismaClient, MembershipRole, EmploymentType, AssignedClass, SubscriptionPlan, SubscriptionStatus } = require('@prisma/client');
 
+const { TERMS_VERSION, PRIVACY_VERSION } = require('../dist/presentation/setup/setup.constants');
 const prisma = new PrismaClient();
 const base = process.env.API_BASE_URL || 'http://localhost:8080/api';
 const run = randomUUID().slice(0, 8);
@@ -25,7 +26,7 @@ async function main() {
   const externalAdmin = await prisma.user.create({ data: { email: `s9b1a-external-${run}@e2e.local`, displayName: '別園管理者', passwordHash: hash(password), isPlatformAdmin: true } });
   userIds = [admin.id, director.id, staffUser.id, otherUser.id, externalAdmin.id];
   const consentAt = new Date();
-  const tenant = await prisma.tenant.create({ data: { name: `Sprint 9-B1a 園 ${run}`, contactEmail: 'contact@example.invalid', setupStatus: 'NOT_STARTED', setupCurrentStep: 1, termsAcceptedAt: consentAt, privacyAcceptedAt: consentAt, termsVersion: '2026-07-draft', privacyVersion: '2026-07-draft' } });
+  const tenant = await prisma.tenant.create({ data: { name: `Sprint 9-B1a 園 ${run}`, contactEmail: 'contact@example.invalid', setupStatus: 'NOT_STARTED', setupCurrentStep: 1, termsAcceptedAt: consentAt, privacyAcceptedAt: consentAt, termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION } });
   tenantId = tenant.id;
   const other = await prisma.tenant.create({ data: { name: `別園 ${run}` } }); otherTenantId = other.id;
   await prisma.membership.createMany({ data: [
@@ -40,7 +41,7 @@ async function main() {
   const adminToken = await login(admin.email); const directorToken = await login(director.email); const staffToken = await login(staffUser.email); const otherToken = await login(otherUser.email); const externalToken = await login(externalAdmin.email);
   const initial = await setup(adminToken);
   for (const field of ['setupStatus', 'setupCurrentStep', 'setupCompletedAt', 'termsAcceptedAt', 'privacyAcceptedAt', 'termsVersion', 'privacyVersion', 'currentTermsVersion', 'currentPrivacyVersion', 'termsVersionCurrent', 'privacyVersionCurrent', 'tenant', 'shiftSettings', 'classRequirements', 'activeStaffCount', 'canComplete', 'missingRequirements']) assert.ok(Object.hasOwn(initial, field), `${field} must be returned`);
-  assert.equal(initial.tenant.id, tenantId); assert.equal(initial.canComplete, true); assert.deepEqual(initial.missingRequirements, []); assert.equal(initial.activeStaffCount, 1); assert.equal(initial.currentTermsVersion, '2026-07-draft'); assert.equal(initial.currentPrivacyVersion, '2026-07-draft'); assert.equal(JSON.stringify(initial).includes('passwordHash'), false); assert.equal(JSON.stringify(initial).match(/passwordHash|refreshToken|secretKey|privateKey/), null);
+  assert.equal(initial.tenant.id, tenantId); assert.equal(initial.canComplete, true); assert.deepEqual(initial.missingRequirements, []); assert.equal(initial.activeStaffCount, 1); assert.equal(initial.currentTermsVersion, TERMS_VERSION); assert.equal(initial.currentPrivacyVersion, PRIVACY_VERSION); assert.equal(JSON.stringify(initial).includes('passwordHash'), false); assert.equal(JSON.stringify(initial).match(/passwordHash|refreshToken|secretKey|privateKey/), null);
   assert.equal((await setup(directorToken)).tenant.id, tenantId);
   assert.equal((await call('/setup', {}, staffToken)).status, 403);
   const otherSetup = await setup(otherToken); assert.equal(otherSetup.tenant.id, otherTenantId); assert.notEqual(otherSetup.tenant.id, tenantId); await prisma.membership.update({ where: { tenantId_userId: { tenantId: otherTenantId, userId: otherUser.id } }, data: { isActive: false } }); assert.equal((await call('/setup', {}, otherToken)).status, 403);
@@ -53,9 +54,9 @@ async function main() {
   await prisma.staff.updateMany({ where: { tenantId }, data: { isActive: false } }); includes(await setup(adminToken), 'ACTIVE_STAFF_REQUIRED'); await prisma.staff.updateMany({ where: { tenantId }, data: { isActive: true } });
   await prisma.tenant.update({ where: { id: tenantId }, data: { termsAcceptedAt: null, termsVersion: null } }); let result = await setup(adminToken); includes(result, 'TERMS_NOT_ACCEPTED'); assert.equal(result.missingRequirements.includes('TERMS_VERSION_OUTDATED'), false);
   await prisma.tenant.update({ where: { id: tenantId }, data: { termsAcceptedAt: consentAt, termsVersion: 'old' } }); includes(await setup(adminToken), 'TERMS_VERSION_OUTDATED');
-  await prisma.tenant.update({ where: { id: tenantId }, data: { termsVersion: '2026-07-draft', privacyAcceptedAt: null, privacyVersion: null } }); result = await setup(adminToken); includes(result, 'PRIVACY_NOT_ACCEPTED'); assert.equal(result.missingRequirements.includes('PRIVACY_VERSION_OUTDATED'), false);
+  await prisma.tenant.update({ where: { id: tenantId }, data: { termsVersion: TERMS_VERSION, privacyAcceptedAt: null, privacyVersion: null } }); result = await setup(adminToken); includes(result, 'PRIVACY_NOT_ACCEPTED'); assert.equal(result.missingRequirements.includes('PRIVACY_VERSION_OUTDATED'), false);
   await prisma.tenant.update({ where: { id: tenantId }, data: { privacyAcceptedAt: consentAt, privacyVersion: 'old' } }); includes(await setup(adminToken), 'PRIVACY_VERSION_OUTDATED');
-  await prisma.tenant.update({ where: { id: tenantId }, data: { privacyVersion: '2026-07-draft' } }); result = await setup(adminToken); assert.equal(result.canComplete, true); assert.equal(new Set(result.missingRequirements).size, result.missingRequirements.length);
+  await prisma.tenant.update({ where: { id: tenantId }, data: { privacyVersion: PRIVACY_VERSION } }); result = await setup(adminToken); assert.equal(result.canComplete, true); assert.equal(new Set(result.missingRequirements).size, result.missingRequirements.length);
 
   const beforeRead = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { name: true, setupStatus: true, setupCurrentStep: true, setupCompletedAt: true, termsAcceptedAt: true, privacyAcceptedAt: true, termsVersion: true, privacyVersion: true, updatedAt: true } });
   const beforeSettings = await prisma.tenantShiftSetting.findUniqueOrThrow({ where: { tenantId } }); const beforeClasses = await prisma.classStaffingRequirement.findMany({ where: { tenantId }, orderBy: { classType: 'asc' } }); const beforeStaff = await prisma.staff.findMany({ where: { tenantId }, select: { id: true, isActive: true }, orderBy: { id: 'asc' } });

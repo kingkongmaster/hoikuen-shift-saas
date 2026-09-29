@@ -4,7 +4,7 @@ import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { UpdateClassRequirementsDto, UpdateShiftSettingDto } from '../settings/settings.dto';
-import { PRIVACY_VERSION, TERMS_VERSION } from './setup.constants';
+import { LEGAL_RELEASE, PRIVACY_VERSION, TERMS_VERSION } from './setup.constants';
 import { UpdateConsentsDto, UpdateProgressDto, UpdateTenantDto } from './setup.dto';
 
 @Injectable()
@@ -34,11 +34,12 @@ export class SetupService {
     const managedDataExists = Boolean(provenance?.matrixSourceId || patternCount || ruleCount || departmentCount || requirementCount);
     const workforceSetupState = preserveWorkforceSetup ? 'COMPLETE' : managedDataExists ? 'PARTIAL' : 'NEW';
     const result = this.evaluateSetupRequirements({ tenant, shiftSettings, classRequirements, activeStaffCount });
-    return { ...tenant, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, workforceSetupState, workforceSetupEvidence, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
+    return { ...tenant, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, workforceSetupState, workforceSetupEvidence, legalRelease: LEGAL_RELEASE, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
   }
 
   evaluateSetupRequirements(data: any) {
     const missing: string[] = [];
+    if (!LEGAL_RELEASE.approved || !LEGAL_RELEASE.effectiveDate) missing.push('LEGAL_RELEASE_NOT_APPROVED');
     if (!data.tenant.name?.trim()) missing.push('TENANT_NAME_REQUIRED');
     if (!data.tenant.contactEmail?.trim()) missing.push('TENANT_CONTACT_EMAIL_REQUIRED');
     if (!data.shiftSettings) missing.push('SHIFT_SETTINGS_REQUIRED');
@@ -102,13 +103,19 @@ export class SetupService {
   }
 
   async updateConsents(user: AuthenticatedUser, input: UpdateConsentsDto) {
-    if (input.acceptTerms === undefined && input.acceptPrivacy === undefined) throw new BadRequestException('同意内容を指定してください。');
+    if (!LEGAL_RELEASE.approved || !LEGAL_RELEASE.effectiveDate) throw new ConflictException({ code: 'LEGAL_RELEASE_NOT_APPROVED', message: '正式文面は確認中です。まだ同意を取得できません。' });
+    if (input.termsVersion !== TERMS_VERSION || input.privacyVersion !== PRIVACY_VERSION || input.termsHash !== LEGAL_RELEASE.termsHash || input.privacyHash !== LEGAL_RELEASE.privacyHash) throw new ConflictException({ code: 'LEGAL_VERSION_CHANGED', message: '文書が更新されています。再読込して全文を確認してください。' });
+    if (input.acceptTerms !== true || input.acceptPrivacy !== true) throw new BadRequestException('両方の文書への明示的な同意が必要です。');
     await this.prisma.$transaction(async (tx) => {
+      // Serialize concurrent consent requests for one tenant; keep evidence append-only.
+      await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${user.tenantId}::uuid FOR UPDATE`;
       const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { termsAcceptedAt: true, termsVersion: true, privacyAcceptedAt: true, privacyVersion: true } });
       await this.startIfNeeded(user, tx);
       const data: Prisma.TenantUpdateInput = {};
-      if (input.acceptTerms && (!tenant.termsAcceptedAt || tenant.termsVersion !== TERMS_VERSION)) { data.termsAcceptedAt = new Date(); data.termsVersion = TERMS_VERSION; await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'TERMS_ACCEPTED', targetType: 'Tenant', targetId: user.tenantId, detail: { version: TERMS_VERSION } } }); }
-      if (input.acceptPrivacy && (!tenant.privacyAcceptedAt || tenant.privacyVersion !== PRIVACY_VERSION)) { data.privacyAcceptedAt = new Date(); data.privacyVersion = PRIVACY_VERSION; await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'PRIVACY_ACCEPTED', targetType: 'Tenant', targetId: user.tenantId, detail: { version: PRIVACY_VERSION } } }); }
+      const agreedAt = new Date();
+      const evidence = { agreedAt: agreedAt.toISOString(), effectiveDate: LEGAL_RELEASE.effectiveDate, termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, termsHash: LEGAL_RELEASE.termsHash, privacyHash: LEGAL_RELEASE.privacyHash };
+      if (!tenant.termsAcceptedAt || tenant.termsVersion !== TERMS_VERSION) { data.termsAcceptedAt = agreedAt; data.termsVersion = TERMS_VERSION; await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'TERMS_ACCEPTED', targetType: 'Tenant', targetId: user.tenantId, detail: { ...evidence, version: TERMS_VERSION }, createdAt: agreedAt } }); }
+      if (!tenant.privacyAcceptedAt || tenant.privacyVersion !== PRIVACY_VERSION) { data.privacyAcceptedAt = agreedAt; data.privacyVersion = PRIVACY_VERSION; await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'PRIVACY_ACCEPTED', targetType: 'Tenant', targetId: user.tenantId, detail: { ...evidence, version: PRIVACY_VERSION }, createdAt: agreedAt } }); }
       if (Object.keys(data).length) await tx.tenant.update({ where: { id: user.tenantId }, data });
     });
     return this.get(user);

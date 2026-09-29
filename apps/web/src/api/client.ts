@@ -123,6 +123,7 @@ export type SetupState = {
   shiftSettings: (ShiftSetting & { id: string; tenantId: string }) | null;
   classRequirements: ClassRequirement[];
   activeStaffCount: number;
+  legalRelease?: { approved: boolean; effectiveDate: string | null; termsHash: string; privacyHash: string };
   currentTermsVersion: string;
   currentPrivacyVersion: string;
   termsVersionCurrent: boolean;
@@ -289,7 +290,7 @@ export const api = {
   updateSetupWorkSettings(token:string,input:Partial<ShiftSetting>){return request<SetupState>('/setup/work-settings',{method:'PATCH',body:JSON.stringify(input)},token);},
   updateSetupClassRequirements(token:string,requirements:Array<Pick<ClassRequirement,'classType'|'weekdayRequired'|'saturdayRequired'|'isActive'>>){return request<SetupState>('/setup/class-requirements',{method:'PATCH',body:JSON.stringify({requirements})},token);},
   updateSetupProgress(token:string,currentStep:number){return request<SetupState>('/setup/progress',{method:'PATCH',body:JSON.stringify({currentStep})},token);},
-  updateSetupConsents(token:string,input:{acceptTerms:boolean;acceptPrivacy:boolean}){return request<SetupState>('/setup/consents',{method:'PATCH',body:JSON.stringify(input)},token);},
+  updateSetupConsents(token:string,input:{acceptTerms:boolean;acceptPrivacy:boolean;termsVersion:string;privacyVersion:string;termsHash:string;privacyHash:string}){return request<SetupState>('/setup/consents',{method:'PATCH',body:JSON.stringify(input)},token);},
   completeSetup(token:string){return request<SetupState>('/setup/complete',{method:'POST'},token);},
   subscription(token:string){return request<SubscriptionInfo>('/subscription',{},token);},
   features(token:string){return request<EffectiveFeatures>('/features',{},token);},

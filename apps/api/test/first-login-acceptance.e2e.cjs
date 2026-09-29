@@ -63,9 +63,17 @@ async function main() {
   assert.notEqual(saved.body.contactEmail, email);
   const missing = await req('/setup', token); assert.equal(missing.body.activeStaffCount, 23); assert.equal(missing.body.preserveWorkforceSetup, true);
   assert.equal((await req('/setup/progress', token, { currentStep: 4 }, 'PATCH')).status, 200);
-  assert.equal((await req('/setup/consents', token, { acceptTerms: true, acceptPrivacy: true }, 'PATCH')).status, 200);
-  assert.equal((await req('/setup/complete', token, {}, 'POST')).status, 201);
-  assert.equal((await req('/setup', token)).body.setupStatus, 'COMPLETED');
+  const legal = missing.body;
+  const consent = { acceptTerms: true, acceptPrivacy: true, termsVersion: legal.currentTermsVersion, privacyVersion: legal.currentPrivacyVersion, termsHash: legal.legalRelease.termsHash, privacyHash: legal.legalRelease.privacyHash };
+  if (legal.legalRelease.approved) {
+    assert.equal((await req('/setup/consents', token, consent, 'PATCH')).status, 200);
+    assert.equal((await req('/setup/complete', token, {}, 'POST')).status, 201);
+    assert.equal((await req('/setup', token)).body.setupStatus, 'COMPLETED');
+  } else {
+    assert.equal((await req('/setup/consents', token, consent, 'PATCH')).status, 409);
+    assert.equal((await req('/setup/complete', token, {}, 'POST')).status, 400);
+    assert.equal(await p.auditLog.count({ where: { tenantId, action: { in: ['TERMS_ACCEPTED','PRIVACY_ACCEPTED'] } } }), 0);
+  }
   const staff = await req('/staff', token); assert.equal(staff.status, 200); assert.equal(staff.body.length, 23);
   assert.equal(await protectedSnapshot(), before, 'staff/rules/provenance/settings/membership unchanged');
   assert.deepEqual(await p.user.findUnique({ where: { id: userId } }), adminBefore, 'onboarding must not update admin');

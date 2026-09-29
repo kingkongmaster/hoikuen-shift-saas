@@ -5,7 +5,7 @@ export function canUseSetupWizard(role) {
 }
 
 export function isSetupComplete(setup) {
-  return setup?.setupStatus === 'COMPLETED' || Boolean(setup?.setupCompletedAt);
+  return (setup?.setupStatus === 'COMPLETED' || Boolean(setup?.setupCompletedAt)) && setup?.termsVersionCurrent !== false && setup?.privacyVersionCurrent !== false;
 }
 
 export function hasExistingWorkforceSetup(setup) {
@@ -18,6 +18,7 @@ export function workforceSetupNeedsReview(setup) {
 
 export function resumeSetupStep(setup) {
   if (isSetupComplete(setup)) return SETUP_STEP_COUNT;
+  if ((setup?.setupStatus === 'COMPLETED' || setup?.setupCompletedAt) && (setup?.termsVersionCurrent === false || setup?.privacyVersionCurrent === false)) return 4;
   const step = Number(setup?.setupCurrentStep ?? 1);
   const normalized = Math.min(SETUP_STEP_COUNT, Math.max(1, Number.isInteger(step) ? step : 1));
   return hasExistingWorkforceSetup(setup) && (normalized === 2 || normalized === 3) ? 1 : normalized;
