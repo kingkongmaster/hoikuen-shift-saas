@@ -8,7 +8,7 @@ import {
   type ShiftSetting,
 } from '../../api/client';
 import { profileDraft, profilePatch, hasProfile } from './profile-mapping.js';
-import { moveSetupStep, resumeSetupStep, validateSetupStep } from './setup-wizard-state.js';
+import { hasExistingWorkforceSetup, workforceSetupNeedsReview, moveSetupStep, resumeSetupStep, validateSetupStep } from './setup-wizard-state.js';
 
 const steps = ['園情報', '勤務設定', 'クラス設定', '利用規約', '完了'];
 const classes: Array<{ classType: AssignedClass; label: string }> = [
@@ -121,6 +121,8 @@ export function SetupWizard({
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
+  const existingWorkforce = hasExistingWorkforceSetup(setup);
+  const needsReview = workforceSetupNeedsReview(setup);
   const progress = useMemo(() => `${(step / steps.length) * 100}%`, [step]);
   const setTenant = (key: keyof TenantDraft, value: string) => {
     setDraft((current) => ({ ...current, tenant: { ...current.tenant, [key]: value } }));
@@ -170,6 +172,7 @@ export function SetupWizard({
   }
 
   async function next() {
+    if (needsReview) return;
     const errors = validateSetupStep(step, draft);
     if (errors.length) {
       setToast({ kind: 'error', text: errors[0] });
@@ -179,7 +182,7 @@ export function SetupWizard({
     setToast(null);
     try {
       const saved = await saveCurrentStep();
-      const nextStep = moveSetupStep(step, 1, initialSetup);
+      const nextStep = moveSetupStep(step, 1, saved);
       setSetup(saved);
       const progressed = await api.updateSetupProgress(session.accessToken, nextStep);
       setSetup(progressed);
@@ -194,7 +197,7 @@ export function SetupWizard({
   }
 
   async function back() {
-    const previous = moveSetupStep(step, -1, initialSetup);
+    const previous = moveSetupStep(step, -1, setup);
     if (previous === step) return;
     setBusy(true);
     setToast(null);
@@ -240,10 +243,11 @@ export function SetupWizard({
           {steps.map((label, index) => {
             const number = index + 1;
             const active = number === step;
-            const done = number < step;
+            const configured = existingWorkforce && (number === 2 || number === 3);
+            const done = configured || number < step;
             return <li key={label} aria-current={active ? 'step' : undefined} className="min-w-0 text-center">
               <span className={`mx-auto grid size-8 place-items-center rounded-full text-sm font-bold ${active ? 'bg-emerald-700 text-white ring-4 ring-emerald-100' : done ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{done ? '✓' : number}</span>
-              <span className={`mt-2 block truncate text-[10px] font-medium sm:text-sm ${active ? 'text-emerald-800' : 'text-slate-500'}`}>{label}</span>
+              <span className={`mt-2 block truncate text-[10px] font-medium sm:text-sm ${active ? 'text-emerald-800' : 'text-slate-500'}`}>{label}{configured && <span className="block">設定済み</span>}</span>
             </li>;
           })}
         </ol>
@@ -252,16 +256,17 @@ export function SetupWizard({
       </nav>
 
       <section className="mt-5 rounded-2xl border bg-white p-4 shadow-sm sm:p-7">
+        {needsReview && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm">既存設定の確認が必要です。勤務・クラス設定を上書きせず停止しています。サポートへお問い合わせください。</p>}
         {step === 1 && <TenantStep confirmation={hasProfile(setup)} value={draft.tenant} onChange={setTenant} />}
-        {step === 2 && <WorkStep draft={draft} setDraft={setDraft} setSetting={setSetting} />}
-        {step === 3 && <ClassStep rows={draft.classRequirements} setDraft={setDraft} />}
+        {step === 2 && !needsReview && !existingWorkforce && <WorkStep draft={draft} setDraft={setDraft} setSetting={setSetting} />}
+        {step === 3 && !needsReview && !existingWorkforce && <ClassStep rows={draft.classRequirements} setDraft={setDraft} />}
         {step === 4 && <ConsentStep accepted={draft.accepted} setAccepted={(accepted) => setDraft((current) => ({ ...current, accepted }))} setup={setup} />}
         {step === 5 && <CompleteStep setup={setup} />}
         <div className="mt-8 flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-between">
           <button type="button" onClick={back} disabled={busy || step === 1} className="min-h-12 rounded-lg border border-slate-300 px-6 font-semibold disabled:opacity-40">戻る</button>
           {step < 5
-            ? <button type="button" onClick={next} disabled={busy || (step === 4 && !draft.accepted)} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
-            : <button type="button" onClick={complete} disabled={busy} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '完了処理中…' : '初期設定を完了'}</button>}
+            ? <button type="button" onClick={next} disabled={busy || needsReview || (step === 4 && !draft.accepted)} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
+            : <button type="button" onClick={complete} disabled={busy || needsReview} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '完了処理中…' : '初期設定を完了'}</button>}
         </div>
       </section>
     </section>

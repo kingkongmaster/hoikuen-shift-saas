@@ -13,3 +13,5 @@ export function validateSetupStep(step: number, draft: {
   classRequirements: Array<{ weekdayRequired: number }>;
   accepted: boolean;
 }): string[];
+
+export function workforceSetupNeedsReview(setup: SetupState | null | undefined): boolean;

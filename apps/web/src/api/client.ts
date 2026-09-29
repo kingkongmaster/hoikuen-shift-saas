@@ -99,6 +99,8 @@ export type BackupValidation = { valid:boolean; errors:string[]; warnings:string
 export type SetupStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type SetupState = {
   preserveWorkforceSetup?: boolean;
+  workforceSetupState?: 'NEW' | 'COMPLETE' | 'PARTIAL';
+  workforceSetupEvidence?: Record<string, boolean>;
   id: string;
   name: string;
   code: string | null;

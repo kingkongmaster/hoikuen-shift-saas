@@ -9,7 +9,11 @@ export function isSetupComplete(setup) {
 }
 
 export function hasExistingWorkforceSetup(setup) {
-  return Boolean(setup?.preserveWorkforceSetup && setup?.shiftSettings && setup?.classRequirements?.length && setup?.activeStaffCount > 0);
+  return Boolean(setup?.workforceSetupState === 'COMPLETE' && setup?.preserveWorkforceSetup && setup?.shiftSettings && setup?.classRequirements?.length && setup?.activeStaffCount > 0);
+}
+
+export function workforceSetupNeedsReview(setup) {
+  return setup?.workforceSetupState === 'NEW' ? false : !hasExistingWorkforceSetup(setup);
 }
 
 export function resumeSetupStep(setup) {

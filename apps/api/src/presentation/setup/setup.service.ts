@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -12,15 +12,29 @@ export class SetupService {
   constructor(private readonly prisma: PrismaService, private readonly settings: SettingsService) {}
 
   async get(user: AuthenticatedUser) {
-    const [tenant, shiftSettings, classRequirements, activeStaffCount, formalFeature] = await Promise.all([
+    const [tenant, shiftSettings, classRequirements, activeStaffCount, formalFeature, patternCount, ruleCount, departmentCount, assignedStaff, requirementCount] = await Promise.all([
       this.prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { id: true, name: true, code: true, phone: true, postalCode: true, prefecture: true, city: true, addressLine: true, contactName: true, contactEmail: true, timezone: true, setupStatus: true, setupCurrentStep: true, setupCompletedAt: true, termsAcceptedAt: true, privacyAcceptedAt: true, termsVersion: true, privacyVersion: true } }),
       this.prisma.tenantShiftSetting.findUnique({ where: { tenantId: user.tenantId } }), this.prisma.classStaffingRequirement.findMany({ where: { tenantId: user.tenantId } }), this.prisma.staff.count({ where: { tenantId: user.tenantId, isActive: true } }),
       this.prisma.tenantFeature.findUnique({ where: { tenantId_featureCode: { tenantId: user.tenantId, featureCode: 'TENANT_CUSTOM_RULES' } }, select: { configuration: true } }),
+      this.prisma.workPattern.count({ where: { tenantId: user.tenantId, isActive: true } }),
+      this.prisma.staffWorkRule.count({ where: { tenantId: user.tenantId, isActive: true, staff: { isActive: true } } }),
+      this.prisma.department.count({ where: { tenantId: user.tenantId, isActive: true } }),
+      this.prisma.staffDepartmentAssignment.findMany({ where: { tenantId: user.tenantId, isActive: true, staff: { isActive: true }, department: { isActive: true } }, distinct: ['staffId'], select: { staffId: true } }),
+      this.prisma.shiftStaffingRequirement.count({ where: { tenantId: user.tenantId, isActive: true } }),
     ]);
     const provenance = (formalFeature?.configuration as { release1SourceProvenance?: { matrixSourceId?: string } } | null)?.release1SourceProvenance;
-    const preserveWorkforceSetup = Boolean(provenance?.matrixSourceId && shiftSettings && classRequirements.length && activeStaffCount);
+    const workforceSetupEvidence = {
+      shiftSettings: Boolean(shiftSettings), classes: classRequirements.some(row => row.isActive),
+      staff: activeStaffCount > 0, patterns: patternCount > 0, rules: ruleCount > 0,
+      departments: departmentCount > 0,
+      departmentCoverage: activeStaffCount > 0 && assignedStaff.length === activeStaffCount,
+      requirements: requirementCount > 0,
+    };
+    const preserveWorkforceSetup = Object.values(workforceSetupEvidence).every(Boolean);
+    const managedDataExists = Boolean(provenance?.matrixSourceId || patternCount || ruleCount || departmentCount || requirementCount);
+    const workforceSetupState = preserveWorkforceSetup ? 'COMPLETE' : managedDataExists ? 'PARTIAL' : 'NEW';
     const result = this.evaluateSetupRequirements({ tenant, shiftSettings, classRequirements, activeStaffCount });
-    return { ...tenant, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
+    return { ...tenant, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, workforceSetupState, workforceSetupEvidence, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
   }
 
   evaluateSetupRequirements(data: any) {
@@ -53,25 +67,35 @@ export class SetupService {
     return this.get(user);
   }
 
+  private async guardWorkforceSetup(user: AuthenticatedUser) {
+    const state = await this.get(user);
+    if (state.workforceSetupState !== 'NEW') throw new ConflictException({ code: 'EXISTING_WORKFORCE_SETUP_PROTECTED', message: '既存の勤務・部署設定は初回セットアップでは上書きできません。' });
+  }
+
   async updateWorkSettings(user: AuthenticatedUser, input: UpdateShiftSettingDto) {
+    await this.guardWorkforceSetup(user);
     await this.settings.updateSetting(user, input);
     await this.prisma.$transaction((tx) => this.startIfNeeded(user, tx));
     return this.get(user);
   }
 
   async updateClassRequirements(user: AuthenticatedUser, input: UpdateClassRequirementsDto) {
+    await this.guardWorkforceSetup(user);
     await this.settings.updateRequirements(user, input);
     await this.prisma.$transaction((tx) => this.startIfNeeded(user, tx));
     return this.get(user);
   }
 
   async updateProgress(user: AuthenticatedUser, input: UpdateProgressDto) {
+    const state = await this.get(user);
+    if (state.workforceSetupState === 'PARTIAL' && input.currentStep > 1) throw new ConflictException('既存設定の確認が必要です。');
+    const currentStep = state.preserveWorkforceSetup && [2, 3].includes(input.currentStep) ? 4 : input.currentStep;
     await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { setupStatus: true, setupCurrentStep: true } });
       await this.startIfNeeded(user, tx);
-      if (tenant.setupCurrentStep !== input.currentStep && tenant.setupStatus !== 'COMPLETED') {
-        await tx.tenant.update({ where: { id: user.tenantId }, data: { setupCurrentStep: input.currentStep } });
-        await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'SETUP_STEP_UPDATED', targetType: 'Tenant', targetId: user.tenantId, detail: { from: tenant.setupCurrentStep, to: input.currentStep } } });
+      if (tenant.setupCurrentStep !== currentStep && tenant.setupStatus !== 'COMPLETED') {
+        await tx.tenant.update({ where: { id: user.tenantId }, data: { setupCurrentStep: currentStep } });
+        await tx.auditLog.create({ data: { tenantId: user.tenantId, memberId: user.sub, action: 'SETUP_STEP_UPDATED', targetType: 'Tenant', targetId: user.tenantId, detail: { from: tenant.setupCurrentStep, to: currentStep } } });
       }
     });
     return this.get(user);
@@ -92,6 +116,7 @@ export class SetupService {
 
   async complete(user: AuthenticatedUser) {
     const state = await this.get(user);
+    if (state.workforceSetupState === 'PARTIAL') throw new ConflictException('既存設定の確認が必要です。');
     if (!state.canComplete) throw new BadRequestException({ code: 'SETUP_REQUIREMENTS_NOT_MET', missingRequirements: state.missingRequirements });
     await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { setupStatus: true } });
