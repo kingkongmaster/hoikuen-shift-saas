@@ -28,6 +28,19 @@ export function WorkforceReviewStep({setup,step}:{setup:SetupState;step:number})
  })}</ul>
  <details open className="rounded border p-3"><summary className="min-h-11 cursor-pointer font-bold">必要人数</summary><ul className="space-y-3">{requirements.map(({row:x,days},i)=><li key={i} className="border-t pt-3"><strong>{x.workPattern?.name??'勤務全体'}：{x.requiredCount}名</strong><p>{x.attributeDefinition.name} / {dayLabel(days)}{x.classType?` / ${classes[x.classType]??x.classType}`:''}</p><p>{x.constraintLevel==='HARD'?'必須条件':x.constraintLevel==='SOFT'?'優先条件':'参考条件'} / {period(x.startDate,x.endDate)}</p></li>)}</ul></details>
  <details open className="rounded border p-3"><summary className="min-h-11 cursor-pointer font-bold">固定勤務</summary><ul className="space-y-3">{(r.fixedRuleGroups??r.rules.filter(x=>x.ruleType==='FIXED_WORK_PATTERN').map(({dayOfWeek,staffCount,...rule})=>({rule,days:[dayOfWeek],staffCount}))).map(({rule:x,days,staffCount},i)=><li key={i} className="border-t pt-3"><strong>{x.workPattern?.name?`${x.workPattern.name} `:''}固定勤務：{staffCount}名</strong><p>{dayLabel(days)} {x.startTime||x.endTime?`${x.startTime??'指定なし'}〜${x.endTime??'指定なし'}`:''}{x.numericValue!==null?` / 設定値 ${x.numericValue}`:''}</p><p>{x.isHardConstraint?'必須条件':'優先条件'} / {period(x.startDate,x.endDate)}</p></li>)}</ul></details>
+ {r.childcareSupport && <section aria-labelledby="childcare-support-heading" className="rounded border p-3">
+ <h3 id="childcare-support-heading" className="font-bold">子育て支援職員</h3>
+ <p>子育て支援職員：{r.childcareSupport.staffCount}名</p>
+ <p className="text-sm text-slate-600">子育て支援職員に関係する条件です。上の固定勤務の内訳であり、人数を追加して数えるものではありません。</p>
+ <ul className="space-y-3">{r.childcareSupport.fixedGroups.map((x,i)=><li key={i} className="border-t pt-3">
+ <strong>{x.label === '時間固定勤務' ? x.label : `${x.label}固定勤務`}：{x.staffCount}名</strong>
+ <p>{x.startTime ?? '時刻未設定'}〜{x.endTime ?? '時刻未設定'} ｜ {dayLabel(x.days)}{x.days.length===1&&x.days[0]===6?'（出勤時）':''}</p>
+ <p>{x.isHardConstraint?'必須条件':'優先条件'} / {period(x.startDate,x.endDate)}</p>
+ </li>)}</ul>
+ {r.childcareSupport.fixedGroups.length===0&&<p>登録済みの固定勤務条件はありません。</p>}
+ <p>シフト生成対象：{r.childcareSupport.generatorCount}名。固定勤務・曜日・期間・休暇の条件を優先し、自由なローテーションを意味しません。</p>
+ <p className="text-sm text-slate-600">給食室の固定勤務とは別の区分です。部署全体の構成は次の「職員・クラス設定確認」で確認できます。</p>
+ </section>}
  <p>以下は同じ条件の対象人数です。別条件の人数は合算せず、氏名・個人IDは表示しません。</p>
  {ruleSections.map(section=><details key={section.title} open className="rounded border p-3"><summary className="min-h-11 cursor-pointer font-bold">{section.title}</summary>{section.rows.length===0?<p>該当する登録条件はありません。</p>:<ul className="space-y-3">{section.rows.map((x,i)=><li key={i} className="border-t pt-3"><strong>{x.workPattern?.name?`${x.workPattern.name} `:''}{labels[x.ruleType]??'勤務条件'}：対象{x.staffCount}名</strong><p>{dayLabel([x.dayOfWeek])} {x.startTime||x.endTime?`${x.startTime??'指定なし'}〜${x.endTime??'指定なし'}`:''}{x.numericValue!==null?` / 設定値 ${x.numericValue}`:''}</p><p>{x.isHardConstraint?'必須条件':'優先条件'} / {period(x.startDate,x.endDate)}</p></li>)}</ul>}</details>)}
  </>:<>

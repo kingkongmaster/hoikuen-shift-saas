@@ -32,13 +32,42 @@ export function sourceReviewDayScopes(configuration: unknown, patterns: Array<{c
     .map(({code,days,exclusive})=>({code,days,exclusive,basis:'SOURCE_REVIEW_ONLY' as const,sourceId:'MUSUBI-2026-035',matrixSourceId:provenance.matrixSourceId}));
 }
 
+// Department membership is resolved on the server; identities and free-form rule text never leave it.
+export function childcareSupportReview(
+  departments: Array<{ code?: string; staffAssignments: Array<{ staffId: string }> }>,
+  rules: Array<{ staffId: string; ruleType: string; dayOfWeek: number | null; startDate: Date | null; endDate: Date | null; startTime: string | null; endTime: string | null; isHardConstraint: boolean; workPattern: { code: string; name: string } | null }>,
+  patterns: Array<{ code: string; name: string; startTime: string | null; endTime: string | null; isWorking: boolean }>,
+  excluded: Set<string>,
+) {
+  const members = new Set(departments.filter(d => d.code === 'CHILDCARE_SUPPORT').flatMap(d => d.staffAssignments.map(a => a.staffId)));
+  if (!members.size) return null;
+  const fixed = rules.filter(r => members.has(r.staffId) && r.ruleType === 'FIXED_WORK_PATTERN');
+  const groups = groupFixedRules(fixed.map(r => {
+    const pattern = patterns.find(p => p.code === r.workPattern?.code && p.isWorking);
+    return {
+      staffId: r.staffId, ruleType: r.ruleType, dayOfWeek: r.dayOfWeek,
+      // Keep pattern identity internally for grouping, but do not send employee-bearing codes/names.
+      patternKey: r.workPattern?.code ?? null,
+      label: pattern && /^[①-⑳]$/.test(pattern.name) ? pattern.name : '時間固定勤務',
+      startTime: r.startTime ?? pattern?.startTime ?? null,
+      endTime: r.endTime ?? pattern?.endTime ?? null,
+      startDate: r.startDate, endDate: r.endDate, isHardConstraint: r.isHardConstraint,
+    };
+  })).map(({rule, days, staffCount}) => ({
+    label: rule.label as string, startTime: rule.startTime as string | null, endTime: rule.endTime as string | null,
+    startDate: rule.startDate as string | null, endDate: rule.endDate as string | null,
+    isHardConstraint: rule.isHardConstraint as boolean, days: days.sort((a,b) => (a ?? -1) - (b ?? -1)), staffCount,
+  })).sort((a,b) => (a.days[0] ?? -1) - (b.days[0] ?? -1) || (a.startTime ?? '').localeCompare(b.startTime ?? ''));
+  return { staffCount: members.size, generatorCount: [...members].filter(id => !excluded.has(id)).length, fixedGroups: groups };
+}
+
 export async function workforceReview(prisma: PrismaService, tenantId: string, fiscalYearStartMonth: number) {
   const [staff, patterns, requirements, rules, departments, attributes, feature] = await Promise.all([
     prisma.staff.count({ where: { tenantId, isActive: true } }),
     prisma.workPattern.findMany({ where: { tenantId, isActive: true }, orderBy: [{ displayOrder: 'asc' }, { code: 'asc' }], select: { code: true, name: true, startTime: true, endTime: true, isWorking: true } }),
     prisma.shiftStaffingRequirement.findMany({ where: { tenantId, isActive: true }, orderBy: { code: 'asc' }, select: { workPattern: { select: { code: true, name: true } }, attributeDefinition: { select: { code: true, name: true } }, classType: true, dayOfWeek: true, startDate: true, endDate: true, requiredCount: true, constraintLevel: true } }),
     prisma.staffWorkRule.findMany({ where: { tenantId, isActive: true, staff: { isActive: true } }, select: { staffId: true, ruleType: true, dayOfWeek: true, startDate: true, endDate: true, startTime: true, endTime: true, numericValue: true, isHardConstraint: true, workPattern: { select: { code: true, name: true } } } }),
-    prisma.department.findMany({ where: { tenantId, isActive: true }, orderBy: [{ displayOrder: 'asc' }, { code: 'asc' }], select: { name: true, staffAssignments: { where: { isActive: true, staff: { isActive: true } }, select: { staffId: true } } } }),
+    prisma.department.findMany({ where: { tenantId, isActive: true }, orderBy: [{ displayOrder: 'asc' }, { code: 'asc' }], select: { code: true, name: true, staffAssignments: { where: { isActive: true, staff: { isActive: true } }, select: { staffId: true } } } }),
     prisma.staffAttributeAssignment.findMany({ where: { tenantId, staff: { isActive: true }, isActive: true, attributeDefinition: { isActive: true, code: { in: ['GENERATOR_EXCLUDED', 'FIXED_ASSIGNMENT'] } } }, select: { staffId: true, attributeDefinition: { select: { code: true } } } }),
     prisma.tenantFeature.findUnique({where:{tenantId_featureCode:{tenantId,featureCode:'TENANT_CUSTOM_RULES'}},select:{configuration:true}}),
   ]);
@@ -55,5 +84,5 @@ export async function workforceReview(prisma: PrismaService, tenantId: string, f
   const digest = createHash('sha256').update(JSON.stringify(summary)).digest('hex');
   const evidence = await prisma.auditLog.findMany({ where: { tenantId, action: 'SETUP_STEP_UPDATED', detail: { path: ['reviewDigest'], equals: digest } }, select: { detail: true } });
   const sections = evidence.map(e => (e.detail as { confirmedSection?: string })?.confirmedSection);
-  return { ...summary, sourceDayScopes: sourceReviewDayScopes(feature?.configuration, patterns), fixedRuleGroups: groupFixedRules(rules), digest, workConfirmed: sections.includes('WORK_SETTINGS'), staffConfirmed: sections.includes('STAFF_CLASSES') };
+  return { ...summary, childcareSupport: childcareSupportReview(departments, rules, patterns, excluded), sourceDayScopes: sourceReviewDayScopes(feature?.configuration, patterns), fixedRuleGroups: groupFixedRules(rules), digest, workConfirmed: sections.includes('WORK_SETTINGS'), staffConfirmed: sections.includes('STAFF_CLASSES') };
 }

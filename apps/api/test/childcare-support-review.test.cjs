@@ -1,0 +1,29 @@
+const assert=require('node:assert/strict');
+const {childcareSupportReview,workforceReview}=require('../dist/presentation/setup/workforce-review');
+const departments=[{code:'CHILDCARE_SUPPORT',name:'Support',staffAssignments:[{staffId:'support-a'},{staffId:'support-b'},{staffId:'support-a'}]},{code:'CHILDCARE',name:'Care',staffAssignments:[{staffId:'care-a'}]},{code:'FOOD_SERVICE',name:'Food',staffAssignments:[{staffId:'food-a'}]}];
+const patterns=[{code:'A',name:'①',startTime:'07:00',endTime:'15:00',isWorking:true},{code:'PERSONAL_PRIVATE',name:'PRIVATE_NAME',startTime:'09:00',endTime:'16:00',isWorking:true},{code:'SAT',name:'⑦',startTime:'07:00',endTime:'14:00',isWorking:true},{code:'B',name:'②',startTime:'08:00',endTime:'16:00',isWorking:true}];
+const rule=(staffId,code,dayOfWeek,extra={})=>({staffId,ruleType:'FIXED_WORK_PATTERN',dayOfWeek,startDate:null,endDate:null,startTime:null,endTime:null,numericValue:null,isHardConstraint:true,workPattern:{code,name:patterns.find(p=>p.code===code).name},...extra});
+const rows=[...[1,2,3,4,5].flatMap(d=>[rule('support-a','A',d),rule('support-b','PERSONAL_PRIVATE',d)]),rule('support-a','SAT',6),rule('support-b','SAT',6),rule('care-a','B',1),rule('food-a','A',1)];
+const before=JSON.stringify({departments,patterns,rows});
+const review=childcareSupportReview(departments,rows,patterns,new Set(['food-a']));
+assert.equal(review.staffCount,2);assert.equal(review.generatorCount,2);
+assert.deepEqual(review.fixedGroups.map(g=>[g.label,g.staffCount,g.days]),[['①',1,[1,2,3,4,5]],['時間固定勤務',1,[1,2,3,4,5]],['⑦',2,[6]]]);
+assert.ok(!/staffId|support-a|support-b|PRIVATE|②|food-a/.test(JSON.stringify(review)));
+assert.equal(JSON.stringify({departments,patterns,rows}),before);
+assert.equal(childcareSupportReview([],rows,patterns,new Set()),null);
+assert.equal(childcareSupportReview(departments,rows,patterns,new Set(['support-b'])).generatorCount,1);
+// Different people, periods, null weekdays and HARD/SOFT must not be merged.
+const exceptional=[rule('support-a','A',1),rule('support-b','A',2),rule('support-a','A',null),rule('support-a','A',1,{endDate:new Date('2030-03-31')}),rule('support-a','A',1,{isHardConstraint:false})];
+assert.equal(childcareSupportReview(departments,exceptional,patterns,new Set()).fixedGroups.length,5);
+assert.equal(childcareSupportReview(departments,[rule('support-a','A',1,{startTime:'07:15',endTime:'15:15'})],patterns,new Set()).fixedGroups[0].startTime,'07:15');
+(async()=>{
+ const tenant='synthetic-tenant';const read=value=>({findMany:async args=>{assert.equal(args.where.tenantId,tenant);return value;}});
+ const db={staff:{count:async()=>23},workPattern:read(patterns),shiftStaffingRequirement:read([]),staffWorkRule:read(rows),department:read(departments),staffAttributeAssignment:read([{staffId:'food-a',attributeDefinition:{code:'GENERATOR_EXCLUDED'}}]),auditLog:read([]),tenantFeature:{findUnique:async()=>null}};
+ const result=await workforceReview(db,tenant,4);
+ const {childcareSupport,sourceDayScopes,fixedRuleGroups,digest,workConfirmed,staffConfirmed,...summary}=result;
+ assert.deepEqual(childcareSupport,review);
+ assert.equal(digest,require('node:crypto').createHash('sha256').update(JSON.stringify(summary)).digest('hex'));
+ assert.equal(workConfirmed,false);assert.equal(staffConfirmed,false);
+ assert.equal(JSON.stringify({departments,patterns,rows}),before);
+ console.log('CHILDCARE_SUPPORT_PASS membership-derived counts; no identities; fixed conditions only; date/day/time/hardness preserved; department/food separation; digest unchanged; tenant query scope; writes0');
+})().catch(e=>{console.error(e.name,e.message);process.exitCode=1;});
