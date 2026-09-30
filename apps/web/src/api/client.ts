@@ -101,8 +101,8 @@ export type WorkforceReview = {
   digest: string; workConfirmed: boolean; staffConfirmed: boolean; fiscalYearStartMonth: number;
   staffCount: number; generatorCount: number; excludedCount: number; fixedAttributeCount: number;
   patterns: Array<{code: string; name: string; startTime: string | null; endTime: string | null; isWorking: boolean}>;
-  requirements: Array<{workPattern: {name: string} | null; attributeDefinition: {name: string}; classType: string | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; requiredCount: number; constraintLevel: string}>;
-  rules: Array<{ruleType: string; workPattern: {name: string} | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; startTime: string | null; endTime: string | null; numericValue: number | null; isHardConstraint: boolean; staffCount: number}>;
+  requirements: Array<{workPattern: {code: string; name: string} | null; attributeDefinition: {code: string; name: string}; classType: string | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; requiredCount: number; constraintLevel: string}>;
+  rules: Array<{ruleType: string; workPattern: {code: string; name: string} | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; startTime: string | null; endTime: string | null; numericValue: number | null; isHardConstraint: boolean; staffCount: number}>;
   departments: Array<{name: string; staffCount: number; fixedCount: number; excludedCount: number}>;
 };
 export type SetupState = {

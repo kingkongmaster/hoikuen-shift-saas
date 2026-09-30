@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+const source=fs.readFileSync(new URL('../src/features/setup/workforce-review-display.ts',import.meta.url),'utf8');
+const {dayLabel,groupDays,displayPatterns,patternDays}=await import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2020}}).outputText).toString('base64'));
+assert.equal(dayLabel([5,1,2,4,3]),'月〜金');assert.equal(dayLabel([6]),'土曜日');assert.equal(dayLabel([1,3,5]),'月曜日・水曜日・金曜日');assert.equal(dayLabel([null]),'曜日指定なし');assert.equal(dayLabel([]),'曜日設定なし');
+const req=(dayOfWeek,code='A',requiredCount=2,startDate=null)=>({workPattern:{code,name:'同名'},attributeDefinition:{code:'STAFF',name:'人数'},classType:null,dayOfWeek,requiredCount,startDate,endDate:null,constraintLevel:'HARD'});
+const rows=[...[1,2,3,4,5].map(d=>req(d)),req(6,'A',1),req(1,'OTHER'),req(1,'A',2,'2030-01-01'),req(1),req(null)];const before=JSON.stringify(rows);const groups=groupDays(rows);
+assert.equal(groups[0].days.length,5);assert.equal(groups.length,6);
+const canonical=x=>JSON.stringify(Object.fromEntries(Object.entries(x).sort(([a],[b])=>a.localeCompare(b))));
+assert.deepEqual(groups.flatMap(g=>g.days.map(dayOfWeek=>canonical({...g.row,dayOfWeek}))).sort(),rows.map(canonical).sort());assert.equal(JSON.stringify(rows),before);
+assert.equal(patternDays('MISSING',rows).length,0);assert.equal(patternDays('OTHER',rows).length,1);
+const patterns=['固定','⑨','⑥','普通出（土曜）','①','普通出','②','③','④','⑤','⑦','⑧'].map((name,i)=>({name,code:'CODE'+i,startTime:'08:00',endTime:'16:00',isWorking:true}));const patternBefore=JSON.stringify(patterns);const sorted=displayPatterns(patterns);
+assert.deepEqual(sorted.slice(0,11).map(x=>x.name),['普通出','普通出（土曜）','①','②','③','④','⑤','⑥','⑦','⑧','⑨']);assert.equal(JSON.stringify(patterns),patternBefore);assert.deepEqual(sorted.map(x=>x.code).sort(),patterns.map(x=>x.code).sort());
+console.log('WORKFORCE_REVIEW_DISPLAY_PASS weekday groups, gaps, null, duplicate preservation, code isolation, periods/count differences, stable read-only order');
