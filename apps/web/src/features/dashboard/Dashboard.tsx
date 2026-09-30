@@ -4,6 +4,7 @@ import { AuditLogManagement } from '../audit/AuditLogManagement';
 import { DataExportManagement } from '../exports/DataExportManagement';
 import { NotificationManagement } from '../notifications/NotificationManagement';
 import { RequestManagement } from '../requests/RequestManagement';
+import { RegisteredSetupReview } from '../setup/RegisteredSetupReview';
 import { ShiftSettings } from '../settings/ShiftSettings';
 import { ShiftSwapManagement } from '../shift-swaps/ShiftSwapManagement';
 import { ShiftManagement } from '../shifts/ShiftManagement';
@@ -20,7 +21,7 @@ import { AnnualWorkSummaryManagement } from '../staff/AnnualWorkSummaryManagemen
 import { PaidLeaveManagement } from '../staff/PaidLeaveManagement';
 import { TenantCalendarManagement } from '../calendar/TenantCalendarManagement';
 
-type View = 'home' | 'calendar' | 'tenant-calendar' | 'mypage' | 'staff' | 'annual-work' | 'paid-leave' | 'requests' | 'shifts' | 'settings' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
+type View = 'home' | 'calendar' | 'tenant-calendar' | 'mypage' | 'staff' | 'annual-work' | 'paid-leave' | 'requests' | 'shifts' | 'settings' | 'registered-review' | 'work-patterns' | 'notifications' | 'swaps' | 'audit' | 'exports' | 'subscription' | 'feedback' | 'updates' | 'musubi-demo';
 const roleLabels = { ADMIN: '管理者', DIRECTOR: '園長', CHIEF: '主任', STAFF: '一般職員' } as const;
 const musubiBeta = import.meta.env.VITE_RELEASE_CHANNEL === 'musubi-beta';
 const viewInfo: Record<View, { title: string; description: string }> = {
@@ -33,6 +34,7 @@ const viewInfo: Record<View, { title: string; description: string }> = {
   'paid-leave': { title: '有給管理', description: '人間が確認した有給の付与・取得・残高・履歴を管理します。' },
   requests: { title: '希望休管理', description: '希望休の申請と確認を行います。' },
   shifts: { title: '月間シフト管理', description: '月間勤務表を確認・管理します。' },
+  'registered-review': { title: '登録内容の確認', description: '登録済みの勤務・職員・クラス設定を確認します。' },
   settings: { title: '園設定', description: '必要人数、勤務ルール、クラス配置、休園日を管理します。' },
   'work-patterns': { title: '勤務パターン管理', description: '勤務区分の時間、名称、表示を管理します。' },
   notifications: { title: '通知', description: '自分宛のお知らせを確認します。' },
@@ -149,7 +151,8 @@ function ViewContent({ view, session, isAdmin, canManageShifts, onUnreadChange, 
     : view === 'paid-leave' && canManageShifts ? <PaidLeaveManagement token={session.accessToken} />
     : view === 'work-patterns' && isAdmin ? <WorkPatternManagement token={session.accessToken} />
     : view === 'requests' ? <RequestManagement session={session} />
-      : view === 'settings' && canManageShifts ? <ShiftSettings session={session} />
+      : view === 'registered-review' && isAdmin ? <RegisteredSetupReview session={session} onBack={() => onNavigate('settings')} />
+      : view === 'settings' && canManageShifts ? <ShiftSettings session={session} onReview={isAdmin ? () => onNavigate('registered-review') : undefined} />
         : view === 'subscription' && canManageShifts ? <SubscriptionInfo session={session} />
           : view === 'notifications' ? <NotificationManagement session={session} onUnreadChange={onUnreadChange} onNavigate={onNavigate} />
             : view === 'swaps' ? <ShiftSwapManagement session={session} />
