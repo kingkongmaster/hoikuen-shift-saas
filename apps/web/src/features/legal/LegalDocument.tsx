@@ -39,6 +39,8 @@ export function LegalConsent({ setup, setAccepted }: { setup: SetupState; accept
   const ready = legalConsentAvailable(setup);
   const [terms, setTerms] = useState(false);
   const [privacy, setPrivacy] = useState(false);
+  if (setup.legalConsentVerified && ready) return <section aria-label="利用条件の確認"><h2 className="text-2xl font-bold">利用規約・プライバシーポリシー 同意済み</h2><p>現在の文書と既存の本人同意が一致しています。再同意は不要です。</p><DocumentReader kind="terms" /><DocumentReader kind="privacy" /></section>;
+  if (setup.legalConsentStatus === 'EVIDENCE_MISMATCH') return <section aria-label="利用条件の確認"><h2 className="text-2xl font-bold">利用規約</h2><p role="alert">既存の同意証跡を確認できません。再同意せず運営窓口へご確認ください。</p><DocumentReader kind="terms" /><DocumentReader kind="privacy" /></section>;
   return <section aria-label="利用条件の確認"><h2 className="text-2xl font-bold">利用規約</h2><p className="mt-3 text-base leading-7">全文を確認し、施設を代表して同意する権限があることをご確認ください。職員本人への必要な説明や同意を代替するものではありません。</p>
     <div className="mt-5 grid gap-4"><DocumentReader kind="terms" /><DocumentReader kind="privacy" /></div>
     {!ready && <p role="alert" className="mt-4 rounded border border-amber-700 bg-amber-50 p-3 text-amber-950">正式文面の承認待ち、または表示文書とサーバーの版が一致しません。同意せず運営窓口へご確認ください。</p>}

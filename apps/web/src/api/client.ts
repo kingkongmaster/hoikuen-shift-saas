@@ -139,6 +139,8 @@ export type SetupState = {
   legalRelease?: { approved: boolean; effectiveDate: string | null; termsHash: string; privacyHash: string };
   currentTermsVersion: string;
   currentPrivacyVersion: string;
+  legalConsentVerified?: boolean;
+  legalConsentStatus?: 'VERIFIED' | 'NOT_ACCEPTED' | 'OUTDATED' | 'EVIDENCE_MISMATCH';
   termsVersionCurrent: boolean;
   privacyVersionCurrent: boolean;
   canComplete: boolean;

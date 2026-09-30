@@ -25,6 +25,8 @@ export function resumeSetupStep(setup) {
     if (!setup.workforceReview?.workConfirmed) return 2;
     if (normalized > 2 && !setup.workforceReview?.staffConfirmed) return 3;
   }
+  if (normalized >= 4 && setup?.legalConsentVerified && setup?.canComplete) return 5;
+  if (normalized >= 5 && setup?.legalConsentVerified === false) return 4;
   return normalized;
 }
 

@@ -62,7 +62,7 @@ for (const endpoint of [
 }
 assert.ok(wizardSource.includes('sm:grid-cols-2'), 'レスポンシブレイアウトを持つ');
 assert.ok(wizardSource.includes("setToast({ kind: 'error'"), 'API失敗をToast表示する');
-assert.ok(wizardSource.includes('setStep(nextStep)'), '保存後にStep遷移する');
+assert.ok(wizardSource.includes('setStep(resumeSetupStep(progressed))'), '保存後にStep遷移する');
 assert.ok(wizardSource.includes('onComplete(completed)'), '完了後にDashboardへ進める');
 
 console.log('Sprint 9-B2 Web tests: PASS (Step遷移・保存契約・途中再開・完了・完了済みスキップ・権限制御・390px・入力検証)');
@@ -84,3 +84,7 @@ assert.equal(resumeSetupStep({setupStatus:'COMPLETED',setupCurrentStep:7,termsVe
 
 assert.equal(resumeSetupStep({...existing,setupCurrentStep:4,workforceReview:{workConfirmed:false,staffConfirmed:false}}),2);
 assert.equal(resumeSetupStep({...existing,setupCurrentStep:4,workforceReview:{workConfirmed:true,staffConfirmed:false}}),3);
+
+assert.equal(resumeSetupStep({...existing,setupCurrentStep:4,workforceReview:{workConfirmed:true,staffConfirmed:true},legalConsentVerified:true,canComplete:true}),5);
+assert.equal(resumeSetupStep({...existing,setupCurrentStep:4,workforceReview:{workConfirmed:true,staffConfirmed:false},legalConsentVerified:true,canComplete:true}),3);
+for(const status of ['OUTDATED','NOT_ACCEPTED','EVIDENCE_MISMATCH'])assert.equal(resumeSetupStep({...existing,setupCurrentStep:5,workforceReview:{workConfirmed:true,staffConfirmed:true},legalConsentVerified:false,legalConsentStatus:status,canComplete:false}),4);

@@ -5,6 +5,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { UpdateClassRequirementsDto, UpdateShiftSettingDto } from '../settings/settings.dto';
 import { LEGAL_RELEASE, PRIVACY_VERSION, TERMS_VERSION } from './setup.constants';
+import { legalConsentState } from './legal-consent-state';
 import { workforceReview } from './workforce-review';
 import { UpdateConsentsDto, UpdateProgressDto, UpdateTenantDto } from './setup.dto';
 
@@ -35,9 +36,13 @@ export class SetupService {
     const managedDataExists = Boolean(provenance?.matrixSourceId || patternCount || ruleCount || departmentCount || requirementCount);
     const workforceSetupState = preserveWorkforceSetup ? 'COMPLETE' : managedDataExists ? 'PARTIAL' : 'NEW';
     const review = workforceSetupState === 'COMPLETE' ? await workforceReview(this.prisma, user.tenantId, shiftSettings!.fiscalYearStartMonth) : null;
+    const consent = await legalConsentState(this.prisma, user.tenantId, user.sub, tenant);
     const result = this.evaluateSetupRequirements({ tenant, shiftSettings, classRequirements, activeStaffCount });
+    result.termsVersionCurrent = consent.termsVerified;
+    result.privacyVersionCurrent = consent.privacyVerified;
+    if (!consent.legalConsentVerified) { result.canComplete = false; if (consent.legalConsentStatus === 'EVIDENCE_MISMATCH') result.missingRequirements.push('LEGAL_CONSENT_EVIDENCE_MISMATCH'); }
     if (review && tenant.setupStatus !== 'COMPLETED' && (!review.workConfirmed || !review.staffConfirmed)) { result.canComplete = false; result.missingRequirements.push('WORKFORCE_REVIEW_REQUIRED'); }
-    return { ...tenant, workforceReview: review, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, workforceSetupState, workforceSetupEvidence, legalRelease: LEGAL_RELEASE, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
+    return { ...tenant, workforceReview: review, tenant: { id: tenant.id, name: tenant.name, code: tenant.code }, shiftSettings, classRequirements, activeStaffCount, preserveWorkforceSetup, workforceSetupState, workforceSetupEvidence, legalConsentVerified: consent.legalConsentVerified, legalConsentStatus: consent.legalConsentStatus, legalRelease: LEGAL_RELEASE, currentTermsVersion: TERMS_VERSION, currentPrivacyVersion: PRIVACY_VERSION, ...result };
   }
 
   evaluateSetupRequirements(data: any) {
@@ -94,6 +99,7 @@ export class SetupService {
     const state = await this.get(user);
     if (state.workforceSetupState === 'PARTIAL' && input.currentStep > 1) throw new ConflictException('既存設定の確認が必要です。');
     const currentStep = input.currentStep;
+    if (currentStep >= 5 && !state.legalConsentVerified) throw new ConflictException('現在の利用条件への同意と設定確認が必要です。');
     const review = state.workforceReview;
     if (input.confirmedSection && (!review || input.reviewDigest !== review.digest)) throw new ConflictException('設定が更新されています。再読込して確認してください。');
     if (input.confirmedSection === 'WORK_SETTINGS' && currentStep !== 3) throw new BadRequestException('勤務設定確認の遷移が不正です。');
@@ -117,6 +123,7 @@ export class SetupService {
   async updateConsents(user: AuthenticatedUser, input: UpdateConsentsDto) {
     const state = await this.get(user);
     if (state.workforceSetupState === 'PARTIAL' || (state.workforceReview && state.setupStatus !== 'COMPLETED' && (!state.workforceReview.workConfirmed || !state.workforceReview.staffConfirmed))) throw new ConflictException('既存設定を順番に確認してください。');
+    if (state.legalConsentStatus === 'EVIDENCE_MISMATCH') throw new ConflictException({ code: 'LEGAL_CONSENT_EVIDENCE_MISMATCH', message: '既存の同意証跡を確認できません。再同意せず運営窓口へご確認ください。' });
     if (!LEGAL_RELEASE.approved || !LEGAL_RELEASE.effectiveDate) throw new ConflictException({ code: 'LEGAL_RELEASE_NOT_APPROVED', message: '正式文面は確認中です。まだ同意を取得できません。' });
     if (input.termsVersion !== TERMS_VERSION || input.privacyVersion !== PRIVACY_VERSION || input.termsHash !== LEGAL_RELEASE.termsHash || input.privacyHash !== LEGAL_RELEASE.privacyHash) throw new ConflictException({ code: 'LEGAL_VERSION_CHANGED', message: '文書が更新されています。再読込して全文を確認してください。' });
     if (input.acceptTerms !== true || input.acceptPrivacy !== true) throw new BadRequestException('両方の文書への明示的な同意が必要です。');
@@ -124,6 +131,9 @@ export class SetupService {
       // Serialize concurrent consent requests for one tenant; keep evidence append-only.
       await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${user.tenantId}::uuid FOR UPDATE`;
       const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { termsAcceptedAt: true, termsVersion: true, privacyAcceptedAt: true, privacyVersion: true } });
+      const evidenceState = await legalConsentState(tx, user.tenantId, user.sub, tenant);
+      if (evidenceState.legalConsentStatus === 'EVIDENCE_MISMATCH') throw new ConflictException('既存の同意証跡を確認できません。');
+      if (evidenceState.legalConsentVerified) return;
       await this.startIfNeeded(user, tx);
       const data: Prisma.TenantUpdateInput = {};
       const agreedAt = new Date();

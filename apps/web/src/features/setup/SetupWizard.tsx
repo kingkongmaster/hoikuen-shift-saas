@@ -172,12 +172,13 @@ export function SetupWizard({
         })),
       );
     }
+    if (setup.legalConsentVerified) return setup;
     return api.updateSetupConsents(session.accessToken, { acceptTerms: true, acceptPrivacy: true, termsVersion: setup.currentTermsVersion, privacyVersion: setup.currentPrivacyVersion, termsHash: setup.legalRelease!.termsHash, privacyHash: setup.legalRelease!.privacyHash });
   }
 
   async function next() {
-    if (needsReview || (step === 4 && !legalConsentAvailable(setup))) return;
-    const errors = existingWorkforce && (step === 2 || step === 3) ? [] : validateSetupStep(step, draft);
+    if (needsReview || (step === 4 && (!legalConsentAvailable(setup) || setup.legalConsentStatus === 'EVIDENCE_MISMATCH'))) return;
+    const errors = existingWorkforce && (step === 2 || step === 3) ? [] : validateSetupStep(step, { ...draft, accepted: draft.accepted || Boolean(setup.legalConsentVerified) });
     if (errors.length) {
       setToast({ kind: 'error', text: errors[0] });
       return;
@@ -190,7 +191,7 @@ export function SetupWizard({
       setSetup(saved);
       const progressed = await api.updateSetupProgress(session.accessToken, nextStep, existingWorkforce && (step === 2 || step === 3) ? {confirmedSection: step === 2 ? 'WORK_SETTINGS' : 'STAFF_CLASSES', reviewDigest: setup.workforceReview!.digest} : undefined);
       setSetup(progressed);
-      setStep(nextStep);
+      setStep(resumeSetupStep(progressed));
       setToast({ kind: 'success', text: `${steps[step - 1]}を確認しました。` });
       if (step === 4) setDraft((current) => ({ ...current, accepted: saved.termsVersionCurrent && saved.privacyVersionCurrent }));
     } catch (error) {
@@ -270,7 +271,7 @@ export function SetupWizard({
         <div className="mt-8 flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-between">
           <button type="button" onClick={back} disabled={busy || step === 1} className="min-h-12 rounded-lg border border-slate-300 px-6 font-semibold disabled:opacity-40">戻る</button>
           {step < 5
-            ? <button type="button" onClick={next} disabled={busy || needsReview || (step === 4 && (!draft.accepted || !legalConsentAvailable(setup)))} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : existingWorkforce && step === 2 ? '勤務設定を確認しました' : existingWorkforce && step === 3 ? '職員・クラス設定を確認しました' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : '保存して次へ'}</button>
+            ? <button type="button" onClick={next} disabled={busy || needsReview || (step === 4 && ((!draft.accepted && !setup.legalConsentVerified) || !legalConsentAvailable(setup) || setup.legalConsentStatus === 'EVIDENCE_MISMATCH'))} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '保存中…' : existingWorkforce && step === 2 ? '勤務設定を確認しました' : existingWorkforce && step === 3 ? '職員・クラス設定を確認しました' : step === 1 && !profilePatch(setup, draft.tenant) ? '確認して次へ' : step === 4 && setup.legalConsentVerified ? '完了画面へ' : '保存して次へ'}</button>
             : <button type="button" onClick={complete} disabled={busy || needsReview} className="min-h-12 rounded-lg bg-emerald-700 px-8 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{busy ? '完了処理中…' : '初期設定を完了'}</button>}
         </div>
       </section>
