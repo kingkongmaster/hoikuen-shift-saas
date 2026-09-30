@@ -20,8 +20,9 @@ assert.equal(childcareSupportReview(departments,[rule('support-a','A',1,{startTi
  const tenant='synthetic-tenant';const read=value=>({findMany:async args=>{assert.equal(args.where.tenantId,tenant);return value;}});
  const db={staff:{count:async()=>23},workPattern:read(patterns),shiftStaffingRequirement:read([]),staffWorkRule:read(rows),department:read(departments),staffAttributeAssignment:read([{staffId:'food-a',attributeDefinition:{code:'GENERATOR_EXCLUDED'}}]),auditLog:read([]),tenantFeature:{findUnique:async()=>null}};
  const result=await workforceReview(db,tenant,4);
- const {childcareSupport,sourceDayScopes,fixedRuleGroups,digest,workConfirmed,staffConfirmed,...summary}=result;
+ const {departmentDisplayNames,childcareSupport,sourceDayScopes,fixedRuleGroups,digest,workConfirmed,staffConfirmed,...summary}=result;
  assert.deepEqual(childcareSupport,review);
+ assert.deepEqual(departmentDisplayNames,['子育て支援','Care','Food']);
  assert.equal(digest,require('node:crypto').createHash('sha256').update(JSON.stringify(summary)).digest('hex'));
  assert.equal(workConfirmed,false);assert.equal(staffConfirmed,false);
  assert.equal(JSON.stringify({departments,patterns,rows}),before);

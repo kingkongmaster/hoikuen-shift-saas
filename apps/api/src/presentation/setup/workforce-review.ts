@@ -84,5 +84,5 @@ export async function workforceReview(prisma: PrismaService, tenantId: string, f
   const digest = createHash('sha256').update(JSON.stringify(summary)).digest('hex');
   const evidence = await prisma.auditLog.findMany({ where: { tenantId, action: 'SETUP_STEP_UPDATED', detail: { path: ['reviewDigest'], equals: digest } }, select: { detail: true } });
   const sections = evidence.map(e => (e.detail as { confirmedSection?: string })?.confirmedSection);
-  return { ...summary, childcareSupport: childcareSupportReview(departments, rules, patterns, excluded), sourceDayScopes: sourceReviewDayScopes(feature?.configuration, patterns), fixedRuleGroups: groupFixedRules(rules), digest, workConfirmed: sections.includes('WORK_SETTINGS'), staffConfirmed: sections.includes('STAFF_CLASSES') };
+  return { ...summary, departmentDisplayNames: departments.map(d => d.code === 'CHILDCARE_SUPPORT' ? '子育て支援' : d.name), childcareSupport: childcareSupportReview(departments, rules, patterns, excluded), sourceDayScopes: sourceReviewDayScopes(feature?.configuration, patterns), fixedRuleGroups: groupFixedRules(rules), digest, workConfirmed: sections.includes('WORK_SETTINGS'), staffConfirmed: sections.includes('STAFF_CLASSES') };
 }

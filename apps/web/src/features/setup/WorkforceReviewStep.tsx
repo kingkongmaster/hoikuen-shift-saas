@@ -46,8 +46,16 @@ export function WorkforceReviewStep({setup,step}:{setup:SetupState;step:number})
  </>:<>
  <dl className="grid gap-3 sm:grid-cols-2">{[['職員',r.staffCount],['シフト生成対象',r.generatorCount],['自動生成から除外',r.excludedCount],['固定勤務属性',r.fixedAttributeCount]].map(([label,n])=><div key={label} className="rounded border bg-slate-50 p-3"><dt>{label}</dt><dd className="text-xl font-bold">{n}名</dd></div>)}</dl>
  <p>登録済みの除外・固定属性に基づく人数です。日別の勤務可否は曜日・期間・休暇等の条件でも変わります。</p>
- <h3 className="font-bold">部署構成</h3><ul className="space-y-2">{r.departments.map((x,i)=><li key={i} className="rounded border p-3">{x.name}：{x.staffCount}名（固定{x.fixedCount}名・生成対象外{x.excludedCount}名）</li>)}</ul>
- <h3 className="font-bold">クラス構成・必要人数</h3><ul className="space-y-2">{setup.classRequirements.filter(x=>x.isActive).map(x=><li key={x.classType} className="rounded border p-3">{classes[x.classType]??x.classType}：平日{x.weekdayRequired}名 / 土曜{x.saturdayRequired}名</li>)}</ul>
+ <h3 className="font-bold">部署構成</h3><ul className="space-y-2">{r.departments.map((x,i)=><li key={i} className="rounded border p-3">{r.departmentDisplayNames?.[i]??x.name}：{x.staffCount}名（固定{x.fixedCount}名・生成対象外{x.excludedCount}名）</li>)}</ul>
+ <h3 className="font-bold">クラス構成・必要人数</h3><ul className="space-y-2">{setup.classRequirements.filter(x=>x.isActive).map(x=><li key={x.classType} className="rounded border p-3">{classes[x.classType]??x.classType}：平日{x.weekdayRequired}名{x.saturdayRequired>0?` / 土曜${x.saturdayRequired}名`:null}</li>)}</ul>
+ <section aria-labelledby="saturday-review-heading" className="rounded border p-3">
+ <h3 id="saturday-review-heading" className="font-bold">土曜日</h3>
+ {!setup.classRequirements.some(x=>x.isActive&&x.saturdayRequired>0)&&!r.requirements.some(x=>x.classType&&(x.dayOfWeek===6||x.dayOfWeek===null))&&<p>クラス別人数設定なし</p>}
+ {setup.shiftSettings?<p>園全体：最低{setup.shiftSettings.saturdayMinimumStaff}名</p>:<p>園全体の最低人数：未設定</p>}
+ {setup.shiftSettings?.saturdayOperationEnabled===false&&<p>土曜運用は無効に設定されています。</p>}
+ <p className="text-sm text-slate-600">園全体の最低人数と、勤務・役割ごとの必要人数は別の設定です。以下の人数は重複する場合があるため、合算しません。</p>
+ <ul className="space-y-3">{displayRequirements(r.requirements.filter(x=>x.dayOfWeek===6||x.dayOfWeek===null)).map((x,i)=><li key={i} className="border-t pt-3"><strong>{x.workPattern?.name??'勤務全体'}：{x.requiredCount}名</strong><p>{x.attributeDefinition.name}{x.classType?` / ${classes[x.classType]??x.classType}`:''} / {dayLabel([x.dayOfWeek])}</p><p>{x.constraintLevel==='HARD'?'必須条件':x.constraintLevel==='SOFT'?'優先条件':'参考条件'} / {period(x.startDate,x.endDate)}</p></li>)}</ul>
+ </section>
  <p>個人別の詳細は、初期設定完了後に管理者の職員・勤務条件画面で確認できます。ここでは氏名一覧を表示しません。</p>
  </>}
  </section>;

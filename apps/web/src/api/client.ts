@@ -98,6 +98,7 @@ export type PrintShiftData = { tenantName:string; month:string; status:MonthlySh
 export type BackupValidation = { valid:boolean; errors:string[]; warnings:string[]; metadata:{format:string;version:number;exportedAt:string;tenantName:string;integrity:{algorithm:string;checksum:string}}; counts:Record<string,number> };
 export type SetupStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type WorkforceReview = {
+  departmentDisplayNames?: string[];
   childcareSupport?: {staffCount: number; generatorCount: number; fixedGroups: Array<{label: string; startTime: string | null; endTime: string | null; startDate: string | null; endDate: string | null; isHardConstraint: boolean; days: Array<number | null>; staffCount: number}>} | null;
   sourceDayScopes?: Array<{code:string;days:number[];exclusive:boolean;basis:"SOURCE_REVIEW_ONLY";sourceId:string;matrixSourceId:string}>;
   digest: string; workConfirmed: boolean; staffConfirmed: boolean; fiscalYearStartMonth: number;
