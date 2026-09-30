@@ -38,13 +38,17 @@ async function main(){
  const names=await cards.locator('strong').allTextContents();assert.deepEqual(names.slice(0,11),['普通出','普通出（土曜）','①','②','③','④','⑤','⑥','⑦','⑧','⑨']);
  for(const pattern of state.workforceReview.patterns){if(names.filter(n=>n===pattern.name).length!==1)continue;const card=cards.filter({has:page.locator('strong',{hasText:pattern.name})}).filter({hasText:pattern.startTime??'非勤務'});assert.ok(await card.count()>0);}
  const early=cards.filter({has:page.getByText('①',{exact:true})});assert.ok((await early.innerText()).includes('月〜金'));const sat=cards.filter({has:page.getByText('⑦',{exact:true})});assert.ok((await sat.innerText()).includes('土曜日'));
- assert.ok((await cards.filter({has:page.getByText('普通出',{exact:true})}).innerText()).includes('曜日設定なし'));
+ for (const [name,label] of [['普通出','月〜金'],['普通出（土曜）','土曜日限定']]) {
+  const text=await cards.filter({has:page.getByText(name,{exact:true})}).innerText();
+  assert.ok(text.includes(label));assert.ok(text.includes('資料上の分類'));assert.ok(!text.includes('曜日設定なし'));
+ }
+ assert.equal(await page.getByText(/出勤可能職員|未算定/).count(),0);
  assert.equal(await page.locator('input').count(),0);assert.equal(await page.locator('table').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  for(const title of ['固定勤務','曜日条件','期間条件','配置上の重要ルール'])await page.locator('summary').filter({hasText:title}).waitFor();
  assert.equal(writes,0);assert.equal(await protectedData(fixture.tenantId),original);
  await list.scrollIntoViewIfNeeded();
  if(process.env.REVIEW_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.REVIEW_SCREENSHOT_DIR,engine.name()+'-review.png'),fullPage:false});
- console.log(engine.name()+' WORK_PATTERN_UI_PASS order, DB times, registered weekdays, unspecified preserved, readOnly,390px,workforce digest unchanged');
+ console.log(engine.name()+' WORK_PATTERN_UI_PASS order, DB times, registered weekdays and source review scopes, readOnly,390px,workforce digest unchanged');
  }finally{await c.close();await b.close();}
  }
 }
