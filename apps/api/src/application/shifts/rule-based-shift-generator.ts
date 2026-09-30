@@ -1,3 +1,4 @@
+import { basicMemberEligibility, basicRuleEligibility, basicAttributeEligibility, basicFixedConflict } from './basic-candidate-evaluator';
 import { hardDeficits, repairSameWeek, replayKey, replayValue, type ReplayChoices, type ReassignmentTrace } from './same-week-reassignment';
 import { provisionalSoftRank, type ProvisionalSoftRule } from './provisional-soft-rules';
 import { AssignedClass, EmploymentType, ShiftRequestType, ShiftType, StaffWorkRuleType } from '@prisma/client';
@@ -82,7 +83,7 @@ function generateCandidateSchedule(targetMonth: Date, staffInput: GeneratorStaff
       if (blockedByPreviousPattern(member.id, workDate, rule.workPattern.id)) { add({ code: 'PATTERN_TRANSITION_BLOCKED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんは前日の勤務番号から当日の固定希望への禁止遷移に該当するため割り当てませんでした。` }); continue; }
       if (options.fixedWorkPatternOverridesWeeklyLimit !== true && weeklyPatternLimitExceeded(member.id, workDate, type, rule.workPattern.id)) { add({ code: 'WEEKLY_PATTERN_GROUP_LIMIT_BLOCKED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんは同一週の対象勤務グループ上限に達しているため、固定勤務を割り当てませんでした。` }); continue; }
       const times = rule.workPattern.startTime && rule.workPattern.endTime ? { startTime: rule.workPattern.startTime, endTime: rule.workPattern.endTime } : null;
-      const conflict = prohibitionConflict(options.staffWorkRules ?? [], member.id, workDate, type, times, rule.workPattern.id);
+      const conflict = basicFixedConflict(options.staffWorkRules ?? [], member.id, workDate, type, times, rule.workPattern.id);
       const approvedOverride = options.approvedHardRuleOverrides?.find((item) => item.date === key && item.staffId === member.id && item.workPatternId === rule.workPattern!.id);
       if (conflict && !approvedOverride) { add({ code: 'STAFF_WORK_RULE_FIXED_PROHIBITED', level: 'ERROR', workDate: key, staffId: member.id, message: `${member.displayName}さんの固定勤務は${ruleLabel(conflict)}と競合するため割り当てませんでした。` }); continue; }
       if (conflict && approvedOverride) add({ code: 'ADMIN_APPROVED_HARD_RULE_OVERRIDE', level: 'INFO', workDate: key, staffId: member.id, message: `${member.displayName}さんは「${ruleLabel(conflict)}」に対する日付限定例外が管理者承認済みのため、指定勤務を割り当てました。`, details: { sourceType: approvedOverride.sourceType, sourceReference: approvedOverride.sourceReference, confirmedAt: approvedOverride.confirmedAt, reason: approvedOverride.reason } });
@@ -149,13 +150,13 @@ function generateCandidateSchedule(targetMonth: Date, staffInput: GeneratorStaff
       const request = fixed.get(`${member.id}:${key}`); if (request && !isHalfDayRequest(request.requestType)) return false;
       if (request && isHalfDayRequest(request.requestType) && !fixedStaffIds.has(member.id)) return false;
       if (fixedStaffIds.has(member.id)) return false;
-      if (saturday && !member.canWorkSaturdays) return false;
-      if (type === ShiftType.EARLY && (!member.canWorkEarly || member.lateShiftOnly || (earlyStreak.get(member.id) ?? 0) >= options.maxConsecutiveEarlyDays)) return false;
+      if (!basicMemberEligibility(member, workDate, type).eligible) return false;
+      if (type === ShiftType.EARLY && ((earlyStreak.get(member.id) ?? 0) >= options.maxConsecutiveEarlyDays)) return false;
       if (blockedByPreviousPattern(member.id, workDate, options.systemWorkPatternIds?.[type])) return false;
       if (weeklyPatternLimitExceeded(member.id, workDate, type, options.systemWorkPatternIds?.[type])) return false;
-      if (type === ShiftType.LATE && (!member.canWorkLate || member.earlyShiftOnly || (lateStreak.get(member.id) ?? 0) >= options.maxConsecutiveLateDays)) return false;
-      if (type === ShiftType.NORMAL && (!member.canWorkRegular || member.earlyShiftOnly || member.lateShiftOnly)) return false;
-      const workRule = ruleEligibility(options.staffWorkRules ?? [], member.id, workDate, type, timesForMember(type, options, member) ?? null, options.systemWorkPatternIds?.[type]); if (!workRule.eligible) return false;
+      if (type === ShiftType.LATE && ((lateStreak.get(member.id) ?? 0) >= options.maxConsecutiveLateDays)) return false;
+      if (!basicMemberEligibility(member, workDate, type, true).eligible) return false;
+      const workRule = basicRuleEligibility(options.staffWorkRules ?? [], member.id, workDate, type, timesForMember(type, options, member) ?? null, options.systemWorkPatternIds?.[type]); if (!workRule.eligible) return false;
       if ((workStreak.get(member.id) ?? 0) >= options.maxConsecutiveWorkDays) return false;
       const nextMinutes = (minutes.get(member.id) ?? 0) + minutesForType(type, options, member); const nextDays = (days.get(`${member.id}:${weekKey(key)}`) ?? 0) + 1;
       for (const rule of applicableRules(options.staffWorkRules ?? [], member.id, workDate)) {
@@ -228,16 +229,16 @@ function generateCandidateSchedule(targetMonth: Date, staffInput: GeneratorStaff
       }
     }
     function eligibleForPattern(member: GeneratorStaff, pattern: GeneratorWorkPattern, attributeDefinitionId: string, allowWeeklyRelaxation = false, weeklyMaximumOverride?: number) {
-      if (!hasAttribute(options.staffAttributeAssignments ?? [], member.id, attributeDefinitionId, workDate) || fixed.has(`${member.id}:${key}`) || fixedStaffIds.has(member.id)) return false;
-      if (saturday && !member.canWorkSaturdays) return false;
+      if (!basicAttributeEligibility(options.staffAttributeAssignments ?? [], member.id, attributeDefinitionId, workDate).eligible || fixed.has(`${member.id}:${key}`) || fixedStaffIds.has(member.id)) return false;
       const type = shiftTypeForPattern(pattern.id);
+      if (!basicMemberEligibility(member, workDate, type).eligible) return false;
       if (replayChoices && replayChoices.get(replayKey(member.id, workDate)) !== replayValue({ shiftType: type, workPatternId: pattern.id })) return false;
       if ((type === ShiftType.EARLY || type === ShiftType.LATE) && isFixedClass(member.assignedClass) && staff.some((other) => other.id !== member.id && other.assignedClass === member.assignedClass && day.get(other.id)?.shiftType === type)) return false;
-      if (type === ShiftType.EARLY && (!member.canWorkEarly || member.lateShiftOnly || (earlyStreak.get(member.id) ?? 0) >= options.maxConsecutiveEarlyDays)) return false;
-      if (type === ShiftType.LATE && (!member.canWorkLate || member.earlyShiftOnly || (lateStreak.get(member.id) ?? 0) >= options.maxConsecutiveLateDays)) return false;
+      if (type === ShiftType.EARLY && ((earlyStreak.get(member.id) ?? 0) >= options.maxConsecutiveEarlyDays)) return false;
+      if (type === ShiftType.LATE && ((lateStreak.get(member.id) ?? 0) >= options.maxConsecutiveLateDays)) return false;
       if (blockedByPreviousPattern(member.id, workDate, pattern.id)) return false;
       if (allowWeeklyRelaxation ? !weeklyPatternRelaxationAllowed(member.id, workDate, type, pattern.id, weeklyMaximumOverride) : weeklyPatternLimitExceeded(member.id, workDate, type, pattern.id)) return false;
-      if (!ruleEligibility(options.staffWorkRules ?? [], member.id, workDate, type, pattern.startTime && pattern.endTime ? { startTime: pattern.startTime, endTime: pattern.endTime } : null, pattern.id).eligible) return false;
+      if (!basicRuleEligibility(options.staffWorkRules ?? [], member.id, workDate, type, pattern.startTime && pattern.endTime ? { startTime: pattern.startTime, endTime: pattern.endTime } : null, pattern.id).eligible) return false;
       if ((workStreak.get(member.id) ?? 0) >= options.maxConsecutiveWorkDays) return false;
       const nextMinutes = (minutes.get(member.id) ?? 0) + minutesForPattern(pattern); const nextDays = (days.get(`${member.id}:${weekKey(key)}`) ?? 0) + 1;
       for (const rule of applicableRules(options.staffWorkRules ?? [], member.id, workDate)) {

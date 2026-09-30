@@ -23,3 +23,10 @@ export function patternDays(code:string,requirements:WorkforceReview['requiremen
  // Required staffing dates are evidence, not a declaration of every employee's availability.
  return groupDays(requirements.filter(r=>r.workPattern?.code===code));
 }
+
+// Only order existing rows. Do not generate missing numbered requirements.
+export function displayRequirements(rows: WorkforceReview['requirements']) {
+ const numbers=['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
+ const rank=(name:string|undefined)=>{const i=numbers.indexOf(name??'');return i<0?numbers.length:i;};
+ return rows.map((row,index)=>({row,index})).sort((a,b)=>rank(a.row.workPattern?.name)-rank(b.row.workPattern?.name)||a.index-b.index).map(x=>x.row);
+}

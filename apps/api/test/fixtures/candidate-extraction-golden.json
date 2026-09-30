@@ -1,0 +1,25 @@
+{
+  "baseSha": "1239758172cf2968938dc1d05a085ea059148d93",
+  "results": {
+    "reassignment": {
+      "output": "96247840199e14004963c371f15233499f61ff079a8c945864743fbcfa32dc5c",
+      "candidateDecisions": "27602c2692189169bbe6efecde20639d9007e6da0f69b0636f94f56dbfe9c48c",
+      "decisionCount": 13874
+    },
+    "without-reassignment": {
+      "output": "8c48bba8beea7aa9d346cf65ea99a3553529177e20183f8ca9c70a404c6ad872",
+      "candidateDecisions": "0cdb0e66ab1f8a6b3502380363dcaba9ee4912450f337efbf3c93b92459d5e8c",
+      "decisionCount": 4755
+    },
+    "other-month": {
+      "output": "c08d187c57333fdca62aa7bd5915c04df092ae9aed583134a6eba12f9b40a75f",
+      "candidateDecisions": "bc4f39937091525601adfb258b009832c85f555f2515ae1b0fadf09fed6a0b25",
+      "decisionCount": 4521
+    },
+    "requests": {
+      "output": "17771f320614d004bfc498cb49d422cca696f6b71a8c2070f6d4a6c91c0b49e2",
+      "candidateDecisions": "af4c740e6288abd82974b3f23fe4aad2b2d39914e2cccb35edb0ab41bdc465d8",
+      "decisionCount": 4652
+    }
+  }
+}

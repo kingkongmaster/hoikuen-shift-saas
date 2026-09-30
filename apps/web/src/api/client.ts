@@ -98,11 +98,13 @@ export type PrintShiftData = { tenantName:string; month:string; status:MonthlySh
 export type BackupValidation = { valid:boolean; errors:string[]; warnings:string[]; metadata:{format:string;version:number;exportedAt:string;tenantName:string;integrity:{algorithm:string;checksum:string}}; counts:Record<string,number> };
 export type SetupStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type WorkforceReview = {
+  sourceDayScopes?: Array<{code:string;days:number[];exclusive:boolean;basis:"SOURCE_REVIEW_ONLY";sourceId:string;matrixSourceId:string}>;
   digest: string; workConfirmed: boolean; staffConfirmed: boolean; fiscalYearStartMonth: number;
   staffCount: number; generatorCount: number; excludedCount: number; fixedAttributeCount: number;
   patterns: Array<{code: string; name: string; startTime: string | null; endTime: string | null; isWorking: boolean}>;
   requirements: Array<{workPattern: {code: string; name: string} | null; attributeDefinition: {code: string; name: string}; classType: string | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; requiredCount: number; constraintLevel: string}>;
   rules: Array<{ruleType: string; workPattern: {code: string; name: string} | null; dayOfWeek: number | null; startDate: string | null; endDate: string | null; startTime: string | null; endTime: string | null; numericValue: number | null; isHardConstraint: boolean; staffCount: number}>;
+  fixedRuleGroups?: Array<{rule: Omit<WorkforceReview['rules'][number], 'dayOfWeek' | 'staffCount'>; days: Array<number | null>; staffCount: number}>;
   departments: Array<{name: string; staffCount: number; fixedCount: number; excludedCount: number}>;
 };
 export type SetupState = {
