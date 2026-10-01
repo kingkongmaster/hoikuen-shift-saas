@@ -14,12 +14,19 @@ export function applyMonthlyAnswers(input: MonthlyGenerationContext, items: Revi
       const staff=context.staff.find(s=>s.id===staffId);if(!staff)throw Error('REVIEW_STAFF_OUTSIDE_TENANT');
       for(const date of item.dates) for(const original of effects) {
         const effect:MonthlyEffect={...original};const day=new Date(date+'T00:00:00Z');
+        if(effect.type==='KEEP_CONDITIONS') continue;
         if(effect.type==='REMOVE_EVENT_TARGET') {
           const index=context.events.findIndex(e=>e.id===effect.eventId&&iso(e.eventDate)===date);if(index<0)throw Error('REVIEW_EVENT_OUTSIDE_SCOPE');
           const event=context.events[index];
           if(!Array.isArray(event.targetStaffCodes)||!event.targetStaffCodes.includes(staff.employeeNumber)||Array.isArray(event.targetClasses)&&event.targetClasses.length)throw Error('EVENT_SCOPE_REQUIRES_EXPLICIT_REVIEW');
           const codes=event.targetStaffCodes.filter(c=>c!==staff.employeeNumber);
           context.events[index]={...event,targetStaffCodes:codes,affectsGeneration:codes.length>0};continue;
+        }
+        if(effect.type==='CANCEL_REQUEST') {
+          const target=context.approvedRequests.filter(r=>r.staffId===staffId&&iso(r.requestDate)===date);
+          if(target.length!==1||target[0].requestType!==effect.requestType)throw Error('REQUEST_CANCELLATION_CONFLICT');
+          context.requests=context.requests.filter(r=>r.id!==target[0].id);
+          context.approvedRequests=context.approvedRequests.filter(r=>r.id!==target[0].id);continue;
         }
         if(effect.type==='REQUEST'||effect.type==='NO_WORK') {
           const requestType=effect.type==='NO_WORK'?ShiftRequestType.DAY_OFF:effect.requestType;
@@ -33,6 +40,7 @@ export function applyMonthlyAnswers(input: MonthlyGenerationContext, items: Revi
         const code=effect.type==='PATTERN'?effect.code:effect.basePatternCode;
         const base=context.workPatterns.find(p=>p.code===code&&p.isActive&&p.isWorking);if(!base)throw Error('INVALID_REVIEW_PATTERN');
         const pattern={...base};
+        if(effect.type==='TIME'&&item.kind==='EARLY_DEPARTURE'&&(!item.answer.time||item.answer.time<=effect.startTime||item.answer.time>effect.endTime))throw Error('DEPARTURE_OUTSIDE_BASE');
         if(effect.type==='TIME') {pattern.startTime=item.answer.startTime??effect.startTime;pattern.endTime=item.answer.time??item.answer.endTime??effect.endTime;}
         else {pattern.startTime=effect.startTime??base.startTime;pattern.endTime=effect.endTime??base.endTime;}
         if(!pattern.startTime||!pattern.endTime||!/^([01]\d|2[0-3]):[0-5]\d$/.test(pattern.startTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(pattern.endTime)||pattern.startTime>=pattern.endTime)throw Error('INVALID_REVIEW_HOURS');

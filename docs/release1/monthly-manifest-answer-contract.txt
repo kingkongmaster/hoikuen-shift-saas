@@ -1,0 +1,56 @@
+Release 1 monthly manifest and manager-answer contract
+
+Scope
+Monthly approved inputs and independent OPEN records are imported atomically.
+The private manifest/ledger/Source extracts are not repository artifacts.
+A field can be confirmed while another field on the same staff/date remains OPEN.
+The input ledger distinguishes CONFIRMED, OPEN, ANSWERED, RE_EVALUATION_PENDING,
+and RESOLVED. Runtime combines the two middle answer states into
+ANSWERED_PENDING_REEVALUATION: the answer and Audit commit together, but it is
+not usable until reevaluation succeeds. No automatic answers or implicit resolution.
+
+Input targets
+Requests -> approved ShiftRequest, source metadata in adminComment.
+Known half-day base -> existing verified fixed rule or dated explicit fixed rule.
+Unknown half-day base -> approved half-day request plus matching HALF_DAY_BASE OPEN.
+Date rules -> bounded StaffWorkRule; never update permanent rules.
+Explicit fixed / preferred / allowed-set semantics remain distinct.
+NO_ROTATION -> an existing working pattern that does not count toward staffing;
+never DAY_OFF/NO_WORK. An allowed set must not become one guessed fixed pattern.
+Events -> TenantEvent, source references and manifest identity retained.
+SOURCE_RECORDED records a known event without inventing onsite/offsite classification.
+An empty allowed-pattern array does not assert any extra numbered restriction.
+Closures -> one TenantClosedDate per tenant/date, no duplicate calendar conditions.
+Existing mismatches reject and roll back the entire import; reapply is idempotent.
+
+Answer mapping (7 independent groups; each target gets its own answer)
+Group | Question | Input | Apply target | Validation / reevaluation
+Q1 | Departure time | TIME HH:MM | dated time override, existing known base retained | valid time after known start; staff/date and related capacity
+Q2 | Half-day base | WORK_PATTERN or explicit start/end | dated base + existing half-day request | active tenant weekday pattern; explicit times for OTHER_TIME
+Q3 | Half-day base | WORK_PATTERN or explicit start/end | same as Q2, independent target | same as Q2
+Q4 | Event-day preference | ENUM/pattern/withdraw | dated pattern, or retain existing conditions without forcing a default | offered tenant/day pattern; event/date capacity
+Q5 | Missing pattern meaning | WORK_PATTERN | dated explicit pattern, including working NO_ROTATION only when answered | weekday/Saturday options differ; no inferred NORMAL
+Q6 | Leave category | LEAVE_TYPE | monthly request | DAY_OFF/PAID_LEAVE/SUMMER_LEAVE/BEREAVEMENT only; conflicting request rejected
+Q7 | Event vs approved leave | ENUM | remove only this event target OR explicitly cancel this monthly leave and retain known fixed work | exact tenant/staff/date/request type; no permanent edit
+
+Every answer records MONTHLY_MANAGER_ANSWERED; successful reevaluation records
+MONTHLY_MANAGER_REEVALUATED. Both retain original references plus MANAGER_CONFIRMED.
+Answered effects live in the monthly TenantRuleException record, not solver state.
+The generator reads a derived context; the original request/permanent rule history
+is retained. Cancellation cannot target a different staff, tenant, date or leave type.
+Concurrent/stale answers use revision checks and transactional Audit.
+Unrepresentable answers remain pending; no arbitrary free-text execution.
+
+DRAFT and FINAL
+Exclude OPEN staff/date cells before generation and materialization. Display pending
+review, never default NORMAL/OFF. Confirmed unaffected cells remain generatable.
+Required OPEN, HARD failures, stale review digest and assignment mismatch block FINAL.
+No FINAL is persisted by the test harness. DRAFT audit completion is not approval
+of shortages or authorization to deploy/confirm.
+
+Verification
+monthly-manifest-draft.e2e.cjs accepts an explicit Git-external manifest and report
+path, runs only with isolated-database guard, creates synthetic identities with the
+approved anonymous permanent master, and audits real DB import/readback/reapply,
+OPEN masking, immutable baseline, all offered answer effects and FINAL rejection.
+No Production connection, Source originals, names or credentials in Git.

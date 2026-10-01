@@ -14,3 +14,8 @@ test('unsafe answer, missing half-day base, unavailable option rejected',()=>{co
 test('open cells are excluded before generation; unaffected cells remain eligible',()=>{const input=[base(),{...base(),id:'item-2',dates:['2026-09-24','2026-09-29'],kind:'HALF_DAY_BASE'}];const before=JSON.stringify(input);const scope=core.draftScope(input,actor.tenantId,'2026-09');assert.equal(scope.blockedCells.length,3);assert(!scope.blockedCells.includes(JSON.stringify(['anonymous-2','2026-09-14'])));assert.equal(scope.canFinalize,false);assert.equal(JSON.stringify(input),before);assert.throws(()=>core.draftScope(input,'other','2026-09'));});
 test('HARD remains blocking independently of review resolution',()=>{const item={...base(),status:'RESOLVED'};assert.throws(()=>core.assertFinalAllowed([item],actor.tenantId,item.month,1));core.assertFinalAllowed([item],actor.tenantId,item.month,0);assert.throws(()=>core.assertFinalAllowed([item],actor.tenantId,item.month,NaN));});
 test('invalid and out-of-month dates rejected',()=>{for(const date of ['2026-09-31','2026-10-01'])assert.throws(()=>core.validateItem({...base(),dates:[date]}));});
+test('departure answer cannot precede the approved start or extend past its end',()=>{
+ const item={...base(),optionEffects:{TIME:[{type:'TIME',basePatternCode:'NORMAL',startTime:'08:30',endTime:'17:00'}]}};
+ for(const time of ['08:30','08:00','17:01'])assert.throws(()=>core.submitAnswer(item,actor,1,{option:'TIME',time},'2026-10-01T00:00:00Z'));
+ assert.equal(core.submitAnswer(item,actor,1,{option:'TIME',time:'15:00'},'2026-10-01T00:00:00Z').status,'ANSWERED_PENDING_REEVALUATION');
+});

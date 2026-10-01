@@ -37,3 +37,13 @@ test('existing mismatch stops instead of overwriting; equal data is reusable', (
   assert(assertSameExisting({ ...mapped }, mapped));
   assert.throws(() => assertSameExisting({ ...mapped, endTime: '18:00' }, mapped), /EXISTING_VALUE_CONFLICT/);
 });
+test('monthly preference preserves SOFT, allowed sets do not become fixed assignments', () => {
+ const soft=fixedFields({...base,ruleType:'PREFERRED_WORK_PATTERN'},'2026-09',lookup);
+ assert.equal(soft.isHardConstraint,false);assert.equal(soft.ruleType,'PREFERRED_WORK_PATTERN');
+ assert.equal(fixedFields({...base,ruleType:'AVAILABLE_WORK_PATTERN'},'2026-09',lookup).ruleType,'AVAILABLE_WORK_PATTERN');
+ assert.throws(()=>fixedFields({...base,ruleType:'DELETE_ALL'},'2026-09',lookup));
+});
+test('JSON property order is immaterial, effect order remains protected', () => {
+ assert(assertSameExisting({configuration:{b:2,a:1}},{configuration:{a:1,b:2}}));
+ assert.throws(()=>assertSameExisting({effects:[{type:'CANCEL_REQUEST'},{type:'REQUEST'}]},{effects:[{type:'REQUEST'},{type:'CANCEL_REQUEST'}]}));
+});

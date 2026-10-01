@@ -36,8 +36,11 @@ function fixedFields(row, month, lookup) {
   const start = row.startTime ?? null, end = row.endTime ?? null;
   if ((start === null) !== (end === null)) reject();
   if (start !== null && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || start >= end)) reject();
-  return { staffId, workPatternId, ruleType: 'FIXED_WORK_PATTERN', startDate: date, endDate: date,
-    startTime: start, endTime: end, priority: 0, isHardConstraint: true, ...provenance(row) };
+  const ruleType = row.ruleType ?? 'FIXED_WORK_PATTERN';
+  if (!['FIXED_WORK_PATTERN', 'PREFERRED_WORK_PATTERN', 'AVAILABLE_WORK_PATTERN'].includes(ruleType)) reject();
+  if (ruleType !== 'FIXED_WORK_PATTERN' && start !== null) reject();
+  return { staffId, workPatternId, ruleType, startDate: date, endDate: date,
+    startTime: start, endTime: end, priority: 0, isHardConstraint: ruleType !== 'PREFERRED_WORK_PATTERN', ...provenance(row) };
 }
 function halfDayBaseFields(row, month, lookup) {
   if (!['HALF_DAY_AM', 'HALF_DAY_PM'].includes(row.requestType) || !row.baseWorkPatternCode) reject();
@@ -48,7 +51,7 @@ function requestProvenanceFields(row) {
   return { adminComment: provenance(row).sourceReference };
 }
 function assertSameExisting(existing, intended) {
-  const normalize = value => value instanceof Date ? value.toISOString() : Array.isArray(value) ? [...value].sort() : value ?? null;
+  const normalize = value => value instanceof Date ? value.toISOString() : Array.isArray(value) ? value.map(normalize) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,normalize(value[key])])) : value ?? null;
   for (const key of Object.keys(intended)) if (JSON.stringify(normalize(existing[key])) !== JSON.stringify(normalize(intended[key]))) {
     throw new Error('MONTHLY_INPUT_EXISTING_VALUE_CONFLICT');
   }

@@ -4,6 +4,8 @@ export type MonthlyEffect =
  | { type: 'PATTERN'; code: string; startTime?: string; endTime?: string }
  | { type: 'TIME'; startTime: string; endTime: string; basePatternCode: string }
  | { type: 'REMOVE_EVENT_TARGET'; eventId: string }
+ | { type: 'CANCEL_REQUEST'; requestType: 'PAID_LEAVE' | 'DAY_OFF' }
+ | { type: 'KEEP_CONDITIONS' }
  | { type: 'NO_WORK' };
 export type ReviewStatus = 'NEEDS_MANAGER_REVIEW' | 'ANSWERED_PENDING_REEVALUATION' | 'RESOLVED';
 export type ReviewKind = 'EARLY_DEPARTURE' | 'HALF_DAY_BASE' | 'EVENT_CONFLICT' | 'REQUEST_MEANING' | 'LEAVE_CATEGORY';
@@ -36,6 +38,8 @@ export function submitAnswer(item: ReviewItem, actor: Actor, revision: number, a
   const time = (value?: string) => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
   if (item.kind === 'EARLY_DEPARTURE') {
     if (answer.option !== 'TIME' || !time(answer.time) || answer.startTime || answer.endTime) fail('INVALID_DEPARTURE_TIME');
+    const base=item.optionEffects?.TIME?.find(effect=>effect.type==='TIME');
+    if(base?.type==='TIME'&&(answer.time!<=base.startTime||answer.time!>base.endTime))fail('DEPARTURE_OUTSIDE_BASE');
   } else if (item.kind === 'HALF_DAY_BASE' && answer.option === 'OTHER_TIME') {
     if (!time(answer.startTime) || !time(answer.endTime) || answer.startTime! >= answer.endTime! || answer.time) fail('INVALID_BASE_TIME');
   } else if (answer.time || answer.startTime || answer.endTime) fail('UNEXPECTED_ANSWER_TIME');
