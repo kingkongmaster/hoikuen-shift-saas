@@ -48,6 +48,7 @@ export function validateGenerationContext(context: MonthlyGenerationContext, pha
   const patternByCode = new Map(context.workPatterns.map((pattern) => [pattern.code, pattern]));
   const baseAssignmentExceptionKey = new Set<string>(); const hardOverrideKey = new Set<string>();
   for (const exception of context.ruleExceptions) {
+    if(exception.exceptionType.startsWith('MANAGER_REVIEW:')) continue;
     const date = iso(exception.exceptionDate);
     const invalidPeriod = (exception.effectiveFrom && exception.effectiveFrom > exception.exceptionDate) || (exception.effectiveTo && exception.effectiveTo < exception.exceptionDate) || (exception.effectiveFrom && exception.effectiveTo && exception.effectiveFrom > exception.effectiveTo);
     const invalidProvenance = exception.sourceType !== 'ADMIN_CONFIRMED' || !exception.confirmedAt || !exception.confirmedBy || !exception.reason?.trim();

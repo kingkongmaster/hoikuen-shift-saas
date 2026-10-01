@@ -1,0 +1,68 @@
+Release 1 manager resolution integration
+
+Policy: a private questionnaire is fallback material, not a product completion gate.
+Unknown values remain NEEDS_MANAGER_REVIEW; unresolved mandatory issues or HARD
+violations prohibit FINAL. No production execution is included in this change.
+
+Storage/API
+TenantRuleException with reserved MANAGER_REVIEW: prefix stores monthly review
+configuration and revision. AuditLog stores actor, Tenant, month, dates, answer,
+sourceReferences and timestamp. Existing schema/migrations are unchanged.
+ADMIN-only /manager-reviews/:month provides list/detail, /:id/answers stores an
+answer, /:id/reevaluate applies the monthly overlay and validates it.
+Updates and audit use a Serializable transaction and compare-and-set. No retries.
+Legacy rule-exception list/deletion excludes/protects reserved review records.
+
+Import
+scripts/import-manager-review-manifest.cjs accepts private JSON only, validates
+Source references and manifest digest via existing monthly-input-fields helpers,
+resolves employee codes against the selected Tenant and rejects conflicts.
+Existing production-operation-guard is mandatory. Reference source originals never
+enter Git. Duplicate equivalent initial records are preserved, never overwritten.
+Each independent person/date answer has its own key; groupId aggregates questions.
+
+Seven categories (synthetic fixtures only in Git)
+Q1 early departure time; Q2/Q3 half-day base; Q4 event vs fixed preference;
+Q5 meaning of monthly dates; Q6 leave classification; Q7 event vs paid leave.
+The actual seven groups/25 date-target links are retained outside Git with Source
+provenance. This linkage is NOT an applied production manifest. Final option-effect
+materialization and isolated DB import/readback remain data-preparation checks.
+Never guess an answer or silently merge two people's answers.
+
+Application
+Answers move NEEDS_MANAGER_REVIEW -> ANSWERED_PENDING_REEVALUATION -> RESOLVED.
+Correcting a pending answer requires the current revision; each answer is audited.
+Monthly effects overlay requests, explicit pattern/time assignments, or explicit
+removal of an individual event target. They never rewrite permanent conditions.
+Missing start/base time, conflicting fixed pattern, foreign references and unsupported
+fixed-staff pattern overrides fail closed. Manager confirmation is not a generic
+HARD override. Full HARD validation remains required at FINAL.
+
+DRAFT
+Blocked staff/date cells are removed BEFORE the daily solver, including fixed
+materialization and future capacity eligibility. They receive no NORMAL/OFF/leave
+assignment and contribute no staffing capacity. The UI marks them review-pending.
+Only the half-day-base preflight diagnostic linked to an open item is deferred;
+other system/HARD diagnostics retain existing behavior. No global ERROR downgrade.
+With no reviews, pinned-baseline generator output is unchanged in golden checks.
+After resolved answers, user explicitly reruns precheck/generation; no automatic
+recreation of a whole month, FINAL or publication occurs.
+
+FINAL and output
+UI disables FINAL with open items. API requires no pending reviews, current
+persisted assignments matching each resolved answer, existing HARD checks, and a
+DRAFT-evaluation digest matching current review state. Save/generate/confirm share
+schedule locking/revision checks. Unresolved CSV/print is rejected rather than
+rendering unknown cells as OFF. Existing B4 layout is unchanged.
+
+Validation
+Docker-free domain/transaction-port, actual Nest HTTP with an in-memory database
+port, generator, FINAL-service and export-guard integration tests; 390px Chromium
+and WebKit cards; API/Web lint/build and Release Gates. Real PostgreSQL transaction,
+rollback/concurrency and private-manifest readback are NOT claimed by mocks.
+Docker remains unresponsive; no reset/image/volume deletion. Production unchanged.
+
+Release status
+Code integration and source RC can be reviewed independently of real DB E2E.
+No production-ready claim until isolated DB E2E and exact monthly manifest validation.
+No dependency/schema/migration change. Commit/push is authorized for this scope.

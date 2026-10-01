@@ -15,6 +15,7 @@ export type FixedAssignmentRequest = {
 };
 
 export type FixedAssignmentMaterializationOptions = {
+  managerReviewCells?: Array<{staffId:string;date:string}>;
   staff: FixedAssignmentStaff[];
   requests: FixedAssignmentRequest[];
   start: Date;
@@ -48,6 +49,7 @@ export function materializeFixedAssignments(options: FixedAssignmentMaterializat
     for (let cursor = new Date(options.start); cursor < options.end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
       const workDate = new Date(cursor);
       const dateKey = iso(workDate);
+      if(options.managerReviewCells?.some(c=>c.staffId===staff.id&&c.date===dateKey))continue;
       const request = requestByStaffDate.get(`${staff.id}:${dateKey}`);
       const isClosed = closed.has(dateKey) || (!options.sundayOperationEnabled && workDate.getUTCDay() === 0);
       const requestedLeave = request ? fullLeaveType.get(request.requestType) : undefined;

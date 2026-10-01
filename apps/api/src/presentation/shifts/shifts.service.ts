@@ -1,3 +1,6 @@
+import { ManagerResolutionService, reviewDigest } from './manager-resolution.service';
+import { applyMonthlyAnswers, validateAnswerAssignments } from '../../application/manager-resolution/monthly-effects';
+import { draftScope } from '../../application/manager-resolution/resolution';
 import { readProvisionalSoftRules } from '../../application/shifts/provisional-soft-rules';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MembershipRole, MonthlyShiftStatus, NotificationType, Prisma, ShiftRequestStatus, ShiftType, StaffWorkRuleType } from '@prisma/client';
@@ -27,7 +30,7 @@ type Warning = { code: string; staffId: string; workDate: string; message: strin
 export class ShiftsService {
   private readonly logger = new Logger(ShiftsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly settings: SettingsService, private readonly notifications: NotificationsService, private readonly audit: AuditService, private readonly workPatterns: WorkPatternsService, private readonly features: FeaturesService, private readonly generationContexts: MonthlyGenerationContextBuilder) {}
+  constructor(private readonly prisma: PrismaService, private readonly settings: SettingsService, private readonly notifications: NotificationsService, private readonly audit: AuditService, private readonly workPatterns: WorkPatternsService, private readonly features: FeaturesService, private readonly generationContexts: MonthlyGenerationContextBuilder, private readonly reviews: ManagerResolutionService) {}
 
   async list(user: AuthenticatedUser, month: string, requestedStaffId?: string) {
     const targetMonth = this.monthDate(month);
@@ -62,6 +65,7 @@ export class ShiftsService {
 
   async save(user: AuthenticatedUser, id: string, inputs: AssignmentInputDto[]) {
     const schedule = await this.requireEditable(user, id);
+    const items=await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));const blocked=new Set(draftScope(items,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7)).blockedCells);if(inputs.some(i=>blocked.has(JSON.stringify([i.staffId,i.workDate]))))throw new ConflictException('管理者確認待ちのセルは直接保存できません。');
     this.validateUniqueInputs(inputs);
     const range = this.monthRange(schedule.targetMonth);
     for (const input of inputs) this.validateAssignmentInput(input, range);
@@ -92,23 +96,40 @@ export class ShiftsService {
     }
     await this.validateFixedClassSpecialShiftUniqueness(user.tenantId, schedule.id, inputs, staff);
     const staffById = new Map(staff.map((member) => [member.id, member]));
-    await this.prisma.$transaction(inputs.map((input) => this.prisma.shiftAssignment.upsert({
+    await this.prisma.$transaction(async db=>{
+      await db.$queryRaw`SELECT id FROM "MonthlyShift" WHERE id=${schedule.id}::uuid AND "tenantId"=${user.tenantId}::uuid FOR UPDATE`;
+      const current=await db.monthlyShift.findFirst({where:{id:schedule.id,tenantId:user.tenantId}});
+      if(!current||current.status!=='DRAFT'||current.updatedAt.getTime()!==schedule.updatedAt.getTime()||reviewDigest(await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7),db))!==reviewDigest(items))throw new ConflictException('下書きまたは確認事項が更新されています。');
+    for(const input of inputs) await db.shiftAssignment.upsert({
       where: { monthlyShiftId_staffId_workDate: { monthlyShiftId: schedule.id, staffId: input.staffId, workDate: this.date(input.workDate) } },
       create: this.assignmentData(schedule, input, staffById.get(input.staffId)),
       update: this.assignmentData(schedule, input, staffById.get(input.staffId)),
-    })));
+    });
+      await db.monthlyShift.update({where:{id:schedule.id},data:{updatedAt:new Date()}});
+    },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
     await this.audit.create(user.tenantId,user.sub,'SHIFT_ASSIGNMENTS_SAVED','MonthlyShift',schedule.id,{assignmentCount:inputs.length}); await this.notifications.notifyRoles(user.tenantId,['ADMIN','DIRECTOR'],NotificationType.SHIFT_UPDATED,'シフト更新','月間シフトが手動更新されました。'); return this.buildView(user, schedule);
   }
 
   async confirm(user: AuthenticatedUser, id: string) {
     const schedule = await this.requireEditable(user, id);
+    const reviewItems=await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));
+    if(!draftScope(reviewItems,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7)).canFinalize)throw new ConflictException('管理者確認または再評価が未完了です。');
     const context = await this.buildGenerationContext(user.tenantId, schedule.targetMonth, schedule.id);
+    if(reviewDigest(context.managerReviewItems)!==reviewDigest(reviewItems))throw new ConflictException('確認事項が更新されています。');
+    if(validateAnswerAssignments(context,reviewItems).length)throw new ConflictException('管理者回答と保存済み勤務が一致しません。下書きを再評価してください。');
     const diagnostics = validateGenerationContext(context, 'CONFIRM');
     const view = await this.buildView(user, schedule);
     const saturdayBlocking = await this.saturdayMinimumWarnings(user.tenantId, schedule);
     const blocking = [...diagnostics.filter((item) => item.severity === 'ERROR').map((item) => this.diagnosticWarning(item)), ...view.warnings.filter((warning) => warning.severity === 'blocking'), ...saturdayBlocking];
     if (blocking.length) throw new ConflictException({ message: '確定できない勤務条件があります。', diagnostics: diagnostics.filter((item) => item.severity === 'ERROR'), warnings: blocking });
-    const confirmed=await this.prisma.monthlyShift.update({ where: { id: schedule.id }, data: { status: MonthlyShiftStatus.CONFIRMED, confirmedByUserId: user.sub, confirmedAt: new Date() } }); await this.audit.create(user.tenantId,user.sub,'SHIFT_CONFIRMED','MonthlyShift',schedule.id); await this.notifications.notifyTenant(user.tenantId,NotificationType.SHIFT_CONFIRMED,'シフト確定',`${this.isoDate(schedule.targetMonth).slice(0,7)}のシフトが確定しました。`); return confirmed;
+    const confirmed=await this.prisma.$transaction(async db=>{
+      await db.$queryRaw`SELECT id FROM "MonthlyShift" WHERE id=${schedule.id}::uuid AND "tenantId"=${user.tenantId}::uuid FOR UPDATE`;
+      const current=await db.monthlyShift.findFirst({where:{id:schedule.id,tenantId:user.tenantId}});
+      const currentReviews=await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7),db);
+      if(!current||current.status!=='DRAFT'||current.updatedAt.getTime()!==schedule.updatedAt.getTime()||reviewDigest(currentReviews)!==reviewDigest(reviewItems))throw new ConflictException('下書きまたは確認事項が更新されています。');
+      if(currentReviews.length){const last=await db.auditLog.findFirst({where:{tenantId:user.tenantId,targetId:schedule.id,action:'MANAGER_REVIEW_DRAFT_EVALUATED'},orderBy:{createdAt:'desc'}});if((last?.detail as {reviewDigest?:string}|null)?.reviewDigest!==reviewDigest(currentReviews))throw new ConflictException('管理者回答後の下書き再評価が必要です。');}
+      return db.monthlyShift.update({where:{id:schedule.id},data:{status:MonthlyShiftStatus.CONFIRMED,confirmedByUserId:user.sub,confirmedAt:new Date()}});
+    },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable}); await this.audit.create(user.tenantId,user.sub,'SHIFT_CONFIRMED','MonthlyShift',schedule.id); await this.notifications.notifyTenant(user.tenantId,NotificationType.SHIFT_CONFIRMED,'シフト確定',`${this.isoDate(schedule.targetMonth).slice(0,7)}のシフトが確定しました。`); return confirmed;
   }
 
   async reopen(user: AuthenticatedUser, id: string) {
@@ -124,7 +145,10 @@ export class ShiftsService {
     const range = this.monthRange(schedule.targetMonth);
     await this.workPatterns.ensureSystemPatterns(user.tenantId);
     const generationContext = await this.buildGenerationContext(user.tenantId, schedule.targetMonth, schedule.id);
-    const preflightDiagnostics = validateGenerationContext(generationContext, 'GENERATE');
+    const reviewItems=generationContext.managerReviewItems;
+    const reviewState=draftScope(reviewItems,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));
+    const managerReviewCells=reviewState.blockedCells.map(key=>{const [staffId,date]=JSON.parse(key) as [string,string];return {staffId,date};});
+    const preflightDiagnostics = validateGenerationContext(generationContext, 'GENERATE').filter(d=>!(d.code==='HALF_DAY_BASE_ASSIGNMENT_UNCONFIRMED'&&managerReviewCells.some(c=>c.staffId===d.staffId&&c.date===d.date)));
     if (hasBlockingDiagnostics(preflightDiagnostics)) throw new ConflictException({ message: '生成前に解決が必要な勤務条件があります。', diagnostics: preflightDiagnostics, warnings: preflightDiagnostics.filter((item) => item.severity === 'ERROR').map((item) => this.diagnosticWarning(item)) });
     let staffingFeatureEnabled = false; let staffingFeatureLookupFailed = false; let workRuleFeatureEnabled = false; let workRuleFeatureLookupFailed = false; let customRulesEnabled = false;
     try { staffingFeatureEnabled = (await this.features.resolve(user.tenantId, 'ADVANCED_STAFFING_REQUIREMENTS')).enabled; } catch { staffingFeatureLookupFailed = true; }
@@ -208,12 +232,17 @@ export class ShiftsService {
     const configuredPatternByCode = new Map([...systemPatterns, ...weeklyPatternRows].map((row) => [row.code, row]));
     const patternTransitionBlocks = transitionConfigurations.map((configuration) => ({ fromWorkPatternIds: (Array.isArray(configuration.fromPatternCodes) ? configuration.fromPatternCodes : []).flatMap((code) => typeof code === 'string' && configuredPatternByCode.get(code) ? [configuredPatternByCode.get(code)!.id] : []), toWorkPatternIds: (Array.isArray(configuration.toPatternCodes) ? configuration.toPatternCodes : []).flatMap((code) => typeof code === 'string' && configuredPatternByCode.get(code) ? [configuredPatternByCode.get(code)!.id] : []) })).filter((block) => block.fromWorkPatternIds.length && block.toWorkPatternIds.length);
     const provisionalSoftRules = readProvisionalSoftRules(customRuleConfiguration.release1ProvisionalSoftRules, generationContext.staff, generationContext.workPatterns);
-    const generated = generateRuleBasedSchedule(schedule.targetMonth, generationStaff.map((item) => ({ ...item, isDirector: false, annualFairness: annualFairnessByStaff.get(item.id) })), requests, { ...effectiveSetting, provisionalSoftRules, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates, priorAssignments, weeklyPatternGroups, weeklyPatternGroupExemptStaffIds: weeklyExemptAssignments.map((row) => row.staffId), fixedWorkPatternOverridesWeeklyLimit: customRuleConfiguration.fixedWorkPatternOverridesWeeklyLimit === true, weeklyPatternRelaxation, approvedWeeklyThirdAssignmentExceptions, approvedHardRuleOverrides, fairnessWindows: { recentStart, fiscalStart: fiscalRange.start, longTermStart }, patternTransitionBlocks, systemWorkPatternIds, replaceLegacyShiftTargetsWhenPatternRequirementsActive: customRuleConfiguration.replaceLegacyShiftTargetsWhenPatternRequirementsActive === true, fillOpenUnassignedWithNormal: customRuleConfiguration.fillOpenUnassignedWithNormal === true, meetingDayRules, ...staffingOptions, ...workRuleOptions });
-    const fixedAssignments = materializeFixedAssignments({ staff: fixedStaff, requests: approvedFixedRequests, start: range.start, end: range.end, closedDates: closedDates.map((item) => item.closedDate), sundayOperationEnabled: setting.sundayOperationEnabled, defaultBreakMinutes: setting.defaultBreakMinutes });
+    const generated = generateRuleBasedSchedule(schedule.targetMonth, generationStaff.map((item) => ({ ...item, isDirector: false, annualFairness: annualFairnessByStaff.get(item.id) })), requests, { ...effectiveSetting, managerReviewCells, provisionalSoftRules, directorClassPlacementMode: setting.directorClassPlacementMode as 'NONE' | 'SHORTAGE_ONLY' | 'NORMAL', classRequirements: requirements, closedDates, priorAssignments, weeklyPatternGroups, weeklyPatternGroupExemptStaffIds: weeklyExemptAssignments.map((row) => row.staffId), fixedWorkPatternOverridesWeeklyLimit: customRuleConfiguration.fixedWorkPatternOverridesWeeklyLimit === true, weeklyPatternRelaxation, approvedWeeklyThirdAssignmentExceptions, approvedHardRuleOverrides, fairnessWindows: { recentStart, fiscalStart: fiscalRange.start, longTermStart }, patternTransitionBlocks, systemWorkPatternIds, replaceLegacyShiftTargetsWhenPatternRequirementsActive: customRuleConfiguration.replaceLegacyShiftTargetsWhenPatternRequirementsActive === true, fillOpenUnassignedWithNormal: customRuleConfiguration.fillOpenUnassignedWithNormal === true, meetingDayRules, ...staffingOptions, ...workRuleOptions });
+    const fixedAssignments = materializeFixedAssignments({ managerReviewCells, staff: fixedStaff, requests: approvedFixedRequests, start: range.start, end: range.end, closedDates: closedDates.map((item) => item.closedDate), sundayOperationEnabled: setting.sundayOperationEnabled, defaultBreakMinutes: setting.defaultBreakMinutes });
     const allAssignments = [...generated.assignments, ...fixedAssignments];
     if (staffingFeatureLookupFailed) generated.warnings.push({ code: 'STAFFING_REQUIREMENT_FEATURE_LOOKUP_FAILED', level: 'WARNING', workDate: this.isoDate(schedule.targetMonth), message: '属性別配置条件のFeature状態を確認できなかったため、従来方式で生成しました。' });
     if (workRuleFeatureLookupFailed) generated.warnings.push({ code: 'STAFF_WORK_RULE_FEATURE_LOOKUP_FAILED', level: 'WARNING', workDate: this.isoDate(schedule.targetMonth), message: '個別勤務ルールのFeature状態を確認できなかったため、従来方式で生成しました。' });
     await this.prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`SELECT id FROM "MonthlyShift" WHERE id=${schedule.id}::uuid AND "tenantId"=${user.tenantId}::uuid FOR UPDATE`;
+      const latest=await transaction.monthlyShift.findFirst({where:{id:schedule.id,tenantId:user.tenantId}});
+      if(!latest||latest.status!=='DRAFT'||latest.updatedAt.getTime()!==schedule.updatedAt.getTime()||reviewDigest(await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7),transaction))!==reviewDigest(reviewItems))throw new ConflictException('下書きまたは確認事項が更新されています。再実行前に確認してください。');
+      await transaction.monthlyShift.update({where:{id:schedule.id},data:{updatedAt:new Date()}});
+      await transaction.auditLog.create({data:{tenantId:user.tenantId,memberId:user.sub,action:'MANAGER_REVIEW_DRAFT_EVALUATED',targetType:'MonthlyShift',targetId:schedule.id,detail:{reviewDigest:reviewDigest(reviewItems)}}});
       await transaction.shiftAssignment.deleteMany({ where: { monthlyShiftId: schedule.id } });
       await transaction.shiftAssignment.createMany({ data: allAssignments.map(({ countsTowardStaffing: _countsTowardStaffing, attendanceModifier: _attendanceModifier, ...assignment }) => ({ tenantId: user.tenantId, monthlyShiftId: schedule.id, ...assignment, workPatternId: assignment.workPatternId ?? patternByCode.get(assignment.shiftType)?.id ?? null })) });
       const modifierRows = allAssignments.filter((item) => item.attendanceModifier);
@@ -237,7 +266,8 @@ export class ShiftsService {
     const schedule = await this.requireEditable(user, id);
     await this.workPatterns.ensureSystemPatterns(user.tenantId);
     const [context, setting, requirements] = await Promise.all([this.buildGenerationContext(user.tenantId, schedule.targetMonth, schedule.id), this.settings.ensureSetting(user.tenantId), this.settings.requirements(user)]);
-    const staff = context.staff; const diagnostics = validateGenerationContext(context, 'PRECHECK');
+    const reviewItems=context.managerReviewItems;const blocked=new Set(draftScope(reviewItems,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7)).blockedCells);
+    const staff = context.staff; const diagnostics = validateGenerationContext(context, 'PRECHECK').filter(d=>!(d.code==='HALF_DAY_BASE_ASSIGNMENT_UNCONFIRMED'&&blocked.has(JSON.stringify([d.staffId,d.date]))));
     const warnings: Array<{ code: string; level: 'INFO' | 'WARNING' | 'ERROR'; category?: string; message: string; staffId?: string; workDate?: string; source?: string; reason?: string; impact?: string; allowedActions?: string[]; overrideAllowed?: boolean }> = diagnostics.map((item) => ({ code: item.code, level: item.severity, category: item.category, message: item.reason, ...(item.staffId ? { staffId: item.staffId } : {}), workDate: item.date, source: item.source, reason: item.reason, impact: item.impact, allowedActions: item.allowedActions, overrideAllowed: item.overrideAllowed }));
     const early = staff.filter((item) => item.canWorkEarly).length; const late = staff.filter((item) => item.canWorkLate).length; const saturday = staff.filter((item) => item.canWorkSaturdays).length;
     const capacity = (code: string, message: string) => classifyGenerationDiagnostic({ severity: 'ERROR', code, staffId: null, date: this.isoDate(schedule.targetMonth), source: 'TenantShiftSetting', reason: message, allowedActions: ['別の職員を選択する', '必要人数条件を確認する', '対象限定例外を承認する', '保留して戻る'] });
@@ -263,12 +293,15 @@ export class ShiftsService {
     const assignments = rawAssignments.map((item) => ({ ...item, staff: mark(item.staff) }));
     const staff = rawStaff.map(mark) as Array<(typeof rawAssignments)[number]['staff'] & { isDirector: boolean }>;
     const summaries = staff.map((member) => { const rows = assignments.filter((item) => item.staffId === member.id); const workDays = rows.filter((item) => (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length; const workMinutes = rows.reduce((sum, item) => sum + this.minutes(item), 0); const targetMinutes = member.monthlyTargetWorkHours == null ? null : Math.round(member.monthlyTargetWorkHours * 60); const limitMinutes = member.monthlyWorkHourLimit == null ? null : member.monthlyWorkHourLimit * 60; const statuses = [member.monthlyTargetWorkDays != null && workDays < member.monthlyTargetWorkDays ? '目標未達' : null, member.monthlyTargetWorkDays != null && workDays > member.monthlyTargetWorkDays ? '目標超過' : null, targetMinutes != null && workMinutes < targetMinutes ? '目標未達' : null, targetMinutes != null && workMinutes > targetMinutes ? '目標超過' : null, limitMinutes != null && workMinutes > limitMinutes ? '上限超過' : null, limitMinutes != null && workMinutes <= limitMinutes && workMinutes >= limitMinutes * 0.9 ? '上限接近' : null].filter((value, index, all): value is string => !!value && all.indexOf(value) === index); return { staffId: member.id, workDays, targetWorkDays: member.monthlyTargetWorkDays, workDaysDifference: member.monthlyTargetWorkDays == null ? null : workDays - member.monthlyTargetWorkDays, workMinutes, targetWorkMinutes: targetMinutes, workMinutesDifference: targetMinutes == null ? null : workMinutes - targetMinutes, monthlyWorkHourLimit: member.monthlyWorkHourLimit, statuses: statuses.length ? statuses : ['目標内'] }; });
+    const reviewItems=manager?await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7)):[];
+    const reviewState=draftScope(reviewItems,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));
+    const pendingReviewCells=reviewState.blockedCells.map(key=>{const [staffId,workDate]=JSON.parse(key) as [string,string];return {staffId,workDate};});
     const viewWarnings = manager ? this.warnings(assignments, requests) : [];
     const enrichedSummaries = summaries.map((summary) => {
       const rows = assignments.filter((item) => item.staffId === summary.staffId); const staffRequests = requests.filter((item) => item.staffId === summary.staffId);
       return { ...summary, paidLeaveCount: rows.filter((item) => item.shiftType === ShiftType.PAID_LEAVE).length, halfDayCount: rows.filter((item) => !!item.attendanceModifier).length, requestCount: staffRequests.length, pendingRequestCount: staffRequests.filter((item) => item.status === ShiftRequestStatus.PENDING).length, offCount: rows.filter((item) => item.shiftType === ShiftType.OFF).length, earlyCount: rows.filter((item) => item.shiftType === ShiftType.EARLY).length, lateCount: rows.filter((item) => item.shiftType === ShiftType.LATE).length, saturdayWorkCount: rows.filter((item) => item.workDate.getUTCDay() === 6 && (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length, hardViolationCount: viewWarnings.filter((item) => item.staffId === summary.staffId && item.severity === 'blocking').length, warningCount: viewWarnings.filter((item) => item.staffId === summary.staffId && item.severity === 'warning').length };
     });
-    return { schedule, assignments, staff, requests, summaries: enrichedSummaries, warnings: viewWarnings };
+    return { schedule, assignments:assignments.filter(a=>!pendingReviewCells.some(c=>c.staffId===a.staffId&&c.workDate===this.isoDate(a.workDate))), pendingReviewCells, managerReviewCount:reviewState.reviewCount, staff, requests, summaries: enrichedSummaries, warnings: viewWarnings };
   }
 
   private async validateFixedClassSpecialShiftUniqueness(tenantId: string, scheduleId: string, inputs: AssignmentInputDto[], inputStaff: Array<{ id: string; assignedClass: any }>) {
@@ -366,7 +399,7 @@ export class ShiftsService {
   private async requireOwnStaff(user: AuthenticatedUser) { const staff = await this.prisma.staff.findUnique({ where: { tenantId_userId: { tenantId: user.tenantId, userId: user.sub } } }); if (!staff?.isActive) throw new ForbiddenException('有効な職員情報が紐づいていません。'); return staff; }
   private async requireTenantStaff(tenantId: string, staffId: string) { const staff = await this.prisma.staff.findFirst({ where: { id: staffId, tenantId } }); if (!staff) throw new NotFoundException('職員が見つかりません。'); return staff; }
   private activeStaff(tenantId: string, staffId?: string) { return this.prisma.staff.findMany({ where: { tenantId, isActive: true, ...(staffId ? { id: staffId } : {}) }, select: staffSelect, orderBy: { employeeNumber: 'asc' } }); }
-  private async buildGenerationContext(tenantId:string,targetMonth:Date,scheduleId:string){try{return await this.generationContexts.build(tenantId,targetMonth,scheduleId);}catch(error){this.logger.error('MonthlyGenerationContext build failed.',error instanceof Error?error.stack:undefined);const diagnostic=classifyGenerationDiagnostic({severity:'ERROR',category:'SYSTEM_SAFETY_BLOCK',code:'GENERATION_CONTEXT_UNAVAILABLE',staffId:null,date:this.isoDate(targetMonth),source:'MonthlyGenerationContext',reason:'対象月の正式条件をDBから一貫して取得できません。',allowedActions:['DB接続とmigration状態を確認する','Feature設定を確認して再試行する'],overrideAllowed:false});throw new ConflictException({message:'システム安全性を確認できないため停止しました。',diagnostics:[diagnostic],warnings:[this.diagnosticWarning(diagnostic)]});}}
+  private async buildGenerationContext(tenantId:string,targetMonth:Date,scheduleId:string){try{const context=await this.generationContexts.build(tenantId,targetMonth,scheduleId);const managerReviewItems=await this.reviews.rows(tenantId,this.isoDate(targetMonth).slice(0,7));return {...applyMonthlyAnswers(context,managerReviewItems),managerReviewItems};}catch(error){this.logger.error('MonthlyGenerationContext build failed.',error instanceof Error?error.stack:undefined);const diagnostic=classifyGenerationDiagnostic({severity:'ERROR',category:'SYSTEM_SAFETY_BLOCK',code:'GENERATION_CONTEXT_UNAVAILABLE',staffId:null,date:this.isoDate(targetMonth),source:'MonthlyGenerationContext',reason:'対象月の正式条件をDBから一貫して取得できません。',allowedActions:['DB接続とmigration状態を確認する','Feature設定を確認して再試行する'],overrideAllowed:false});throw new ConflictException({message:'システム安全性を確認できないため停止しました。',diagnostics:[diagnostic],warnings:[this.diagnosticWarning(diagnostic)]});}}
   private isManager(user: AuthenticatedUser) { return shiftManagerRoles.includes(user.role as any); }
   private monthDate(month: string) { const date = new Date(`${month}-01T00:00:00.000Z`); if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 7) !== month) throw new BadRequestException('monthが正しい年月ではありません。'); return date; }
   private monthRange(month: Date) { const start = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), 1)); return { start, end: new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1)) }; }

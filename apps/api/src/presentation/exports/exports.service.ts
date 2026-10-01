@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { readReviewRows } from '../shifts/manager-resolution.service';
+import { draftScope } from '../../application/manager-resolution/resolution';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MonthlyShiftStatus } from '@prisma/client';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -13,7 +15,9 @@ const shiftTypeLabels: Record<string, string> = { EARLY: '早出', NORMAL: '通�
 export class ExportsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
+  private async assertReviewed(tenantId:string,month:string){const range=this.monthRange(month);const rows=await this.prisma.tenantRuleException.findMany({where:{tenantId,isActive:true,exceptionType:{startsWith:'MANAGER_REVIEW:'},exceptionDate:{gte:range.start,lt:range.end}}});if(!draftScope(readReviewRows(rows),tenantId,month).canFinalize)throw new ConflictException('管理者確認待ちのセルがあります。回答と再評価を完了してから出力してください。');}
   async shiftsCsv(user: AuthenticatedUser, month: string) {
+    await this.assertReviewed(user.tenantId,month);
     const range = this.monthRange(month);
     const schedule = await this.prisma.monthlyShift.findUnique({ where: { tenantId_targetMonth: { tenantId: user.tenantId, targetMonth: range.start } } });
     if (!schedule) throw new NotFoundException('対象月の月間シフトが見つかりません。');
@@ -51,6 +55,7 @@ export class ExportsService {
   }
 
   async printData(user: AuthenticatedUser, month: string, ownOnly: boolean) {
+    await this.assertReviewed(user.tenantId,month);
     const range = this.monthRange(month);
     const schedule = await this.prisma.monthlyShift.findUnique({ where: { tenantId_targetMonth: { tenantId: user.tenantId, targetMonth: range.start } } });
     if (!schedule) throw new NotFoundException('対象月の月間シフトが見つかりません。');
