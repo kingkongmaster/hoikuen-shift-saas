@@ -66,3 +66,33 @@ Release status
 Code integration and source RC can be reviewed independently of real DB E2E.
 No production-ready claim until isolated DB E2E and exact monthly manifest validation.
 No dependency/schema/migration change. Commit/push is authorized for this scope.
+
+Local PostgreSQL DB E2E
+A dedicated loopback PostgreSQL 16 cluster can replace Docker for validation.
+Use a private data/socket directory, unused port, separate non-superuser owner
+role and database name containing isolated/test. Apply existing migrations only.
+Provide TEST_DATABASE_ISOLATED=true and a local TEST_DATABASE_URL matching
+DATABASE_URL through an ephemeral process environment; never commit credentials.
+Run npm run build in apps/api then node test/manager-resolution-db.e2e.cjs.
+The test uses anonymous data and retains the isolated DB/fixtures for inspection.
+It never connects to Production or copies a Production backup.
+
+The real DB suite checks the review CLI and the narrow JSON monthly importer,
+readback of events/hours/half-day base/provenance, idempotency, partial failure
+rollback, concurrent answers, Audit FK failure atomicity, Tenant/role boundaries,
+answer/reevaluation and DRAFT generation with unassigned review cells. It checks
+FINAL refusal for open reviews, HARD constraints and stale review digests.
+For the permitted FINAL path, a test-only proxy intercepts the final update
+after real validation and DB locks and aborts the transaction; no CONFIRMED
+record is ever written. This is not a real user FINAL acceptance test.
+
+import-monthly-input-manifest.cjs accepts MONTHLY_APPROVED_INPUT JSON with
+events, requests and dateFixedRules only. Half-day requests require an explicit
+base pattern. Conflicting existing values fail closed; a Serializable transaction
+protects all writes. It does not replace the legacy package importer or allow
+permanent baseline edits. Reference-only packages remain forbidden.
+Undefined optional review optionLabels are normalized to an empty object so
+PostgreSQL JSON round trips do not turn equivalent repeat imports into conflicts.
+
+Docker image RC and exact private monthly manifest validation remain distinct
+from source RC and anonymous PostgreSQL E2E. Source originals never enter tests.
