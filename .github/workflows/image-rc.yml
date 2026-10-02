@@ -1,0 +1,68 @@
+name: Image RC (manual, no deployment)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Approved source commit (40 lowercase hex characters)
+        required: true
+        type: string
+      cost_verified:
+        description: Confirm current public repo, standard runner, free storage headroom and zero-spend stop
+        required: true
+        type: boolean
+        default: false
+      source_pii_reviewed:
+        description: Confirm source SHA has passed human PII and secret review
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-rc
+  cancel-in-progress: false
+
+jobs:
+  image-rc:
+    if: inputs.cost_verified && inputs.source_pii_reviewed && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Validate dispatch
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+      - name: Checkout reviewed RC tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: control
+      - name: Checkout exact application source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+          path: source
+      - name: Set up Node (no cache)
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Build and verify RC
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: python3 control/tools/release/image-rc.py source "$RUNNER_TEMP/image-rc" "$SOURCE_SHA"
+      - name: Upload sanitized evidence and passing images only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-rc-${{ github.run_id }}
+          path: ${{ runner.temp }}/image-rc/publish/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: ignore
+          include-hidden-files: false
