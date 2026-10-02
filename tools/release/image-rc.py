@@ -1,7 +1,7 @@
 """Manual public-runner RC. No registry push, production credentials or deployment.
 
 Private scanner findings/build logs never enter artifacts. High/Critical findings
-remain UNCLASSIFIED and block RC; this tool does not invent reachability waivers.
+require exact, expiring, source-pinned reachability evidence; unknown findings block RC.
 """
 import datetime
 import gzip
@@ -14,6 +14,8 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import time
+import secrets
 import urllib.request
 
 MAX_ARTIFACT_BYTES = 400 * 1024 * 1024
@@ -41,12 +43,14 @@ def vulnerabilities(document):
         secrets += len(result.get('Secrets', []))
         for v in result.get('Vulnerabilities', []):
             if v.get('Severity') in ('HIGH', 'CRITICAL', 'UNKNOWN'):
-                rows.append({k: v.get(k) for k in ('VulnerabilityID', 'PkgName', 'InstalledVersion', 'FixedVersion', 'Severity')})
+                rows.append({**{k: v.get(k) for k in ('VulnerabilityID', 'PkgName', 'InstalledVersion', 'FixedVersion', 'Severity', 'Layer')}, 'target': result.get('Target')})
     return {'findings': rows, 'secretCount': secrets, 'unclassified': len(rows), 'pass': not rows and secrets == 0}
 
 
-def layer_boundary(archive_path):
-    counts = {'sourceMaps': 0, 'forbiddenFiles': 0, 'personalContactCandidates': 0}
+def layer_boundary(archive_path, public_contact=None):
+    counts = {'sourceMaps': 0, 'forbiddenFiles': 0, 'personalContactCandidates': 0, 'publicContactFiles': 0}
+    contacts = []
+    absent = {'untgz': True}
     with tarfile.open(archive_path) as archive:
         manifests = json.load(archive.extractfile('manifest.json'))
         if len(manifests) != 1 or not manifests[0].get('Layers'):
@@ -57,6 +61,7 @@ def layer_boundary(archive_path):
                     if entry.isdir():
                         continue
                     path = entry.name.lstrip('./')
+                    if Path(path).name == 'untgz': absent['untgz'] = False
                     counts['sourceMaps'] += int(path.endswith('.map'))
                     # System TLS CA bundles are not private credentials. Application
                     # originals, env files, private keys and database files are forbidden.
@@ -67,9 +72,112 @@ def layer_boundary(archive_path):
                         if entry.size > 64 * 1024 * 1024:
                             raise ValueError('UNINSPECTED_OVERSIZED_APPLICATION_FILE')
                         data = layer.extractfile(entry).read()
-                        counts['personalContactCandidates'] += int(bool(PERSONAL_EMAIL.search(data) or PHONE.search(data)))
-    counts['pass'] = not any(counts.values())
+                        matches = PERSONAL_EMAIL.findall(data) + PHONE.findall(data)
+                        if matches:
+                            public = public_contact is not None and all(m == public_contact for m in matches)
+                            counts['personalContactCandidates'] += int(not public)
+                            counts['publicContactFiles'] += int(public)
+                            contacts.append({'path': path, 'layer': name, 'category': 'PUBLIC_BUSINESS_CONTACT' if public else 'UNCLASSIFIED'})
+    counts['pass'] = not any(counts[k] for k in ('sourceMaps', 'forbiddenFiles', 'personalContactCandidates'))
+    counts['contactEvidence'] = contacts
+    counts['absentExecutables'] = absent
     return counts
+
+
+def source_fingerprint(source):
+    paths = ['apps/api/src', 'apps/api/prisma', 'apps/api/package.json', 'apps/api/package-lock.json',
+             'apps/api/migration', 'apps/api/Dockerfile', 'apps/web/src', 'apps/web/package.json',
+             'apps/web/package-lock.json', 'apps/web/Dockerfile', 'apps/web/nginx.conf', 'apps/web/docker-entrypoint.d']
+    files = subprocess.check_output(['git', 'ls-files', *paths], cwd=source).decode().splitlines()
+    digest = hashlib.sha256()
+    for name in sorted(files):
+        digest.update(name.encode() + b'\0' + hashlib.sha256((source / name).read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def public_legal_contact(source):
+    contacts = []
+    for name in ('apps/api/src/presentation/setup/legal-documents.ts', 'apps/web/src/features/legal/legal-documents.ts'):
+        data = (source / name).read_bytes()
+        found = re.search(rb'"contact":\s*"([^"\n]+)"', data)
+        if not found or b'aen-terms-r1-v1' not in data or b'aen-privacy-r1-v1' not in data:
+            raise ValueError('PUBLIC_LEGAL_CONTACT_NOT_VERIFIED')
+        contacts.append(found[1])
+    if contacts[0] != contacts[1]:
+        raise ValueError('LEGAL_CONTACT_MISMATCH')
+    return contacts[0]
+
+
+def classify(scan, scope, policy, guards):
+    rows = {(r['scope'], r['VulnerabilityID'], r['PkgName'], r['InstalledVersion']): r for r in policy['rows']}
+    valid = guards and datetime.date.today().isoformat() <= policy['expiresAt']
+    for finding in scan['findings']:
+        key = (scope, finding['VulnerabilityID'], finding['PkgName'], finding['InstalledVersion'])
+        rule = rows.get(key) if valid else None
+        if rule and rule['Severity'] == finding['Severity'] and rule['category'] in ('RUNTIME_REACHABLE_BLOCKER', 'RUNTIME_REACHABLE_MITIGATED', 'BUILD_ONLY', 'DEV_ONLY', 'OS_PACKAGE_NOT_REACHABLE', 'FALSE_POSITIVE') and rule['assessedSeverity'] in ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'NONE'):
+            finding.update({k: rule[k] for k in ('category', 'assessedSeverity', 'reason', 'exploitCondition', 'reference')})
+        else:
+            finding['category'] = 'UNKNOWN'
+    scan['unclassified'] = sum(f['category'] == 'UNKNOWN' for f in scan['findings'])
+    scan['runtimeBlockers'] = sum(f['category'] == 'RUNTIME_REACHABLE_BLOCKER' for f in scan['findings'])
+    scan['pass'] = valid and not (scan['unclassified'] or scan['runtimeBlockers'] or scan['secretCount'])
+    return scan
+
+
+def runtime_evidence(command, manifest, source):
+    # Anonymous, disposable runner-only network: no host port, no external routing.
+    suffix = os.environ.get('GITHUB_RUN_ID', 'local')
+    network, db, api, web = ['rc-' + x + '-' + suffix for x in ('net', 'db', 'api', 'web')]
+    created = []
+    result = {}
+    def run_container(name, args):
+        command(['docker', 'run', '-d', '--name', name, '--network', network, *args])
+        created.append(name)
+    try:
+        command(['docker', 'pull', '--platform', 'linux/amd64', 'postgres:16-alpine'])
+        result['isolatedPostgresImageId'] = json.loads(command(['docker', 'image', 'inspect', 'postgres:16-alpine'], capture=True))[0]['Id']
+        command(['docker', 'network', 'create', '--internal', network])
+        run_container(db, ['--network-alias', 'db', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rc', 'postgres:16-alpine'])
+        for attempt in range(30):
+            ready = subprocess.run(['docker', 'exec', db, 'pg_isready', '-U', 'postgres'], capture_output=True)
+            if ready.returncode == 0: break
+            time.sleep(1)
+        else: raise ValueError('ISOLATED_POSTGRES_NOT_READY')
+        # Synthetic secret only; never copied into artifact or command output.
+        os.environ['RC_TEST_JWT'] = secrets.token_hex(40)
+        run_container(api, ['--network-alias', 'api', '-e', 'DATABASE_URL=postgresql://postgres@db:5432/rc',
+            '-e', 'JWT_SECRET=' + os.environ.pop('RC_TEST_JWT'), '-e', 'JWT_EXPIRES_IN=15m', '-e', 'NODE_ENV=production',
+            '-e', 'DEPLOYMENT_ENV=staging', '-e', 'WEB_ORIGIN=https://rc.example.invalid', '-e', 'TRUST_PROXY=1', '-e', 'LOG_LEVEL=error',
+            manifest['images']['api']['imageId']])
+        run_container(web, ['-e', 'API_UPSTREAM=http://api:3000', manifest['images']['web']['imageId']])
+        probe = """(async()=>{const paths=['http://api:3000/api/health','http://api:3000/api/ready'];for(const url of paths){let ok=false;for(let i=0;i<30;i++){try{ok=(await fetch(url)).status===200}catch{}if(ok)break;await new Promise(r=>setTimeout(r,1000))}if(!ok)throw Error('HEALTH')};const form=new FormData();form.append('probe','anonymous');const r=await fetch('http://api:3000/api/auth/login',{method:'POST',body:form});if(![400,401].includes(r.status))throw Error('MULTIPART_REJECTION');console.log(JSON.stringify({health:200,readiness:200,multipartRejected:true}))})().catch(()=>process.exit(1))"""
+        result['api'] = json.loads(command(['docker', 'exec', api, 'node', '-e', probe], capture=True))
+        # Node probe in the API container reaches only this internal Web container.
+        paths = ['/', '/manifest.json', '/sw.js', '/icons/aen-shift-icon-192.png', '/icons/aen-shift-icon-512.png', '/release-metadata.json']
+        web_probe = "(async()=>{for(const p of " + json.dumps(paths) + "){const r=await fetch('http://" + web + ":8080'+p);if(r.status!==200)throw Error('WEB_HTTP');if(p==='/release-metadata.json'&&JSON.stringify(await r.json())!==JSON.stringify(" + json.dumps(manifest['metadata']) + "))throw Error('WEB_METADATA')}console.log(JSON.stringify({http:200,pwa:200,metadataMatch:true}))})().catch(()=>process.exit(1))"
+        result['web'] = json.loads(command(['docker', 'exec', api, 'node', '-e', web_probe], capture=True))
+        config = command(['docker', 'exec', web, 'nginx', '-T'], capture=True)
+        ldd = command(['docker', 'exec', web, 'ldd', '/usr/sbin/nginx'], capture=True)
+        result['nginxEvidence'] = {'effectiveConfigurationSha256': hashlib.sha256(config.encode()).hexdigest(),
+            'linkedLibraries': sorted(set(re.findall(r'lib[\w.+-]+\.so[\w.-]*', ldd))),
+            'excludedFeatureDirectives': not re.search(r'^\s*(?:image_filter|xslt_stylesheet|xslt_types|ssl_certificate|ssl_crl|http2|quic)\b|listen[^;]*(?:ssl|http2|quic)|proxy_pass\s+https:', config, re.M),
+            'staticHttpUpstream': 'proxy_pass http://api:3000/api/;' in config}
+        result['api']['deepmergeAbsent'] = command(['docker', 'exec', api, 'node', '-e', "try{require.resolve('deepmerge-ts');process.exit(1)}catch(e){if(e.code!=='MODULE_NOT_FOUND')process.exit(1);console.log('absent')}"], capture=True).strip() == 'absent'
+        result['web']['nginxOnlyProcess'] = all('nginx:' in line for line in command(['docker', 'top', web, '-eo', 'args'], capture=True).splitlines()[1:])
+        result['amd64'] = all(json.loads(command(['docker','image','inspect',x['imageId']],capture=True))[0]['Architecture']=='amd64' for x in manifest['images'].values())
+        for name in (api, web):
+            state = json.loads(command(['docker', 'inspect', '--format', '{{json .State}}', name], capture=True))
+            if not state['Running'] or state.get('OOMKilled'): raise ValueError('RUNTIME_STATE')
+            if command(['docker', 'inspect', '--format', '{{.RestartCount}}', name], capture=True).strip() != '0': raise ValueError('RUNTIME_RESTART')
+        result['restartCount'] = 0
+        result['internalNetwork'] = True
+        result['productionConnected'] = False
+        result['pass'] = result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
+        return result
+    finally:
+        for name in reversed(created):
+            subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
+        subprocess.run(['docker', 'network', 'rm', network], capture_output=True)
 
 
 def artifact_size_ok(paths):
@@ -135,14 +243,23 @@ def run(source, output, expected_sha):
         command(['node', str(source / 'tools/release/build-images.mjs'), str(metadata_file), str(manifest_file)])
         command(['node', str(source / 'tools/release/verify-images.mjs'), str(manifest_file)])
         manifest = json.loads(manifest_file.read_text())
+        policy = json.loads((source / 'tools/release/image-security-policy.json').read_text())
+        fingerprint_ok = source_fingerprint(source) == policy['sourceFingerprint']
+        if not fingerprint_ok: raise ValueError('REACHABILITY_SOURCE_CHANGED')
+        public_contact = public_legal_contact(source)
+        report['stage'] = 'isolated-runtime'
+        report['runtime'] = runtime_evidence(command, manifest, source)
+        guards = report['runtime']['pass']
+        report['sourceSecurity'] = classify(report['sourceSecurity'], 'source', policy, guards)
         archives = []
         for app, image in manifest['images'].items():
+            report['stage'] = 'image-scan-' + app
             archive = output / (app + '.tar')
             command(['docker', 'save', '-o', str(archive), image['imageId']])
-            boundary = layer_boundary(archive)
+            boundary = layer_boundary(archive, public_contact)
             scan_file = output / (app + '.scan.private.json')
             command([str(scanner), 'image', '--cache-dir', str(cache), '--scanners', 'vuln,secret', '--format', 'json', '--output', str(scan_file), image['imageId']])
-            security = vulnerabilities(json.loads(scan_file.read_text()))
+            security = classify(vulnerabilities(json.loads(scan_file.read_text())), app, policy, guards and boundary['absentExecutables']['untgz'])
             detail = json.loads(command(['docker', 'image', 'inspect', image['imageId']], capture=True))[0]
             compressed = output / (app + '.tar.gz')
             with archive.open('rb') as src, gzip.open(compressed, 'wb', compresslevel=6) as dst:
@@ -160,7 +277,7 @@ def run(source, output, expected_sha):
             raise ValueError('ARTIFACT_COST_SIZE_HOLD')
         for archive in archives:
             shutil.move(str(archive), publish / archive.name)
-        report['status'] = 'IMAGE_SECURITY_METADATA_VERIFIED_RUNTIME_NOT_YET_VERIFIED'
+        report['status'] = 'IMAGE_SECURITY_METADATA_RUNTIME_VERIFIED'
     except Exception as error:
         report['reason'] = str(error) if isinstance(error, ValueError) else type(error).__name__
     finally:
@@ -171,7 +288,7 @@ def run(source, output, expected_sha):
                 artifact.unlink()
             raise ValueError('ARTIFACT_COST_SIZE_HOLD')
     print(json.dumps({'status': report['status'], 'reason': report.get('reason'), 'sourceSha': expected_sha}))
-    return 0 if report['status'].startswith('IMAGE_SECURITY_METADATA_VERIFIED') else 1
+    return 0 if report['status'].startswith('IMAGE_SECURITY_METADATA_RUNTIME_VERIFIED') else 1
 
 
 if __name__ == '__main__':

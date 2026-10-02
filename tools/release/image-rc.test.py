@@ -61,6 +61,35 @@ class RcSafety(unittest.TestCase):
             self.assertEqual(value['personalContactCandidates'], 1)
             self.assertNotIn('@', json.dumps(value))
 
+    def test_only_exact_public_contact_is_allowed_without_value_disclosure(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'image.tar'
+            saved_image(path, [('app/dist/legal.js', b'public-example@gmail.com'), ('app/dist/other.js', b'private-example@gmail.com')])
+            value = rc.layer_boundary(path, b'public-example@gmail.com')
+            self.assertEqual(value['publicContactFiles'], 1)
+            self.assertEqual(value['personalContactCandidates'], 1)
+            self.assertFalse(value['pass'])
+            self.assertNotIn('@', json.dumps(value))
+
+    def test_known_classification_requires_exact_version_severity_and_guards(self):
+        row = dict(scope='api', VulnerabilityID='CVE-TEST', PkgName='test', InstalledVersion='1', Severity='HIGH',
+                   category='BUILD_ONLY', assessedSeverity='HIGH', reason='fixture', exploitCondition='fixture', reference='https://example.invalid')
+        policy = {'rows': [row], 'expiresAt': '2099-01-01'}
+        def scan(version='1'):
+            return rc.vulnerabilities({'Results': [{'Vulnerabilities': [{**row, 'InstalledVersion': version}]}]})
+        self.assertTrue(rc.classify(scan(), 'api', policy, True)['pass'])
+        self.assertFalse(rc.classify(scan(), 'api', policy, False)['pass'])
+        self.assertFalse(rc.classify(scan('2'), 'api', policy, True)['pass'])
+        self.assertFalse(rc.classify(scan(), 'web', policy, True)['pass'])
+        policy['expiresAt'] = '2000-01-01'
+        self.assertFalse(rc.classify(scan(), 'api', policy, True)['pass'])
+
+    def test_unknown_finding_and_runtime_blocker_never_pass(self):
+        policy = {'rows': [], 'expiresAt': '2099-01-01'}
+        scan = rc.vulnerabilities({'Results': [{'Vulnerabilities': [dict(VulnerabilityID='new', PkgName='p', InstalledVersion='1', Severity='CRITICAL')]}]})
+        self.assertEqual(rc.classify(scan, 'web', policy, True)['unclassified'], 1)
+        self.assertFalse(scan['pass'])
+
     def test_size_cap_before_upload(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / 'large'
