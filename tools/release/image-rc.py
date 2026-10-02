@@ -124,19 +124,20 @@ def classify(scan, scope, policy, guards):
     return scan
 
 
-def runtime_evidence(command, manifest, source):
+def runtime_evidence(command, manifest, source, result):
     # Anonymous, disposable runner-only network: no host port, no external routing.
     suffix = os.environ.get('GITHUB_RUN_ID', 'local')
     network, db, api, web = ['rc-' + x + '-' + suffix for x in ('net', 'db', 'api', 'web')]
     created = []
-    result = {}
     def run_container(name, args):
         command(['docker', 'run', '-d', '--name', name, '--network', network, *args])
         created.append(name)
     try:
+        result['phase'] = 'pull-isolated-postgres'
         command(['docker', 'pull', '--platform', 'linux/amd64', 'postgres:16-alpine'])
         result['isolatedPostgresImageId'] = json.loads(command(['docker', 'image', 'inspect', 'postgres:16-alpine'], capture=True))[0]['Id']
         command(['docker', 'network', 'create', '--internal', network])
+        result['phase'] = 'start-isolated-postgres'
         run_container(db, ['--network-alias', 'db', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rc', 'postgres:16-alpine'])
         for attempt in range(30):
             ready = subprocess.run(['docker', 'exec', db, 'pg_isready', '-U', 'postgres'], capture_output=True)
@@ -145,36 +146,55 @@ def runtime_evidence(command, manifest, source):
         else: raise ValueError('ISOLATED_POSTGRES_NOT_READY')
         # Synthetic secret only; never copied into artifact or command output.
         os.environ['RC_TEST_JWT'] = secrets.token_hex(40)
+        result['phase'] = 'start-api'
         run_container(api, ['--network-alias', 'api', '-e', 'DATABASE_URL=postgresql://postgres@db:5432/rc',
             '-e', 'JWT_SECRET=' + os.environ.pop('RC_TEST_JWT'), '-e', 'JWT_EXPIRES_IN=15m', '-e', 'NODE_ENV=production',
             '-e', 'DEPLOYMENT_ENV=staging', '-e', 'WEB_ORIGIN=https://rc.example.invalid', '-e', 'TRUST_PROXY=1', '-e', 'LOG_LEVEL=error',
             manifest['images']['api']['imageId']])
+        result['phase'] = 'start-web'
         run_container(web, ['-e', 'API_UPSTREAM=http://api:3000', manifest['images']['web']['imageId']])
         probe = """(async()=>{const paths=['http://api:3000/api/health','http://api:3000/api/ready'];for(const url of paths){let ok=false;for(let i=0;i<30;i++){try{ok=(await fetch(url)).status===200}catch{}if(ok)break;await new Promise(r=>setTimeout(r,1000))}if(!ok)throw Error('HEALTH')};const form=new FormData();form.append('probe','anonymous');const r=await fetch('http://api:3000/api/auth/login',{method:'POST',body:form});if(![400,401].includes(r.status))throw Error('MULTIPART_REJECTION');console.log(JSON.stringify({health:200,readiness:200,multipartRejected:true}))})().catch(()=>process.exit(1))"""
+        result['phase'] = 'api-health-readiness-multipart'
         result['api'] = json.loads(command(['docker', 'exec', api, 'node', '-e', probe], capture=True))
         # Node probe in the API container reaches only this internal Web container.
         paths = ['/', '/manifest.json', '/sw.js', '/icons/aen-shift-icon-192.png', '/icons/aen-shift-icon-512.png', '/release-metadata.json']
         web_probe = "(async()=>{for(const p of " + json.dumps(paths) + "){const r=await fetch('http://" + web + ":8080'+p);if(r.status!==200)throw Error('WEB_HTTP');if(p==='/release-metadata.json'&&JSON.stringify(await r.json())!==JSON.stringify(" + json.dumps(manifest['metadata']) + "))throw Error('WEB_METADATA')}console.log(JSON.stringify({http:200,pwa:200,metadataMatch:true}))})().catch(()=>process.exit(1))"
+        result['phase'] = 'web-http-pwa-metadata'
         result['web'] = json.loads(command(['docker', 'exec', api, 'node', '-e', web_probe], capture=True))
+        result['phase'] = 'nginx-config'
         config = command(['docker', 'exec', web, 'nginx', '-T'], capture=True)
+        result['phase'] = 'nginx-linked-libraries'
         ldd = command(['docker', 'exec', web, 'ldd', '/usr/sbin/nginx'], capture=True)
         result['nginxEvidence'] = {'effectiveConfigurationSha256': hashlib.sha256(config.encode()).hexdigest(),
             'linkedLibraries': sorted(set(re.findall(r'lib[\w.+-]+\.so[\w.-]*', ldd))),
             'excludedFeatureDirectives': not re.search(r'^\s*(?:image_filter|xslt_stylesheet|xslt_types|ssl_certificate|ssl_crl|http2|quic)\b|listen[^;]*(?:ssl|http2|quic)|proxy_pass\s+https:', config, re.M),
             'staticHttpUpstream': 'proxy_pass http://api:3000/api/;' in config}
+        result['phase'] = 'deepmerge-absence'
         result['api']['deepmergeAbsent'] = command(['docker', 'exec', api, 'node', '-e', "try{require.resolve('deepmerge-ts');process.exit(1)}catch(e){if(e.code!=='MODULE_NOT_FOUND')process.exit(1);console.log('absent')}"], capture=True).strip() == 'absent'
+        result['phase'] = 'nginx-process'
         result['web']['nginxOnlyProcess'] = all('nginx:' in line for line in command(['docker', 'top', web, '-eo', 'args'], capture=True).splitlines()[1:])
         result['amd64'] = all(json.loads(command(['docker','image','inspect',x['imageId']],capture=True))[0]['Architecture']=='amd64' for x in manifest['images'].values())
         for name in (api, web):
             state = json.loads(command(['docker', 'inspect', '--format', '{{json .State}}', name], capture=True))
             if not state['Running'] or state.get('OOMKilled'): raise ValueError('RUNTIME_STATE')
             if command(['docker', 'inspect', '--format', '{{.RestartCount}}', name], capture=True).strip() != '0': raise ValueError('RUNTIME_RESTART')
+        result['phase'] = 'complete'
         result['restartCount'] = 0
         result['internalNetwork'] = True
         result['productionConnected'] = False
         result['pass'] = result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
         return result
     finally:
+        result['containerDiagnostics'] = []
+        for name in created:
+            state = subprocess.run(['docker', 'inspect', '--format', '{{json .State}}', name], capture_output=True)
+            if state.returncode == 0:
+                data = json.loads(state.stdout)
+                logs = subprocess.run(['docker', 'logs', name], capture_output=True)
+                text = (logs.stdout + logs.stderr).decode(errors='replace')
+                result['containerDiagnostics'].append({'role': name.split('-')[1], 'running': data.get('Running'),
+                    'exitCode': data.get('ExitCode'), 'oomKilled': data.get('OOMKilled'),
+                    'errorSignals': {label: label in text for label in ('Invalid production environment', 'Cannot find module', 'ECONNREFUSED', 'Error', 'FATAL')}})
         for name in reversed(created):
             subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
         subprocess.run(['docker', 'network', 'rm', network], capture_output=True)
@@ -248,7 +268,8 @@ def run(source, output, expected_sha):
         if not fingerprint_ok: raise ValueError('REACHABILITY_SOURCE_CHANGED')
         public_contact = public_legal_contact(source)
         report['stage'] = 'isolated-runtime'
-        report['runtime'] = runtime_evidence(command, manifest, source)
+        report['runtime'] = {}
+        runtime_evidence(command, manifest, source, report['runtime'])
         guards = report['runtime']['pass']
         report['sourceSecurity'] = classify(report['sourceSecurity'], 'source', policy, guards)
         archives = []
