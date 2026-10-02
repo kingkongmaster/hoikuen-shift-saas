@@ -1,3 +1,4 @@
+import { assertMonthlySubmitted } from './monthly-submission';
 import { ManagerResolutionService, reviewDigest } from './manager-resolution.service';
 import { applyMonthlyAnswers, validateAnswerAssignments } from '../../application/manager-resolution/monthly-effects';
 import { draftScope } from '../../application/manager-resolution/resolution';
@@ -112,6 +113,7 @@ export class ShiftsService {
 
   async confirm(user: AuthenticatedUser, id: string) {
     const schedule = await this.requireEditable(user, id);
+    await assertMonthlySubmitted(this.prisma,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));
     const reviewItems=await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));
     if(!draftScope(reviewItems,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7)).canFinalize)throw new ConflictException('管理者確認または再評価が未完了です。');
     const context = await this.buildGenerationContext(user.tenantId, schedule.targetMonth, schedule.id);
@@ -123,6 +125,7 @@ export class ShiftsService {
     const blocking = [...diagnostics.filter((item) => item.severity === 'ERROR').map((item) => this.diagnosticWarning(item)), ...view.warnings.filter((warning) => warning.severity === 'blocking'), ...saturdayBlocking];
     if (blocking.length) throw new ConflictException({ message: '確定できない勤務条件があります。', diagnostics: diagnostics.filter((item) => item.severity === 'ERROR'), warnings: blocking });
     const confirmed=await this.prisma.$transaction(async db=>{
+      await assertMonthlySubmitted(db,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));
       await db.$queryRaw`SELECT id FROM "MonthlyShift" WHERE id=${schedule.id}::uuid AND "tenantId"=${user.tenantId}::uuid FOR UPDATE`;
       const current=await db.monthlyShift.findFirst({where:{id:schedule.id,tenantId:user.tenantId}});
       const currentReviews=await this.reviews.rows(user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7),db);

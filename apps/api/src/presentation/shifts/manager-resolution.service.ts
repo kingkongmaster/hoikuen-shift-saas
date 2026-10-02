@@ -1,3 +1,4 @@
+import { monthlySubmissionStatus, confirmMonthlySubmission } from './monthly-submission';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
@@ -15,6 +16,8 @@ export function readReviewRows(rows:Array<{id:string;tenantId:string;version:num
 @Injectable()
 export class ManagerResolutionService {
  constructor(private readonly prisma:PrismaService,private readonly contexts:MonthlyGenerationContextBuilder){}
+ async submissions(user:AuthenticatedUser,month:string){this.admin(user);return monthlySubmissionStatus(this.prisma,user.tenantId,month);}
+ async submitMonth(user:AuthenticatedUser,month:string,category:string,revision:number,inputDigest:string,state:string){return confirmMonthlySubmission(this.prisma,user,month,category,revision,inputDigest,state);}
  async rows(tenantId:string,month:string,db:Prisma.TransactionClient=this.prisma) {
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new BadRequestException('対象月が不正です。');
   const start=new Date(month+'-01T00:00:00Z'),end=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+1,1));

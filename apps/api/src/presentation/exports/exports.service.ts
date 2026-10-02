@@ -1,3 +1,4 @@
+import { monthlySubmissionStatus } from '../shifts/monthly-submission';
 import { readReviewRows } from '../shifts/manager-resolution.service';
 import { draftScope } from '../../application/manager-resolution/resolution';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
@@ -68,7 +69,7 @@ export class ExportsService {
       this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } } }),
     ]);
     await this.audit.create(user.tenantId, user.sub, 'SHIFT_PRINT_VIEWED', 'MonthlyShift', schedule.id, { month, ownOnly });
-    return { tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.workPattern?.name ?? shiftTypeLabels[item.shiftType] ?? 'その他勤務', assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
+    return { hasUnsubmitted: schedule.status !== 'CONFIRMED' && (await monthlySubmissionStatus(this.prisma,user.tenantId,month)).hasUnsubmitted, tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.workPattern?.name ?? shiftTypeLabels[item.shiftType] ?? 'その他勤務', assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
   }
 
   private csv(headers: string[], rows: unknown[][]) { return BOM + [headers, ...rows].map((row) => row.map((value) => this.cell(value)).join(',')).join('\r\n') + '\r\n'; }

@@ -1,3 +1,4 @@
+export type MonthlySubmission = {month:string;hasUnsubmitted:boolean;items:Array<{category:string;state:'NOT_SUBMITTED'|'SUBMITTED_EMPTY'|'SUBMITTED_WITH_DATA';count:number;pending:number;revision:number;inputDigest:string;confirmedAt:string|null}>};
 import type { ManagerReviewCard, Answer as ManagerReviewAnswer } from '../features/manager-resolution/ManagerResolutionCards';
 export type Role = 'ADMIN' | 'DIRECTOR' | 'CHIEF' | 'STAFF';
 export type Session = {
@@ -95,7 +96,7 @@ export type Notification = { id:string; type:NotificationType; title:string; mes
 export type ShiftSwap = { id:string; requesterId:string; targetMemberId:string; requestDate:string; status:'PENDING'|'APPROVED'|'REJECTED'|'CANCELLED'; requestComment:string|null; adminComment:string|null; createdAt:string; requester:{id:string;displayName:string}; targetMember:{id:string;displayName:string} };
 export type SwapTarget = { userId:string|null; displayName:string; employeeNumber:string };
 export type AuditLog = { id:string; memberId:string; action:string; targetType:string; targetId:string; detail:unknown; createdAt:string; member:{id:string;displayName:string;email:string} };
-export type PrintShiftData = { tenantName:string; month:string; status:MonthlyShiftStatus; printedAt:string; ownOnly:boolean; closedDates:Array<{date:string;name:string}>; assignments:Array<{employeeNumber:string;staffName:string;date:string;weekday:string;shiftType:string;assignedClass:string;startTime:string|null;endTime:string|null;breakMinutes:number|null;note:string|null}> };
+export type PrintShiftData = { hasUnsubmitted?:boolean; tenantName:string; month:string; status:MonthlyShiftStatus; printedAt:string; ownOnly:boolean; closedDates:Array<{date:string;name:string}>; assignments:Array<{employeeNumber:string;staffName:string;date:string;weekday:string;shiftType:string;assignedClass:string;startTime:string|null;endTime:string|null;breakMinutes:number|null;note:string|null}> };
 export type BackupValidation = { valid:boolean; errors:string[]; warnings:string[]; metadata:{format:string;version:number;exportedAt:string;tenantName:string;integrity:{algorithm:string;checksum:string}}; counts:Record<string,number> };
 export type SetupStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type WorkforceReview = {
@@ -264,6 +265,8 @@ export const api = {
   createRequest(token: string, input: ShiftRequestInput) { return request<ShiftRequest>('/requests', { method: 'POST', body: JSON.stringify(input) }, token); },
   updateRequest(token: string, id: string, input: ShiftRequestUpdate) { return request<ShiftRequest>(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify(input) }, token); },
   cancelRequest(token: string, id: string) { return request<ShiftRequest>(`/requests/${id}`, { method: 'DELETE' }, token); },
+  monthlySubmission(token:string,month:string){return request<MonthlySubmission>(`/manager-reviews/${month}/submission`,{},token);},
+  confirmMonthlySubmission(token:string,month:string,category:string,body:{revision:number;inputDigest:string;state:string}){return request(`/manager-reviews/${month}/submission/${category}`,{method:'POST',body:JSON.stringify(body)},token);},
   managerReviews(token:string,month:string) {return request<ManagerReviewCard[]>(`/manager-reviews/${month}`,{},token);},
   answerManagerReview(token:string,month:string,id:string,revision:number,answer:ManagerReviewAnswer){return request(`/manager-reviews/${month}/${id}/answers`,{method:'POST',body:JSON.stringify({revision,answer})},token);},
   reevaluateManagerReview(token:string,month:string,id:string,revision:number){return request(`/manager-reviews/${month}/${id}/reevaluate`,{method:'POST',body:JSON.stringify({revision})},token);},

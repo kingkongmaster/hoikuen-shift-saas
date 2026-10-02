@@ -1,0 +1,30 @@
+'use strict';
+const assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
+require('./helpers/isolated-database.cjs').resolveIsolatedDatabaseUrl();
+const {PrismaClient}=require('@prisma/client');const p=new PrismaClient({log:[]});
+const {monthlySubmissionStatus:read,confirmMonthlySubmission:submit,assertMonthlySubmitted:gate}=require('../dist/presentation/shifts/monthly-submission');
+const {ShiftsService}=require('../dist/presentation/shifts/shifts.service');
+async function main(){
+ const t=await p.tenant.create({data:{name:'Anonymous submission '+randomUUID()}}),other=await p.tenant.create({data:{name:'Anonymous other '+randomUUID()}}),u=await p.user.create({data:{displayName:'Anonymous administrator',passwordHash:'DISABLED_TEST_ACCOUNT'}});
+ await p.membership.create({data:{tenantId:t.id,userId:u.id,role:'ADMIN'}});const actor={tenantId:t.id,sub:u.id,role:'ADMIN'},month='2026-10';
+ const s=await p.staff.create({data:{tenantId:t.id,employeeNumber:'ANON',displayName:'Anonymous staff'}});
+ const schedule=await p.monthlyShift.create({data:{tenantId:t.id,targetMonth:new Date(month+'-01'),createdByUserId:u.id}});
+ const shifts=new ShiftsService(p);const initial=await read(p,t.id,month);assert(initial.items.every(i=>i.state==='NOT_SUBMITTED'&&i.count===0));
+ await assert.rejects(()=>shifts.confirm(actor,schedule.id),e=>e.getResponse?.().code==='MONTHLY_INPUT_NOT_SUBMITTED');
+ let auditCount=()=>p.auditLog.count({where:{tenantId:t.id,action:'MONTHLY_SUBMISSION_CONFIRMED'}});
+ const item=initial.items[0];const args=[month,item.category,item.revision,item.inputDigest,'SUBMITTED_EMPTY'];
+ await assert.rejects(()=>submit(p,{...actor,role:'STAFF'},...args));await assert.rejects(()=>submit(p,{...actor,tenantId:other.id},...args));assert.equal(await auditCount(),0);
+ await assert.rejects(()=>submit(p,actor,month,item.category,0,item.inputDigest,'SUBMITTED_WITH_DATA'));assert.equal(await auditCount(),0);
+ await submit(p,actor,...args);await submit(p,actor,...args);assert.equal(await auditCount(),1);
+ const partial=await read(p,t.id,month);assert.equal(partial.items.filter(i=>i.state==='NOT_SUBMITTED').length,3);await assert.rejects(()=>gate(p,t.id,month));
+ for(const i of partial.items.slice(1,3))await submit(p,actor,month,i.category,i.revision,i.inputDigest,'SUBMITTED_EMPTY');await assert.rejects(()=>gate(p,t.id,month));
+ const last=partial.items[3];const concurrent=await Promise.allSettled([submit(p,actor,month,last.category,0,last.inputDigest,'SUBMITTED_EMPTY'),submit(p,actor,month,last.category,0,last.inputDigest,'SUBMITTED_EMPTY')]);assert(concurrent.some(r=>r.status==='fulfilled'));assert.equal(await auditCount(),4);await gate(p,t.id,month);
+ const audit=await p.auditLog.findFirst({where:{tenantId:t.id,action:'MONTHLY_SUBMISSION_CONFIRMED'}});assert.equal(audit.memberId,u.id);assert.equal(audit.detail.month,month);assert.equal(audit.detail.oldState,'NOT_SUBMITTED');assert.equal(audit.detail.newState,'SUBMITTED_EMPTY');assert(audit.detail.confirmedAt);
+ const before=await read(p,t.id,month);await p.shiftRequest.create({data:{tenantId:t.id,staffId:s.id,requestDate:new Date('2026-10-07'),requestType:'DAY_OFF',status:'APPROVED'}});
+ const changed=(await read(p,t.id,month)).items[0];assert.equal(changed.state,'NOT_SUBMITTED');assert.equal(changed.count,1);await assert.rejects(()=>gate(p,t.id,month));await assert.rejects(()=>submit(p,actor,month,changed.category,changed.revision,before.items[0].inputDigest,'SUBMITTED_EMPTY'));assert.equal(await auditCount(),4);
+ await submit(p,actor,month,changed.category,changed.revision,changed.inputDigest,'SUBMITTED_WITH_DATA');await gate(p,t.id,month);
+ const request=await p.shiftRequest.create({data:{tenantId:t.id,staffId:s.id,requestDate:new Date('2026-10-08'),requestType:'HALF_DAY_PM',status:'PENDING'}});const leave=(await read(p,t.id,month)).items[1];assert.equal(leave.pending,1);await assert.rejects(()=>submit(p,actor,month,leave.category,leave.revision,leave.inputDigest,'SUBMITTED_EMPTY'));await p.shiftRequest.update({where:{id:request.id},data:{status:'APPROVED'}});const paid=(await read(p,t.id,month)).items[1];assert.equal(paid.count,1);await submit(p,actor,month,paid.category,paid.revision,paid.inputDigest,'SUBMITTED_WITH_DATA');await gate(p,t.id,month);
+ assert((await read(p,other.id,month)).items.every(i=>i.state==='NOT_SUBMITTED'));assert.equal(await p.tenantRuleException.count({where:{tenantId:other.id}}),0);assert.equal(await p.monthlyShift.count({where:{tenantId:t.id,status:'CONFIRMED'}}),0);
+ console.log('PASS monthly submission: zero != unsubmitted; full/partial FINAL gate; explicit empty/data; invalidation; pending refusal; ADMIN/Tenant; Audit; duplicate/concurrency; no FINAL write');
+}
+main().catch(e=>{console.error('MONTHLY_SUBMISSION_E2E_HOLD',e.code??e.name);console.error(e.stack?.split('\n').filter(s=>s.trim().startsWith('at ')).slice(0,2).join('\n'));process.exitCode=1}).finally(()=>p.$disconnect());
