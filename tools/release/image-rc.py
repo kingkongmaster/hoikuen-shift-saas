@@ -172,7 +172,7 @@ def runtime_evidence(command, manifest, source, result):
         result['phase'] = 'deepmerge-absence'
         result['api']['deepmergeAbsent'] = command(['docker', 'exec', api, 'node', '-e', "try{require.resolve('deepmerge-ts');process.exit(1)}catch(e){if(e.code!=='MODULE_NOT_FOUND')process.exit(1);console.log('absent')}"], capture=True).strip() == 'absent'
         result['phase'] = 'nginx-process'
-        result['web']['nginxOnlyProcess'] = all('nginx:' in line for line in command(['docker', 'top', web, '-eo', 'args'], capture=True).splitlines()[1:])
+        result['web']['nginxOnlyProcess'] = set(command(['docker', 'exec', web, 'ps', '-o', 'comm'], capture=True).splitlines()[1:]) <= {'nginx', 'ps'}
         result['amd64'] = all(json.loads(command(['docker','image','inspect',x['imageId']],capture=True))[0]['Architecture']=='amd64' for x in manifest['images'].values())
         for name in (api, web):
             state = json.loads(command(['docker', 'inspect', '--format', '{{json .State}}', name], capture=True))
