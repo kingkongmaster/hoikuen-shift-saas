@@ -1,7 +1,7 @@
 {
   "reviewedAt": "2026-10-02",
   "expiresAt": "2026-10-16",
-  "sourceFingerprint": "f988e969fad20a01b330e8fb684665930f53748cf9ce907fec4d83365151cf4a",
+  "sourceFingerprint": "7b61fd8621d6dde55f3b9b610046a9982a6f929a3727b8876adb94b02dd4af95",
   "scope": "API/Web only; fixed HTTP upstream; no public TLS termination in these images",
   "rows": [
     {

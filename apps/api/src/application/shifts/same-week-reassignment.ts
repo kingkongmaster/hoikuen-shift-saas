@@ -4,7 +4,7 @@ import { fixedRule } from './staff-work-rule-evaluator';
 // Private replay choices are candidate filters, never fixed rules or HARD overrides.
 export type ReplayChoices = Map<string, string>;
 export type ReassignmentTrace = Map<string, { normal: string[]; relaxed: string[] }>;
-type Result = { assignments: GeneratedAssignment[]; warnings: GenerationWarning[]; staffingRequirementEvaluations?: Array<{ requirementId: string; date: string; constraintLevel: string; isSatisfied: boolean; requiredCount: number; actualCount: number }> };
+type Result = { assignments: GeneratedAssignment[]; warnings: GenerationWarning[]; staffingRequirementEvaluations?: Array<{ requirementId: string; code?: string; date: string; constraintLevel: string; isSatisfied: boolean; requiredCount: number; actualCount: number }> };
 const MAX_ATTEMPTS = 32;
 const MAX_PLANS = 1024;
 const MAX_CANDIDATES = 12;
@@ -15,9 +15,14 @@ const week = (date: Date) => { const d = new Date(date); d.setUTCDate(d.getUTCDa
 export const replayKey = (id: string, date: Date) => `${id}:${day(date)}`;
 export const replayValue = (row: Pick<GeneratedAssignment, 'shiftType' | 'workPatternId'>) => row.shiftType === 'NORMAL' ? NORMAL : row.workPatternId ?? row.shiftType;
 
-export function hardDeficits(result: Result) {
+export function hardDeficits(result: Result, includeExhaustion = false) {
   const values = new Map<string, number>();
   for (const row of result.warnings.filter(row => row.level === 'ERROR' && row.code !== 'STAFFING_REQUIREMENT_HARD')) {
+    // Rescue exhaustion is an explanation of the evaluated staffing deficit,
+    // not an additional HARD constraint. Replay can add this warning without
+    // increasing the authoritative deficit. Keep unmatched warnings fail-closed.
+    if (!includeExhaustion && row.code === 'WEEKLY_PATTERN_RELAXATION_EXHAUSTED' && row.details?.requirementCode
+      && result.staffingRequirementEvaluations?.some(e => e.date === row.workDate && e.code === row.details?.requirementCode && e.constraintLevel === 'HARD')) continue;
     const key = `${row.code}:${row.workDate}:${row.staffId ?? ''}:${row.classType ?? ''}:${row.details?.requirementCode ?? (row.code === 'WORK_PATTERN_REQUIREMENT_SHORTAGE' ? row.message : '')}`;
     values.set(key, Math.max(values.get(key) ?? 0, row.required != null && row.assigned != null ? Math.max(1, row.required - row.assigned) : 1));
   }
@@ -97,6 +102,13 @@ export function repairSameWeek<T extends Result>(initial: T, staff: GeneratorSta
             if (candidate.assignments.length !== result.assignments.length || candidate.assignments.some(row => choices.get(replayKey(row.staffId, row.workDate)) !== replayValue(row))) continue;
             const after = hardDeficits(candidate);
             if ([...after].some(([key, count]) => count > (deficits.get(key) ?? 0))) continue;
+            // Newly admitted repairs must remove a whole unsatisfied HARD
+            // requirement; equal-count candidates retain the previous behavior.
+            const legacyBefore = hardDeficits(result, true);
+            if ([...hardDeficits(candidate, true)].some(([key, count]) => count > (legacyBefore.get(key) ?? 0))) {
+              const count = (r: Result) => (r.staffingRequirementEvaluations ?? []).filter(e => e.constraintLevel === 'HARD' && !e.isSatisfied).length;
+              if (count(candidate) >= count(result)) continue;
+            }
             const targetEvaluation = candidate.staffingRequirementEvaluations?.find(row => row.requirementId === shortage.requirementId && row.date === shortage.date);
             if (!targetEvaluation || targetEvaluation.actualCount <= shortage.actualCount) continue;
             // Outside this week even class/time changes are out of scope.

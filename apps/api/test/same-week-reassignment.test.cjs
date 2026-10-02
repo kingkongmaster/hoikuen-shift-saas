@@ -64,3 +64,5 @@ const open=new Set(bounded.options.staffingRequirements.map(r=>r.startDate.toISO
 const stopped=run(bounded.options,bounded.staff);assert.equal(stopped.sameWeekReassignment.attempts,stopped.sameWeekReassignment.maxAttempts);assert.equal(stopped.sameWeekReassignment.limitReached,true);assert.equal(stopped.sameWeekReassignment.accepted,0);assert.equal(deficits(stopped).length,4);
 for(const summary of after.specialShiftSummary){assert.equal(summary.earlyCount,after.assignments.filter(a=>a.staffId===summary.staffId&&a.shiftType==='EARLY').length);assert.equal(summary.lateCount,after.assignments.filter(a=>a.staffId===summary.staffId&&a.shiftType==='LATE').length);}
 console.log(JSON.stringify({pass:true,beforeDeficit:7,afterDeficit:4,repairs:3,beforeMs:Math.round(beforeMs),afterMs:Math.round(afterMs),search:after.sameWeekReassignment,checks:['structural-warning','weekly-max2','transition','fixed','leave-full-half','weekday','contract','tenant-input-scope','soft-hard','determinism','same-week-only']}));
+
+require('./october-reassignment-gap.test.cjs');
