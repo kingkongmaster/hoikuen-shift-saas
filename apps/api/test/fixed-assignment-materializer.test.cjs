@@ -34,3 +34,5 @@ for(const id of kitchen.map(x=>x.id)) {
  assert.equal(row.startTime,'08:30');assert.equal(row.endTime,'17:00');assert.equal(row.assignedClass,null);
 }
 console.log('three anonymous fixed workers / no childcare class assignment PASS');
+
+require("./fixed-saturday-warnings.test.cjs");

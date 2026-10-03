@@ -19,6 +19,8 @@ import { fiscalYearForDate, fiscalYearRange } from '../../application/annual-fai
 import { calculateAnnualFairnessProgress } from '../../application/annual-fairness/annual-fairness-progress';
 import { resolveDailyPrescribedMinutes } from '../../application/annual-fairness/daily-prescribed-minutes';
 import { assignmentTimeBreakdown } from '../../application/attendance/assignment-time-breakdown';
+import { hasApprovedFixedTime } from '../../application/shifts/approved-fixed-time';
+import { prohibitionConflict } from '../../application/shifts/staff-work-rule-evaluator';
 import { materializeFixedAssignments } from '../../application/shifts/fixed-assignment-materializer';
 import { MonthlyGenerationContextBuilder, jsonStrings } from '../../application/shifts/monthly-generation-context-builder';
 import { classifyGenerationDiagnostic, hasBlockingDiagnostics, validateGenerationContext } from '../../application/shifts/generation-preflight-validator';
@@ -304,7 +306,8 @@ export class ShiftsService {
     }
     const reviewState=draftScope(reviewItems,user.tenantId,this.isoDate(schedule.targetMonth).slice(0,7));
     const pendingReviewCells=reviewState.blockedCells.map(key=>{const [staffId,workDate]=JSON.parse(key) as [string,string];return {staffId,workDate};});
-    const viewWarnings = manager ? this.warnings(assignments, requests) : [];
+    const fixedSaturdayCells = manager ? await this.fixedSaturdayCells(user.tenantId, assignments) : new Set<string>();
+    const viewWarnings = manager ? this.warnings(assignments, requests, fixedSaturdayCells) : [];
     const enrichedSummaries = summaries.map((summary) => {
       const rows = assignments.filter((item) => item.staffId === summary.staffId); const staffRequests = requests.filter((item) => item.staffId === summary.staffId);
       return { ...summary, paidLeaveCount: rows.filter((item) => item.shiftType === ShiftType.PAID_LEAVE).length, halfDayCount: rows.filter((item) => !!item.attendanceModifier).length, requestCount: staffRequests.length, pendingRequestCount: staffRequests.filter((item) => item.status === ShiftRequestStatus.PENDING).length, offCount: rows.filter((item) => item.shiftType === ShiftType.OFF).length, earlyCount: rows.filter((item) => item.shiftType === ShiftType.EARLY).length, lateCount: rows.filter((item) => item.shiftType === ShiftType.LATE).length, saturdayWorkCount: rows.filter((item) => item.workDate.getUTCDay() === 6 && (workingShiftTypes as readonly ShiftType[]).includes(item.shiftType)).length, hardViolationCount: viewWarnings.filter((item) => item.staffId === summary.staffId && item.severity === 'blocking').length, warningCount: viewWarnings.filter((item) => item.staffId === summary.staffId && item.severity === 'warning').length };
@@ -327,7 +330,36 @@ export class ShiftsService {
     }
   }
 
-  private warnings(assignments: Array<any>, requests: Array<any>): Warning[] {
+  // Fixed opening-day work is distinct from rotation eligibility. Fail closed unless
+  // both active marks and the existing source-backed time gate justify this exact cell.
+  private async fixedSaturdayCells(tenantId: string, assignments: Array<any>) {
+    const candidates = assignments.filter(a => a.workDate.getUTCDay() === 6 && !a.staff.canWorkSaturdays
+      && a.shiftType === ShiftType.OTHER && !a.workPatternId && !a.workPattern
+      && a.startTime && a.endTime && a.startTime === a.staff.regularWorkStartTime && a.endTime === a.staff.regularWorkEndTime);
+    const cells = new Set<string>();
+    if (!candidates.length) return cells;
+    const staffId = { in: [...new Set<string>(candidates.map(a => a.staffId))] };
+    const [attributes, rules] = await Promise.all([
+      this.prisma.staffAttributeAssignment.findMany({ where: { tenantId, staffId, isActive: true,
+        attributeDefinition: { isActive: true, code: { in: ['FIXED_ASSIGNMENT', 'GENERATOR_EXCLUDED'] } } },
+        select: { staffId: true, startDate: true, endDate: true, attributeDefinition: { select: { code: true } } } }),
+      this.prisma.staffWorkRule.findMany({ where: { tenantId, staffId, isActive: true }, include: { workPattern: true } }),
+    ]);
+    for (const a of candidates) {
+      const active = (r: { startDate: Date | null; endDate: Date | null }) => (!r.startDate || r.startDate <= a.workDate) && (!r.endDate || r.endDate >= a.workDate);
+      const marks = new Set(attributes.filter(r => r.staffId === a.staffId && active(r)).map(r => r.attributeDefinition.code));
+      const activeRules = rules.filter(active);
+      const end = new Date(a.workDate.getTime() + 86400000);
+      if (marks.has('FIXED_ASSIGNMENT') && marks.has('GENERATOR_EXCLUDED')
+        && hasApprovedFixedTime(activeRules, a.staffId, a.startTime, a.endTime, { start: a.workDate, end })
+        && !prohibitionConflict(activeRules, a.staffId, a.workDate, a.shiftType, { startTime: a.startTime, endTime: a.endTime })) {
+        cells.add(`${a.staffId}:${this.isoDate(a.workDate)}`);
+      }
+    }
+    return cells;
+  }
+
+  private warnings(assignments: Array<any>, requests: Array<any>, fixedSaturdayCells = new Set<string>()): Warning[] {
     const warnings: Warning[] = [];
     const specialShiftClasses = new Set<string>();
     const requestMap = new Map(requests.filter((request) => request.status === ShiftRequestStatus.APPROVED || request.status === ShiftRequestStatus.PENDING).map((request) => [`${request.staffId}:${this.isoDate(request.requestDate)}`, request]));
@@ -344,7 +376,7 @@ export class ShiftsService {
         if (specialShiftClasses.has(classKey)) warnings.push({ code: 'FIXED_CLASS_SPECIAL_SHIFT_DUPLICATE', staffId: assignment.staffId, workDate: date, message: `${date}：${assignment.staff.assignedClass}で${assignment.shiftType === ShiftType.EARLY ? '早出' : '遅出'}職員が重複しています。`, severity: 'blocking' });
         specialShiftClasses.add(classKey);
       }
-      if (new Date(`${date}T00:00:00Z`).getUTCDay() === 6 && workingShiftTypes.includes(assignment.shiftType) && !assignment.staff.canWorkSaturdays) warnings.push(this.warning('SATURDAY_NOT_AVAILABLE', assignment, '土曜日勤務不可の職員に勤務を割り当てています。'));
+      if (new Date(`${date}T00:00:00Z`).getUTCDay() === 6 && workingShiftTypes.includes(assignment.shiftType) && !assignment.staff.canWorkSaturdays && !fixedSaturdayCells.has(key)) warnings.push(this.warning('SATURDAY_NOT_AVAILABLE', assignment, '土曜日勤務不可の職員に勤務を割り当てています。'));
       const list = byStaff.get(assignment.staffId) ?? []; list.push(assignment); byStaff.set(assignment.staffId, list);
     }
     for (const [staffId, list] of byStaff) {
