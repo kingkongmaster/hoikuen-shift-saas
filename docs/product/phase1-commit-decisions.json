@@ -1,0 +1,839 @@
+{
+  "productAuditHead": "26fbb2eeadc569a504c2f3d5bfc4a40e2a88d17e",
+  "mainAuditHead": "1f06c683ed8be5f8d4ed8cf0b1d5523f5b70c919",
+  "categories": {
+    "1": "PRODUCTへ採用（混在commitは採用範囲を限定）",
+    "2": "mainから新規取り込み",
+    "3": "MUSUBI固有、PRODUCT標準へ不採用",
+    "4": "重複/不要",
+    "5": "人間判断が必要"
+  },
+  "product": [
+    {
+      "sha": "f83075b6719b2e4f47ffb2fdf736e825c01cd9b5",
+      "category": 5,
+      "reason": "Windows配布器は保留。標準入口はWeb/PWA。署名・更新・配布保守の採用判断が必要。",
+      "subject": "Add Windows Release 1 distribution package",
+      "paths": [
+        ".github/workflows/windows-distribution.yml",
+        "apps/web/package.json",
+        "distribution/download-page/index.template.html",
+        "distribution/windows/README.md",
+        "distribution/windows/assets/AeNShift.ico",
+        "distribution/windows/assets/release-info.txt",
+        "distribution/windows/installer/AeNShift.iss",
+        "distribution/windows/test/distribution.test.mjs",
+        "docs/windows-distribution-release1.md"
+      ]
+    },
+    {
+      "sha": "eee6e1481891dd75e0b5ae394666cf2b4780edf0",
+      "category": 1,
+      "reason": "月次・行事・休園・有給・復旧の共通基盤を採用。混在するtenant-packages/musubi、園別fixture・deployはCustom/保守専用に除外。既存Migrationは維持。",
+      "subject": "feat: prepare AeN Shift Musubi release candidate",
+      "paths": [
+        ".env.musubi-beta.example",
+        ".gitignore",
+        "apps/api/.dockerignore",
+        "apps/api/Dockerfile",
+        "apps/api/package.json",
+        "apps/api/prisma/fixtures/musubi-nursery-2026-09-confirmed.json",
+        "apps/api/prisma/migrations/20260901090000_shift_attendance_modifier/migration.sql",
+        "apps/api/prisma/migrations/20260901120000_tenant_events_rule_exceptions_provenance/migration.sql",
+        "apps/api/prisma/schema.prisma",
+        "apps/api/scripts/apply-musubi-tenant-master.cjs",
+        "apps/api/scripts/apply-tenant-monthly-package.cjs",
+        "apps/api/scripts/bootstrap-admin.cjs",
+        "apps/api/scripts/import-musubi-beta.cjs",
+        "apps/api/scripts/postgres-restore-audit.cjs",
+        "apps/api/src/app.module.ts",
+        "apps/api/src/application/annual-fairness/annual-work-summary-calculator.ts",
+        "apps/api/src/application/attendance/assignment-time-breakdown.ts",
+        "apps/api/src/application/attendance/paid-leave-metrics.ts",
+        "apps/api/src/application/shifts/fixed-assignment-materializer.ts",
+        "apps/api/src/application/shifts/generation-preflight-validator.ts",
+        "apps/api/src/application/shifts/monthly-generation-context-builder.ts",
+        "apps/api/src/application/shifts/rule-based-shift-generator.ts",
+        "apps/api/src/presentation/annual-work-summaries/annual-work-summaries.service.ts",
+        "apps/api/src/presentation/backups/backups.service.ts",
+        "apps/api/src/presentation/paid-leave/paid-leave.service.ts",
+        "apps/api/src/presentation/shift-swaps/shift-swaps.service.ts",
+        "apps/api/src/presentation/shifts/shifts.module.ts",
+        "apps/api/src/presentation/shifts/shifts.service.ts",
+        "apps/api/src/presentation/tenant-calendar/tenant-calendar.controller.ts",
+        "apps/api/src/presentation/tenant-calendar/tenant-calendar.dto.ts",
+        "apps/api/src/presentation/tenant-calendar/tenant-calendar.module.ts",
+        "apps/api/src/presentation/tenant-calendar/tenant-calendar.service.ts",
+        "apps/api/tenant-packages/musubi/monthly-2026-09-reference.cjs",
+        "apps/api/tenant-packages/musubi/monthly-2026-10.cjs",
+        "apps/api/tenant-packages/musubi/monthly-template.cjs",
+        "apps/api/tenant-packages/musubi/permanent-master.cjs",
+        "apps/api/test/access-safety-audit.e2e.cjs",
+        "apps/api/test/admin-rule-exception-generator.test.cjs",
+        "apps/api/test/annual-fairness-phase1.test.cjs",
+        "apps/api/test/annual-work-summaries.e2e.cjs",
+        "apps/api/test/assignment-time-breakdown.test.cjs",
+        "apps/api/test/confirm-revalidation.e2e.cjs",
+        "apps/api/test/create-musubi-import-rehearsal.cjs",
+        "apps/api/test/fixed-assignment-materializer.test.cjs",
+        "apps/api/test/generation-preflight-validator.test.ts",
+        "apps/api/test/musubi-october-admin-flow.e2e.cjs",
+        "apps/api/test/musubi-september-2026-generation.test.cjs",
+        "apps/api/test/paid-leave-phase4a.e2e.cjs",
+        "apps/api/test/shift-transition-burden.test.cjs",
+        "apps/api/test/staff-work-rule-generator.test.cjs",
+        "apps/api/test/tenant-event-generation.e2e.cjs",
+        "apps/api/test/weekly-rotation-confirm.e2e.cjs",
+        "apps/web/.dockerignore",
+        "apps/web/Dockerfile",
+        "apps/web/package.json",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/components/ErrorBoundary.tsx",
+        "apps/web/src/features/calendar/TenantCalendarManagement.tsx",
+        "apps/web/src/features/dashboard/Dashboard.tsx",
+        "apps/web/src/features/dashboard/HomeDashboard.tsx",
+        "apps/web/src/features/exports/shift-print-layout.ts",
+        "apps/web/src/features/shifts/ShiftManagement.tsx",
+        "apps/web/src/styles.css",
+        "apps/web/src/vite-env.d.ts",
+        "apps/web/test/musubi-beta-scope.test.mjs",
+        "compose.musubi-beta.yaml",
+        "deploy/musubi-beta/Caddyfile",
+        "deploy/postgres-backup/aen-shift-backup.cron.example",
+        "deploy/postgres-backup/backup.env.example",
+        "docs/musubi-beta-deployment-runbook.md",
+        "docs/postgresql-backup-restore-runbook.md",
+        "ops/postgres-backup/backup.sh",
+        "ops/postgres-backup/lib.sh",
+        "ops/postgres-backup/restore-verify.sh",
+        "ops/postgres-backup/retention.sh",
+        "ops/postgres-backup/test-safety.sh"
+      ]
+    },
+    {
+      "sha": "b0c432eb260b89ae533c551404a5266077ef9d24",
+      "category": 1,
+      "reason": "Production操作防御、復旧・secret防御を採用。園別取込/配備手順は標準導入に流用しない。",
+      "subject": "feat: harden AeN Shift production provisioning",
+      "paths": [
+        ".env.musubi-beta.example",
+        "apps/api/Dockerfile",
+        "apps/api/migration/package-lock.json",
+        "apps/api/migration/package.json",
+        "apps/api/package-lock.json",
+        "apps/api/package.json",
+        "apps/api/scripts/apply-musubi-tenant-master.cjs",
+        "apps/api/scripts/apply-tenant-monthly-package.cjs",
+        "apps/api/scripts/bootstrap-admin.cjs",
+        "apps/api/scripts/import-musubi-beta.cjs",
+        "apps/api/scripts/lib/production-migrations.json",
+        "apps/api/scripts/lib/production-operation-guard.cjs",
+        "apps/api/scripts/lib/roster-file-security.cjs",
+        "apps/api/scripts/migration.cjs",
+        "apps/api/scripts/verify-musubi-provisioning.cjs",
+        "apps/api/test/dependency-vulnerability-regression.cjs",
+        "apps/api/test/musubi-october-admin-flow.e2e.cjs",
+        "apps/api/test/production-operation-guard.test.cjs",
+        "apps/api/test/roster-security.container.py",
+        "apps/web/package-lock.json",
+        "apps/web/package.json",
+        "apps/web/test/dependency-vulnerability-regression.mjs",
+        "compose.musubi-beta.yaml",
+        "deploy/postgres-backup/aen-shift-backup.cron.example",
+        "deploy/postgres-backup/backup.env.example",
+        "docs/musubi-beta-deployment-runbook.md",
+        "docs/musubi-production-provisioning-runbook.md",
+        "docs/production-dependency-risk-register.md",
+        "ops/monitoring/check-production.sh",
+        "ops/postgres-backup/.dockerignore",
+        "ops/postgres-backup/Dockerfile",
+        "ops/postgres-backup/backup.sh",
+        "ops/postgres-backup/check-status.sh",
+        "ops/postgres-backup/offhost-copy.sh",
+        "ops/postgres-backup/restore-verify.sh",
+        "ops/postgres-backup/retention.sh",
+        "ops/postgres-backup/status.py",
+        "ops/postgres-backup/test-status.py",
+        "ops/provisioning/Restore.Dockerfile",
+        "ops/provisioning/audit-closure.py",
+        "ops/provisioning/rehearse-local.py",
+        "ops/provisioning/run-operations.sh",
+        "ops/provisioning/verify-roster-host.sh"
+      ]
+    },
+    {
+      "sha": "8f78fa9120d62cff907efbd8ee2668b1ff05364d",
+      "category": 1,
+      "reason": "候補判定、勤務適用、ロール・DB権限防御を採用。Pilot channel制御はそのままPRODUCT仕様にしない。",
+      "subject": "fix: close musubi production release gate",
+      "paths": [
+        ".env.musubi-beta.example",
+        "apps/api/package.json",
+        "apps/api/scripts/lib/production-operation-guard.cjs",
+        "apps/api/scripts/verify-musubi-provisioning.cjs",
+        "apps/api/src/application/shifts/monthly-generation-context-builder.ts",
+        "apps/api/src/application/shifts/rule-based-shift-generator.ts",
+        "apps/api/src/application/shifts/staff-work-rule-evaluator.ts",
+        "apps/api/src/infrastructure/auth/technical-json.guard.ts",
+        "apps/api/src/presentation/backups/backups.controller.ts",
+        "apps/api/test/fixed-assignment-materializer.test.cjs",
+        "apps/api/test/fixed-class-special-shift.test.cjs",
+        "apps/api/test/initial-password-change.e2e.cjs",
+        "apps/api/test/pattern-preference-identity.test.cjs",
+        "apps/api/test/rc1-shift-display.e2e.cjs",
+        "apps/api/test/release-fixed-staff.e2e.cjs",
+        "apps/api/test/release-role-isolation.e2e.cjs",
+        "apps/api/test/shifts.e2e.cjs",
+        "apps/api/test/staffing-requirement-generator.test.cjs",
+        "apps/api/test/technical-json-api.e2e.cjs",
+        "apps/api/test/technical-json-guard.test.cjs",
+        "apps/web/package.json",
+        "apps/web/src/features/exports/DataExportManagement.tsx",
+        "apps/web/src/features/info/PublicInfoPage.tsx",
+        "apps/web/src/features/support/FeedbackManagement.tsx",
+        "apps/web/src/release-policy.ts",
+        "apps/web/test/shift-assignment-display.test.mjs",
+        "apps/web/test/technical-json-render.test.mjs",
+        "compose.musubi-beta.yaml",
+        "deploy/musubi-beta/application-grants.sql",
+        "deploy/musubi-beta/backup-grants.sql",
+        "deploy/musubi-beta/test/compose-role-isolation.py",
+        "docs/musubi-beta-deployment-runbook.md",
+        "docs/musubi-production-provisioning-runbook.md",
+        "docs/phase4-release-gate-verification-20260911.md",
+        "docs/rc1-class-audit-20260911.md",
+        "docs/rc1-count-audit-20260911.md"
+      ]
+    },
+    {
+      "sha": "f3300dcdfe7885a231035492bbcb662c587f2bee",
+      "category": 1,
+      "reason": "image hardening、metadata、検証を採用。既存Security承認はPRODUCTの新SHAへ自動継承しない。",
+      "subject": "fix: rebuild hardened production images",
+      "paths": [
+        ".github/workflows/pr-quality.yml",
+        "apps/api/Dockerfile",
+        "apps/web/Dockerfile",
+        "apps/web/release-metadata.mjs",
+        "apps/web/src/app-info.ts",
+        "apps/web/src/features/info/PublicInfoPage.tsx",
+        "apps/web/test/release-metadata.test.mjs",
+        "apps/web/vite.config.d.ts",
+        "apps/web/vite.config.js",
+        "apps/web/vite.config.ts",
+        "docs/production-dependency-risk-register.md",
+        "docs/production-image-release-policy.md",
+        "tools/release/build-images.mjs",
+        "tools/release/create-metadata.mjs",
+        "tools/release/image-boundaries.test.mjs",
+        "tools/release/metadata.test.mjs",
+        "tools/release/verify-images.mjs"
+      ]
+    },
+    {
+      "sha": "f04319f9e7ec14ddd182fe2fdec748dc26de80fc",
+      "category": 1,
+      "reason": "固定時間判定・同週再配置・validationは共通採用。園別formal入力契約・取込・条件はCustom境界。",
+      "subject": "feat: finalize musubi release 1 formal import",
+      "paths": [
+        "apps/api/package.json",
+        "apps/api/scripts/apply-musubi-tenant-master.cjs",
+        "apps/api/scripts/import-musubi-beta.cjs",
+        "apps/api/scripts/lib/formal-package-adapter.cjs",
+        "apps/api/scripts/lib/formal-package-file.cjs",
+        "apps/api/scripts/validate-musubi-formal-package.cjs",
+        "apps/api/src/application/shifts/approved-fixed-time.ts",
+        "apps/api/src/application/shifts/generation-preflight-validator.ts",
+        "apps/api/src/application/shifts/monthly-generation-context-builder.ts",
+        "apps/api/src/application/shifts/provisional-soft-rules.ts",
+        "apps/api/src/application/shifts/rule-based-shift-generator.ts",
+        "apps/api/src/application/shifts/same-week-reassignment.ts",
+        "apps/api/src/application/shifts/staff-work-rule-evaluator.ts",
+        "apps/api/src/presentation/shifts/shifts.service.ts",
+        "apps/api/tenant-packages/musubi/formal-input-contract.json",
+        "apps/api/tenant-packages/musubi/formal-package.schema.json",
+        "apps/api/tenant-packages/musubi/permanent-master.cjs",
+        "apps/api/test/formal-import-isolated.e2e.cjs",
+        "apps/api/test/formal-package-adapter.test.cjs",
+        "apps/api/test/formal-package-file.test.cjs",
+        "apps/api/test/generation-preflight-validator.test.ts",
+        "apps/api/test/helpers/anonymous-formal-package.cjs",
+        "apps/api/test/helpers/musubi-generator-input.cjs",
+        "apps/api/test/musubi-formal-runtime.test.cjs",
+        "apps/api/test/same-week-reassignment.test.cjs",
+        "apps/api/test/staff-work-rule-generator.e2e.cjs",
+        "docs/musubi-formal-import-ready-20260925.md"
+      ]
+    },
+    {
+      "sha": "7a6cea4a4c0b594e34a13079eec87279234a184d",
+      "category": 1,
+      "reason": "共通テスト表記整合を維持。",
+      "subject": "test: align release gate wording",
+      "paths": [
+        "apps/web/test/staffing-requirement-generator.test.mjs"
+      ]
+    },
+    {
+      "sha": "193563212359c6a853609ce91beb83c24da9f6fb",
+      "category": 1,
+      "reason": "API image source map除去を採用。",
+      "subject": "build: exclude source maps from api image",
+      "paths": [
+        "apps/api/Dockerfile",
+        "tools/release/verify-source-map-free.py"
+      ]
+    },
+    {
+      "sha": "89c5b2cb05bdbd31d8baf13a739cdbb08bf9a865",
+      "category": 1,
+      "reason": "image stageの固定を採用。",
+      "subject": "build: pin source map artifact stage base",
+      "paths": [
+        "apps/api/Dockerfile"
+      ]
+    },
+    {
+      "sha": "9c17ea7a7562831ed430b03bf7847c2e47d25678",
+      "category": 3,
+      "reason": "園別formal preflight/zero-staff取込工程は標準導入から除外。汎用の原子的導入は26fbb2eを再利用。履歴/既存ツールは削除しない。",
+      "subject": "feat: support zero-staff tenant provisioning",
+      "paths": [
+        "apps/api/Dockerfile",
+        "apps/api/package.json",
+        "apps/api/scripts/apply-musubi-tenant-master.cjs",
+        "apps/api/scripts/lib/formal-package-adapter.cjs",
+        "apps/api/scripts/lib/formal-package-file.cjs",
+        "apps/api/scripts/lib/formal-preflight.cjs",
+        "apps/api/scripts/preflight-musubi-formal-package.cjs",
+        "apps/api/test/formal-preflight.test.cjs",
+        "apps/api/test/tenant-zero-staff.e2e.cjs",
+        "docs/musubi-zero-staff-provisioning.md"
+      ]
+    },
+    {
+      "sha": "cbcd9a9e985a5a796b9448968ca95a51a9113356",
+      "category": 1,
+      "reason": "管理者と職員の遅延紐付けを採用。園別IDを標準値にしない。",
+      "subject": "fix: allow unlinked deferred admin bootstrap",
+      "paths": [
+        "apps/api/scripts/bootstrap-admin.cjs",
+        "apps/api/test/bootstrap-deferred-link.e2e.cjs",
+        "docs/musubi-zero-staff-provisioning.md"
+      ]
+    },
+    {
+      "sha": "488c5610815e7a49d73808fed051a6a29d5268e7",
+      "category": 3,
+      "reason": "園別formal import実行器。出典付き取込の考え方だけ汎用取込設計で再利用。標準Setupから実行しない。",
+      "subject": "feat: support deferred admin formal import",
+      "paths": [
+        "apps/api/scripts/import-musubi-beta.cjs",
+        "apps/api/scripts/lib/formal-execution.cjs",
+        "apps/api/scripts/lib/formal-package-adapter.cjs",
+        "apps/api/scripts/lib/production-operation-guard.cjs",
+        "apps/api/scripts/preflight-musubi-formal-package.cjs",
+        "apps/api/test/deferred-formal-import.e2e.cjs",
+        "apps/api/test/formal-preflight.test.cjs",
+        "apps/api/test/production-operation-guard.test.cjs",
+        "docs/runbooks/deferred-admin-formal-import.md"
+      ]
+    },
+    {
+      "sha": "52c7934e5afada9fbe6d641e6ce5c89a3df1a992",
+      "category": 1,
+      "reason": "初回認証・Setup入力検証を採用。",
+      "subject": "fix: enforce secure first login flow",
+      "paths": [
+        "apps/api/src/presentation/setup/setup.dto.ts",
+        "apps/api/src/presentation/setup/setup.service.ts",
+        "apps/api/test/first-login-acceptance.e2e.cjs",
+        "apps/api/test/sprint9b1a.e2e.cjs",
+        "apps/api/test/sprint9b1b.e2e.cjs",
+        "apps/web/src/App.tsx",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/auth/LoginPage.tsx",
+        "apps/web/src/features/setup/SetupWizard.tsx",
+        "apps/web/src/features/setup/setup-wizard-state.d.ts",
+        "apps/web/src/features/setup/setup-wizard-state.js",
+        "apps/web/test/initial-password-change.test.mjs",
+        "apps/web/test/setup-wizard.test.mjs"
+      ]
+    },
+    {
+      "sha": "a16008e45b78e8ab2f01c8611ae7199ec3b1292c",
+      "category": 1,
+      "reason": "PWA、更新、アイコン、初回認証UIを採用。園固有プロフィール値は持ち込まない。",
+      "subject": "feat: prepare staff PWA delivery",
+      "paths": [
+        "apps/api/scripts/update-tenant-profile.cjs",
+        "apps/api/test/tenant-profile-operation.e2e.cjs",
+        "apps/web/index.html",
+        "apps/web/public/icons/aen-shift-maskable.svg",
+        "apps/web/public/manifest.json",
+        "apps/web/public/offline.html",
+        "apps/web/public/sw.js",
+        "apps/web/src/components/AppStatusLayer.tsx",
+        "apps/web/src/features/auth/InitialPasswordChangePage.tsx",
+        "apps/web/src/features/auth/LoginPage.tsx",
+        "apps/web/src/features/info/AppFooter.tsx",
+        "apps/web/src/features/info/InstallPrompt.tsx",
+        "apps/web/src/main.tsx",
+        "apps/web/src/styles.css",
+        "apps/web/test/pwa-shell.test.mjs"
+      ]
+    },
+    {
+      "sha": "3a89533e1881e51316b9cd16f801ec9e08edaed1",
+      "category": 1,
+      "reason": "安全なcredential recoveryを運営専用能力として採用。園ADMINへ公開しない。",
+      "subject": "feat: add secure admin credential recovery",
+      "paths": [
+        "apps/api/Dockerfile",
+        "apps/api/scripts/recover-admin-credential-prompt.py",
+        "apps/api/scripts/recover-admin-credential.cjs",
+        "apps/api/test/admin-credential-recovery.e2e.cjs"
+      ]
+    },
+    {
+      "sha": "b09b1615d74d16e476907ebd0f99fd5c842aae19",
+      "category": 1,
+      "reason": "プロフィール構造を保つSetup修正を採用。",
+      "subject": "fix: preserve profile structure during setup",
+      "paths": [
+        "apps/web/src/features/auth/InitialPasswordChangePage.tsx",
+        "apps/web/src/features/setup/SetupWizard.tsx",
+        "apps/web/src/features/setup/profile-mapping.d.ts",
+        "apps/web/src/features/setup/profile-mapping.js",
+        "apps/web/test/profile-confirmation.browser.cjs"
+      ]
+    },
+    {
+      "sha": "5ec34194488e3d8a67bc8cb6b7a7146b6ade40f2",
+      "category": 4,
+      "reason": "前コミットの空白修正。独立機能として再実装/再取り込み不要。",
+      "subject": "style: remove trailing whitespace from profile regression",
+      "paths": [
+        "apps/web/test/profile-confirmation.browser.cjs"
+      ]
+    },
+    {
+      "sha": "8a11e45f21f001396a4c55fcd599c99afb14f276",
+      "category": 1,
+      "reason": "投入済み設定の保護を採用。新規園Setupの省略条件にはしない。",
+      "subject": "fix: skip setup for existing workforce configuration",
+      "paths": [
+        "apps/api/src/presentation/setup/setup.service.ts",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/setup/SetupWizard.tsx",
+        "apps/web/src/features/setup/setup-wizard-state.d.ts",
+        "apps/web/src/features/setup/setup-wizard-state.js",
+        "apps/web/test/existing-workforce-setup.browser.cjs",
+        "apps/web/test/setup-wizard.test.mjs"
+      ]
+    },
+    {
+      "sha": "7dd226521eb925affeeb22226f8f15b96da3dedd",
+      "category": 5,
+      "reason": "無料Pilotの規約本文は販売契約へ流用しない。同意UI/証跡機構のみ採用。販売文書は人間/専門家確認。",
+      "subject": "feat: finalize free pilot terms and privacy",
+      "paths": [
+        "apps/api/src/presentation/setup/legal-documents.ts",
+        "apps/api/src/presentation/setup/setup.constants.ts",
+        "apps/api/src/presentation/setup/setup.dto.ts",
+        "apps/api/src/presentation/setup/setup.service.ts",
+        "apps/api/test/first-login-acceptance.e2e.cjs",
+        "apps/api/test/legal-consent.e2e.cjs",
+        "apps/api/test/sprint9b1a.e2e.cjs",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/info/PublicInfoPage.tsx",
+        "apps/web/src/features/legal/LegalDocument.tsx",
+        "apps/web/src/features/legal/legal-documents.ts",
+        "apps/web/src/features/setup/SetupWizard.tsx",
+        "apps/web/src/features/setup/setup-wizard-state.js",
+        "apps/web/test/legal-consent.browser.cjs",
+        "apps/web/test/legal-document-parity.test.mjs",
+        "apps/web/test/setup-wizard.test.mjs",
+        "docs/legal/REVIEW.md",
+        "docs/legal/privacy-release1-review.md",
+        "docs/legal/terms-release1-review.md"
+      ]
+    },
+    {
+      "sha": "bf1bed318714bad06a88f0b1032a3a788a12c28c",
+      "category": 1,
+      "reason": "登録内容reviewの枠組みを採用。園固有出典と値はCustom。",
+      "subject": "feat: review existing workforce during setup",
+      "paths": [
+        "apps/api/src/presentation/setup/setup.dto.ts",
+        "apps/api/src/presentation/setup/setup.service.ts",
+        "apps/api/src/presentation/setup/workforce-review.ts",
+        "apps/api/test/first-login-acceptance.e2e.cjs",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/setup/SetupWizard.tsx",
+        "apps/web/src/features/setup/WorkforceReviewStep.tsx",
+        "apps/web/src/features/setup/setup-wizard-state.js",
+        "apps/web/test/existing-workforce-setup.browser.cjs",
+        "apps/web/test/profile-confirmation.browser.cjs",
+        "apps/web/test/setup-wizard.test.mjs"
+      ]
+    },
+    {
+      "sha": "1239758172cf2968938dc1d05a085ea059148d93",
+      "category": 1,
+      "reason": "読みやすいreview UIを再利用。固定のパターン順は将来Tenant設定へ。",
+      "subject": "feat: simplify workforce review display",
+      "paths": [
+        "apps/api/src/presentation/setup/workforce-review.ts",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/setup/WorkforceReviewStep.tsx",
+        "apps/web/src/features/setup/workforce-review-display.ts",
+        "apps/web/test/work-pattern-review.browser.cjs",
+        "apps/web/test/workforce-review-display.test.mjs"
+      ]
+    },
+    {
+      "sha": "49aec7433e27f54c89dfa353a317d95bef49c78f",
+      "category": 1,
+      "reason": "候補抽出とreview基盤を採用。特定出典IDによるルールはCustom境界に維持。",
+      "subject": "feat: finalize source-backed workforce review",
+      "paths": [
+        "apps/api/src/application/shifts/basic-candidate-evaluator.ts",
+        "apps/api/src/application/shifts/rule-based-shift-generator.ts",
+        "apps/api/src/presentation/setup/workforce-review.ts",
+        "apps/api/test/basic-candidate-evaluator.test.cjs",
+        "apps/api/test/candidate-extraction-golden.test.cjs",
+        "apps/api/test/fixed-review-grouping.test.cjs",
+        "apps/api/test/fixtures/candidate-extraction-golden.json",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/setup/WorkforceReviewStep.tsx",
+        "apps/web/src/features/setup/workforce-review-display.ts",
+        "apps/web/test/staffing-clarity.browser.cjs",
+        "apps/web/test/workforce-review-display.test.mjs"
+      ]
+    },
+    {
+      "sha": "7ee9c5f0aa919700a6d3ed541fb815d326dbf97e",
+      "category": 3,
+      "reason": "園別review日範囲fixtureの修正。PRODUCT受入の根拠にはせず匿名一般園fixtureを別途使用。",
+      "subject": "test: align source-backed review day scopes",
+      "paths": [
+        "apps/web/test/work-pattern-review.browser.cjs"
+      ]
+    },
+    {
+      "sha": "5b16684a45eb47472b62dac8dc67f15a625f2eb0",
+      "category": 1,
+      "reason": "子育て支援を含む固定勤務review構造を再利用。園固有人数/時刻は標準化しない。",
+      "subject": "feat: add childcare support workforce review",
+      "paths": [
+        "apps/api/src/presentation/setup/workforce-review.ts",
+        "apps/api/test/childcare-support-review.test.cjs",
+        "apps/api/test/fixed-review-grouping.test.cjs",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/setup/WorkforceReviewStep.tsx",
+        "apps/web/test/staffing-clarity.browser.cjs"
+      ]
+    },
+    {
+      "sha": "737475bd9061877421175059c689b146f187e892",
+      "category": 1,
+      "reason": "土曜と職員reviewの説明構造を採用。特定の土曜体制はTenant。",
+      "subject": "feat: clarify staff and Saturday setup review",
+      "paths": [
+        "apps/api/src/presentation/setup/workforce-review.ts",
+        "apps/api/test/childcare-support-review.test.cjs",
+        "apps/api/test/fixed-review-grouping.test.cjs",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/setup/WorkforceReviewStep.tsx",
+        "apps/web/test/staffing-clarity.browser.cjs"
+      ]
+    },
+    {
+      "sha": "882e4463e98993424712cfa7f4d86c3b0b77b9f4",
+      "category": 1,
+      "reason": "同意version/hash/本人証跡による再利用を採用。販売版同意文書の承認とは別。",
+      "subject": "fix: reuse verified legal consent during setup",
+      "paths": [
+        "apps/api/src/presentation/setup/legal-consent-state.ts",
+        "apps/api/src/presentation/setup/setup.service.ts",
+        "apps/api/test/legal-existing-consent.test.cjs",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/legal/LegalDocument.tsx",
+        "apps/web/src/features/setup/SetupWizard.tsx",
+        "apps/web/src/features/setup/setup-wizard-state.js",
+        "apps/web/test/existing-workforce-setup.browser.cjs",
+        "apps/web/test/setup-wizard.test.mjs"
+      ]
+    },
+    {
+      "sha": "c29ba5bb6cf1d9608f9ff82e3d7802ec22f3a294",
+      "category": 1,
+      "reason": "Setup後READ ONLY確認導線を採用。",
+      "subject": "feat: add read-only post-setup review",
+      "paths": [
+        "apps/web/src/features/dashboard/Dashboard.tsx",
+        "apps/web/src/features/settings/ShiftSettings.tsx",
+        "apps/web/src/features/setup/RegisteredSetupReview.tsx",
+        "apps/web/test/post-setup-review.browser.cjs"
+      ]
+    },
+    {
+      "sha": "16259a820fd561c7240e35c736dc5fd1565420ab",
+      "category": 1,
+      "reason": "月次入力mapping validationを再利用。実データを取り込まない。",
+      "subject": "feat: validate monthly import field mappings",
+      "paths": [
+        "apps/api/scripts/lib/monthly-input-fields.cjs",
+        "apps/api/test/monthly-input-fields.test.cjs"
+      ]
+    },
+    {
+      "sha": "1b1c450737bf83d8cff9d603bab97f7cb9415723",
+      "category": 1,
+      "reason": "管理者回答・再評価の機構を採用。個別回答/出典の実例は持ち込まない。",
+      "subject": "feat: integrate monthly manager resolution flow",
+      "paths": [
+        "apps/api/scripts/import-manager-review-manifest.cjs",
+        "apps/api/scripts/lib/manager-review-manifest.cjs",
+        "apps/api/src/application/manager-resolution/monthly-effects.ts",
+        "apps/api/src/application/manager-resolution/prisma-resolution-store.ts",
+        "apps/api/src/application/manager-resolution/resolution-store.ts",
+        "apps/api/src/application/manager-resolution/resolution.ts",
+        "apps/api/src/application/shifts/fixed-assignment-materializer.ts",
+        "apps/api/src/application/shifts/generation-preflight-validator.ts",
+        "apps/api/src/application/shifts/rule-based-shift-generator.ts",
+        "apps/api/src/presentation/exports/exports.service.ts",
+        "apps/api/src/presentation/shifts/manager-resolution.controller.ts",
+        "apps/api/src/presentation/shifts/manager-resolution.service.ts",
+        "apps/api/src/presentation/shifts/shifts.module.ts",
+        "apps/api/src/presentation/shifts/shifts.service.ts",
+        "apps/api/src/presentation/tenant-calendar/tenant-calendar.service.ts",
+        "apps/api/test/manager-resolution.integration.cjs",
+        "apps/api/test/manager-resolution.test.cjs",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/manager-resolution/ManagerResolutionCards.tsx",
+        "apps/web/src/features/shifts/ShiftManagement.tsx",
+        "apps/web/test/manager-resolution.browser.cjs",
+        "docs/release1/manager-resolution-design.txt"
+      ]
+    },
+    {
+      "sha": "9bf77e0f2577ff654f0fa10a5d1b5a327c6de07b",
+      "category": 1,
+      "reason": "隔離DB検証方式を採用。一般園匿名fixtureで再検証する。",
+      "subject": "test: verify manager resolution against isolated PostgreSQL",
+      "paths": [
+        "apps/api/scripts/import-monthly-input-manifest.cjs",
+        "apps/api/scripts/lib/manager-review-manifest.cjs",
+        "apps/api/test/manager-resolution-db.e2e.cjs",
+        "docs/release1/manager-resolution-design.txt"
+      ]
+    },
+    {
+      "sha": "a7800577c3d71d67c0efca445b417b71b77d94bf",
+      "category": 1,
+      "reason": "未確定入力と回答対応の保護を採用。",
+      "subject": "feat: preserve open monthly inputs and manager answer mapping",
+      "paths": [
+        "apps/api/scripts/import-monthly-input-manifest.cjs",
+        "apps/api/scripts/lib/manager-review-manifest.cjs",
+        "apps/api/scripts/lib/monthly-input-fields.cjs",
+        "apps/api/src/application/manager-resolution/monthly-effects.ts",
+        "apps/api/src/application/manager-resolution/resolution.ts",
+        "apps/api/src/presentation/shifts/shifts.service.ts",
+        "apps/api/test/manager-resolution-db.e2e.cjs",
+        "apps/api/test/manager-resolution.test.cjs",
+        "apps/api/test/monthly-input-fields.test.cjs",
+        "apps/api/test/monthly-manifest-draft.e2e.cjs",
+        "docs/release1/monthly-manifest-answer-contract.txt"
+      ]
+    },
+    {
+      "sha": "1077e0e2d56efd94a7a2b3ffdd092751434428f3",
+      "category": 1,
+      "reason": "費用Gate付きmanual RCを採用。main735ddb5と同一patch。",
+      "subject": "ci: add cost-gated manual image RC workflow",
+      "paths": [
+        ".github/workflows/image-rc.yml",
+        "docs/release1/image-rc-workflow.md",
+        "tools/release/image-rc.py",
+        "tools/release/image-rc.test.py"
+      ]
+    },
+    {
+      "sha": "3262dd17f834e14fa469283373df80c1eba17349",
+      "category": 1,
+      "reason": "RC到達性検証を採用。main8817137とコード/試験/手順が同一、こちらはpolicy資料を追加。",
+      "subject": "ci: verify image findings against runtime reachability evidence",
+      "paths": [
+        "docs/release1/image-rc-workflow.md",
+        "tools/release/image-rc.py",
+        "tools/release/image-rc.test.py",
+        "tools/release/image-security-policy.json"
+      ]
+    },
+    {
+      "sha": "82744985641b31adb152578167625279a271a5f8",
+      "category": 1,
+      "reason": "秘密を含まないRC診断を採用。maina906f25と同一patch。",
+      "subject": "ci: retain secret-free runtime failure diagnostics",
+      "paths": [
+        "tools/release/image-rc.py"
+      ]
+    },
+    {
+      "sha": "6050ae5e57172712ee573764c8431c93d78958e1",
+      "category": 1,
+      "reason": "container内process検証を採用。main1f06c68と同一patch。",
+      "subject": "ci: inspect nginx processes inside the isolated container",
+      "paths": [
+        "tools/release/image-rc.py"
+      ]
+    },
+    {
+      "sha": "5dae4a0b6eae3abf5312cc46a2c0b816909a8780",
+      "category": 1,
+      "reason": "未提出と0件の区別・FINAL前確認を採用。",
+      "subject": "fix: require explicit monthly submission before finalization",
+      "paths": [
+        "apps/api/src/presentation/exports/exports.service.ts",
+        "apps/api/src/presentation/shifts/manager-resolution.controller.ts",
+        "apps/api/src/presentation/shifts/manager-resolution.service.ts",
+        "apps/api/src/presentation/shifts/monthly-submission.ts",
+        "apps/api/src/presentation/shifts/shifts.service.ts",
+        "apps/api/test/manager-resolution-db.e2e.cjs",
+        "apps/api/test/monthly-submission.e2e.cjs",
+        "apps/web/src/api/client.ts",
+        "apps/web/src/features/exports/shift-print-layout.ts",
+        "apps/web/src/features/manager-resolution/MonthlySubmissionPanel.tsx",
+        "apps/web/src/features/shifts/ShiftManagement.tsx",
+        "apps/web/test/monthly-submission.browser.cjs",
+        "tools/release/image-security-policy.json"
+      ]
+    },
+    {
+      "sha": "71e6e1646ef51e599cf7e6dc272b1f50c28198a7",
+      "category": 1,
+      "reason": "重複診断時の安全な同週修正を採用。園別再現fixtureはCustom回帰に限定。",
+      "subject": "fix: preserve safe same-week repairs across duplicate diagnostics",
+      "paths": [
+        "apps/api/src/application/shifts/same-week-reassignment.ts",
+        "apps/api/test/fixtures/october-reassignment-order.json",
+        "apps/api/test/october-reassignment-gap.test.cjs",
+        "apps/api/test/same-week-reassignment.test.cjs",
+        "tools/release/image-security-policy.json"
+      ]
+    },
+    {
+      "sha": "be66f985318e4d03d28ffcdd166ab6e491988d80",
+      "category": 1,
+      "reason": "固定土曜勤務とローテーション適格性の区別を採用。具体条件はTenant。",
+      "subject": "fix: distinguish fixed Saturday work from rotation eligibility",
+      "paths": [
+        "apps/api/src/presentation/shifts/shifts.service.ts",
+        "apps/api/test/fixed-assignment-materializer.test.cjs",
+        "apps/api/test/fixed-saturday-warnings.test.cjs",
+        "tools/release/image-security-policy.json"
+      ]
+    },
+    {
+      "sha": "c4f9c995929b2d359517665b994e4183c09fec66",
+      "category": 1,
+      "reason": "隔離Training/Helpを再利用。コース例は一般仕様そのものではなく匿名例。販売版との内容照合は後続Gate。",
+      "subject": "feat(web): add isolated interactive training and Help entry",
+      "paths": [
+        "apps/web/nginx.conf",
+        "apps/web/package.json",
+        "apps/web/scripts/build-training.mjs",
+        "apps/web/scripts/review-training.mjs",
+        "apps/web/src/features/info/PublicInfoPage.tsx",
+        "apps/web/src/training/AdditionalScreens.tsx",
+        "apps/web/src/training/TrainingApp.tsx",
+        "apps/web/src/training/courses.ts",
+        "apps/web/src/training/entry.tsx",
+        "apps/web/src/training/mock-client.ts",
+        "apps/web/src/training/shell.js",
+        "apps/web/src/training/training.css",
+        "apps/web/test/training-adapter.test.mjs",
+        "apps/web/test/training-back-matrix.test.mjs",
+        "apps/web/test/training-human-path.test.mjs",
+        "apps/web/test/training-isolation.test.mjs",
+        "apps/web/test/training-security.test.mjs",
+        "docs/release1/interactive-training-release.md",
+        "tools/release/image-security-policy.json"
+      ]
+    },
+    {
+      "sha": "531dde7c504577f9277ae603a2a61bdb83f79a64",
+      "category": 1,
+      "reason": "数値proxy trust検証を採用。CVE判定資料は履歴であり新RCの承認ではない。",
+      "subject": "test(release): classify new advisories with numeric proxy trust guard",
+      "paths": [
+        "docs/release1/interactive-training-release.md",
+        "tools/release/image-rc.py",
+        "tools/release/image-security-policy.json"
+      ]
+    },
+    {
+      "sha": "be9fcf4ee4e4280901d0371dd38610d45524c696",
+      "category": 1,
+      "reason": "3scopeと共通表記/保護規則を採用。",
+      "subject": "docs(shared): separate Product and Pilot scope and log destinations",
+      "paths": [
+        "AGENTS.md",
+        "docs/product-architecture-baseline.md",
+        "docs/work-scope-policy.md"
+      ]
+    },
+    {
+      "sha": "26fbb2eeadc569a504c2f3d5bfc4a40e2a88d17e",
+      "category": 1,
+      "reason": "独立園管理者の原子的作成と匿名試験を再利用。運営UI等は未完。",
+      "subject": "feat(product): begin isolated customer onboarding with atomic admin provisioning",
+      "paths": [
+        "apps/api/package.json",
+        "apps/api/src/presentation/tenants/provision-tenant.dto.ts",
+        "apps/api/src/presentation/tenants/provision-tenant.service.ts",
+        "apps/api/src/presentation/tenants/tenants.controller.ts",
+        "apps/api/src/presentation/tenants/tenants.module.ts",
+        "apps/api/test/commercial-onboarding.e2e.cjs",
+        "docs/product/phase1-audit.md"
+      ]
+    }
+  ],
+  "main": [
+    {
+      "sha": "735ddb58bb6bd2bdaada58ab6d014f8052fe1215",
+      "category": 4,
+      "equivalentProduct": "1077e0e2d56efd94a7a2b3ffdd092751434428f3",
+      "patchIdentical": true,
+      "runtimeAndTestsIdentical": true,
+      "reason": "既にPRODUCTへ同等変更あり。重複cherry-pick不要。patch-id一致。"
+    },
+    {
+      "sha": "8817137aacfe38bb8e20d471ee45ec2df72f7e35",
+      "category": 4,
+      "equivalentProduct": "3262dd17f834e14fa469283373df80c1eba17349",
+      "patchIdentical": false,
+      "runtimeAndTestsIdentical": true,
+      "reason": "既にPRODUCTへ同等変更あり。重複cherry-pick不要。PRODUCT側にpolicy資料が追加。"
+    },
+    {
+      "sha": "a906f255865b7607cf01ca9c15fa39175abad018",
+      "category": 4,
+      "equivalentProduct": "82744985641b31adb152578167625279a271a5f8",
+      "patchIdentical": true,
+      "runtimeAndTestsIdentical": true,
+      "reason": "既にPRODUCTへ同等変更あり。重複cherry-pick不要。patch-id一致。"
+    },
+    {
+      "sha": "1f06c683ed8be5f8d4ed8cf0b1d5523f5b70c919",
+      "category": 4,
+      "equivalentProduct": "6050ae5e57172712ee573764c8431c93d78958e1",
+      "patchIdentical": true,
+      "runtimeAndTestsIdentical": true,
+      "reason": "既にPRODUCTへ同等変更あり。重複cherry-pick不要。patch-id一致。"
+    }
+  ]
+}

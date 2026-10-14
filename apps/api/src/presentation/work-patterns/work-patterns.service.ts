@@ -19,8 +19,10 @@ export class WorkPatternsService {
   constructor(private readonly prisma: PrismaService, private readonly features: FeaturesService, private readonly audit: AuditService) {}
 
   async list(user: AuthenticatedUser) {
-    await this.ensureSystemPatterns(user.tenantId);
     const advanced = (await this.features.resolve(user.tenantId, 'ADVANCED_WORK_PATTERNS')).enabled;
+    const basic = (await this.features.resolve(user.tenantId, 'BASIC_SHIFT_GENERATION')).enabled;
+    // Check the contract before lazy initialization; read-only contracts must not seed data.
+    if (advanced || basic) await this.ensureSystemPatterns(user.tenantId);
     return this.prisma.workPattern.findMany({ where: { tenantId: user.tenantId, ...(advanced ? {} : { code: { in: [...SYSTEM_CODES] } }) }, orderBy: [{ displayOrder: 'asc' }, { code: 'asc' }] });
   }
 

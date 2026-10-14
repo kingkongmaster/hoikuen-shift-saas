@@ -4,8 +4,24 @@ import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types'; i
 export const plans: Record<SubscriptionPlan,{staffLimit:number;features:string[]}>={TRIAL:{staffLimit:20,features:['自動生成','CSV・印刷','バックアップ']},STANDARD:{staffLimit:50,features:['自動生成','CSV・印刷','バックアップ','監査ログ']},PROFESSIONAL:{staffLimit:200,features:['すべての既存機能']}};
 @Injectable() export class SubscriptionsService { constructor(private prisma:PrismaService,private audit:AuditService,private notifications:NotificationsService){}
  async get(user:AuthenticatedUser){const subscription=await this.find(user.tenantId);const activeStaffCount=await this.prisma.staff.count({where:{tenantId:user.tenantId,isActive:true}}); await this.trialNotifications(user,subscription); return {...subscription,activeStaffCount,remainingStaffSlots:Math.max(0,subscription.staffLimit-activeStaffCount),features:plans[subscription.plan].features,readOnly:this.readOnly(subscription)};}
- async find(tenantId:string){const sub=await this.prisma.tenantSubscription.findUnique({where:{tenantId}}); if(!sub)return {tenantId,plan:SubscriptionPlan.STANDARD,status:SubscriptionStatus.ACTIVE,staffLimit:50,trialStartedAt:null,trialEndsAt:null,currentPeriodStartedAt:null,currentPeriodEndsAt:null,suspendedAt:null,cancelledAt:null,cancellationReason:null,suspensionReason:null}; if(sub.status===SubscriptionStatus.TRIAL&&sub.trialEndsAt&&sub.trialEndsAt<new Date()) return {...sub,status:SubscriptionStatus.EXPIRED}; return sub;}
- readOnly(sub:any){return [SubscriptionStatus.SUSPENDED,SubscriptionStatus.EXPIRED,SubscriptionStatus.CANCELLED].includes(sub.status);}
+ async find(tenantId: string) {
+   const sub = await this.prisma.tenantSubscription.findUnique({ where: { tenantId } });
+   // A missing contract must never become an implicit paid entitlement.
+   if (!sub || !Object.prototype.hasOwnProperty.call(plans, sub.plan) || !Object.values(SubscriptionStatus).includes(sub.status)) {
+     throw new ForbiddenException({ code: 'SUBSCRIPTION_UNVERIFIED', message: '契約情報を確認できません。運営窓口へお問い合わせください。' });
+   }
+   if (sub.status === SubscriptionStatus.TRIAL) {
+     if (!sub.trialEndsAt || !Number.isFinite(sub.trialEndsAt.getTime())) {
+       throw new ForbiddenException({ code: 'SUBSCRIPTION_UNVERIFIED', message: '試用期限を確認できません。運営窓口へお問い合わせください。' });
+     }
+     if (sub.trialEndsAt <= new Date()) return { ...sub, status: SubscriptionStatus.EXPIRED };
+   }
+   return sub;
+ }
+ readOnly(sub: { status?: unknown } | null | undefined) {
+   // PAST_DUE is an explicit known state; its existing grace policy is unchanged.
+   return !sub || ![SubscriptionStatus.TRIAL, SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE].some(status => status === sub.status);
+ }
  async assertWritable(tenantId:string){const sub=await this.find(tenantId);if(sub.status===SubscriptionStatus.SUSPENDED)throw new ForbiddenException({code:'SUBSCRIPTION_SUSPENDED',message:'この園の利用は停止されています。'});if(this.readOnly(sub))throw new ForbiddenException({code:'SUBSCRIPTION_EXPIRED',message:'この園の契約は利用期限を過ぎています。'});}
  async assertStaffCapacity(tenantId:string){const sub=await this.find(tenantId);const count=await this.prisma.staff.count({where:{tenantId,isActive:true}});if(count>=sub.staffLimit)throw new ConflictException({code:'STAFF_LIMIT_REACHED',message:'職員登録上限に達しています。'});}
  async platformList(user:AuthenticatedUser,query:any){await this.platform(user);return this.prisma.tenant.findMany({where:{...(query.q?{name:{contains:query.q,mode:'insensitive'}}:{}),...(query.plan||query.status?{subscription:{is:{...(query.plan?{plan:query.plan}:{}),...(query.status?{status:query.status}:{})}}}:{})},include:{subscription:true,_count:{select:{staff:{where:{isActive:true}}}}},orderBy:{updatedAt:'desc'}});}

@@ -95,7 +95,8 @@
     "test:formal-source": "node test/formal-package-adapter.test.cjs && node test/formal-package-file.test.cjs && node test/musubi-formal-runtime.test.cjs && node test/formal-preflight.test.cjs",
     "test:formal-import:isolated-db": "node test/helpers/isolated-database.cjs && node test/formal-import-isolated.e2e.cjs",
     "test:tenant-zero-staff": "node test/tenant-zero-staff.e2e.cjs",
-    "test:commercial-onboarding": "node test/helpers/isolated-database.cjs && node test/commercial-onboarding.e2e.cjs"
+    "test:commercial-onboarding": "node test/helpers/isolated-database.cjs && node test/commercial-onboarding.e2e.cjs",
+    "test:product-phase1": "node --test test/subscription-fail-closed.test.cjs && node test/helpers/isolated-database.cjs && node test/subscription-fail-closed.e2e.cjs && node test/product-phase1-regression.e2e.cjs && node test/commercial-onboarding.e2e.cjs && node test/common-workforce-foundation.e2e.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
