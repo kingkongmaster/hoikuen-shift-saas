@@ -25,3 +25,7 @@ Human approval remains a separate fact from automated test results. No new paid 
 Next-version improvements: expand the compact four-person example into a full anonymous 23-person scenario; broaden Windows/iOS/Android physical-device PWA and OS print-dialog coverage; refresh inherited static tests separately. None authorizes changing formal business data in this release.
 
 Existing Web regression: 24/29 PASS; sprint9c, sprint10a, sprint10b, sprint10c and sprint11a fail identically on the unchanged formal baseline. These inherited source-text checks are next-version test maintenance, not evidence of new runtime failures. Training 256 paths, 101-method fail-closed tests, and the four-browser login/return regression pass.
+
+## Fresh advisory classification
+
+The first RC correctly held on three previously unclassified advisories. CVE-2026-90711 (proxy-addr, Critical) requires IPv4-mapped IPv6 subnet trust; this API validates and converts a numeric hop count, now guarded in the RC runtime probe. CVE-2026-93749 (source-map-js, High) belongs to Web build tooling, with no runtime map consumer. CVE-2026-4775 (tiff, High) requires TIFF decoding; nginx has no image filter and does not link libtiff. Exact scope/package/version/severity rules were added with upstream CNA references; expiry and raw severity remain unchanged. No runtime dependency or Production configuration was changed.

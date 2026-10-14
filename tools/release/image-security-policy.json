@@ -705,6 +705,58 @@
       "reason": "Only contrib/untgz demonstration command affected, not zlib library; require untgz executable absent from complete runtime filesystem.",
       "exploitCondition": "zlib versions up to and including 1.3.1.2 include a global buffer overflow in the untgz utility located under contrib/untgz. The vulnerability is limited to the standalone demonstration utility and does not affect the core zlib compression library. The flaw occurs when a user executes the untgz command with an excessively long archive name supplied via the command line, leading to an out-of-bounds write in a fixed-size global buffer.",
       "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/22xxx/CVE-2026-22184.json"
+    },
+    {
+      "scope": "source",
+      "VulnerabilityID": "CVE-2026-90711",
+      "PkgName": "proxy-addr",
+      "InstalledVersion": "2.0.7",
+      "FixedVersion": "2.0.8",
+      "Severity": "CRITICAL",
+      "category": "RUNTIME_REACHABLE_MITIGATED",
+      "assessedSeverity": "CRITICAL",
+      "reason": "IPv4-mapped IPv6 subnet parsing is not used. main.ts configures trust proxy as a Number; production environment validation accepts only hop counts 1\u20133. Source guard and isolated runtime check enforce numeric trust. Existing production environment is separately read-only verified. No subnet string reaches proxy-addr compile.",
+      "exploitCondition": "proxy-addr is a Node.js module that determines a request's client address behind trusted reverse proxies, and it backs Express req.ip and req.ips. In versions 1.1.0 through 2.0.7, a trust subnet written in IPv4-mapped IPv6 notation with an IPv4-sized prefix, such as ::ffff:10.0.0.0/8 instead of the correct ::ffff:10.0.0.0/104, is accepted without error but trusts every IPv4 address on the internet rather than the block it names. Because the socket peer then becomes trusted at hop 0, any unauthenticated client can supply an arbitrary X-Forwarded-For header and control the address the application reads, which defeats IP-based access control, rate limiting, geolocation, and audit logging. This is a fail-open regression introduced in version 1.1.0. The issue is fixed in proxy-addr 2.0.8, and users should upgrade to 2.0.8 or later. As a workaround, ensure any IPv4-mapped IPv6 trust subnet uses a prefix length of at least 97, or express the range in plain IPv4 notation.",
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/90xxx/CVE-2026-90711.json"
+    },
+    {
+      "scope": "api",
+      "VulnerabilityID": "CVE-2026-90711",
+      "PkgName": "proxy-addr",
+      "InstalledVersion": "2.0.7",
+      "FixedVersion": "2.0.8",
+      "Severity": "CRITICAL",
+      "category": "RUNTIME_REACHABLE_MITIGATED",
+      "assessedSeverity": "CRITICAL",
+      "reason": "IPv4-mapped IPv6 subnet parsing is not used. main.ts configures trust proxy as a Number; production environment validation accepts only hop counts 1\u20133. Source guard and isolated runtime check enforce numeric trust. Existing production environment is separately read-only verified. No subnet string reaches proxy-addr compile.",
+      "exploitCondition": "proxy-addr is a Node.js module that determines a request's client address behind trusted reverse proxies, and it backs Express req.ip and req.ips. In versions 1.1.0 through 2.0.7, a trust subnet written in IPv4-mapped IPv6 notation with an IPv4-sized prefix, such as ::ffff:10.0.0.0/8 instead of the correct ::ffff:10.0.0.0/104, is accepted without error but trusts every IPv4 address on the internet rather than the block it names. Because the socket peer then becomes trusted at hop 0, any unauthenticated client can supply an arbitrary X-Forwarded-For header and control the address the application reads, which defeats IP-based access control, rate limiting, geolocation, and audit logging. This is a fail-open regression introduced in version 1.1.0. The issue is fixed in proxy-addr 2.0.8, and users should upgrade to 2.0.8 or later. As a workaround, ensure any IPv4-mapped IPv6 trust subnet uses a prefix length of at least 97, or express the range in plain IPv4 notation.",
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/90xxx/CVE-2026-90711.json"
+    },
+    {
+      "scope": "source",
+      "VulnerabilityID": "CVE-2026-93749",
+      "PkgName": "source-map-js",
+      "InstalledVersion": "1.2.1",
+      "FixedVersion": "1.2.2",
+      "Severity": "HIGH",
+      "category": "BUILD_ONLY",
+      "assessedSeverity": "HIGH",
+      "reason": "Web CSS/build tooling only. No runtime source-map consumer, uploaded indexed source maps or server-side Node runtime exists in the Web image. Application/Training imports exclude source-map-js and source maps are absent from every runtime layer. Build uses reviewed repository assets, not untrusted uploaded maps.",
+      "exploitCondition": "source-map-js through 1.2.1 fails to validate the per-section offset line value in indexed source maps, allowing attackers to specify arbitrary numeric values. Attackers can supply extremely large offset line values that cause synchronous event loop blocking for extended periods, preventing the service from handling other requests.",
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/93xxx/CVE-2026-93749.json"
+    },
+    {
+      "scope": "web",
+      "VulnerabilityID": "CVE-2026-4775",
+      "PkgName": "tiff",
+      "InstalledVersion": "4.7.0-r0",
+      "FixedVersion": "4.7.2-r0",
+      "Severity": "HIGH",
+      "category": "OS_PACKAGE_NOT_REACHABLE",
+      "assessedSeverity": "HIGH",
+      "reason": "Web runtime only serves static files and proxies fixed HTTP upstream. nginx effective config has no image_filter; nginx linked libraries exclude libtiff and only nginx processes run. No TIFF decoder or attacker-supplied TIFF processing is reachable. This does not apply to future image-filter features.",
+      "exploitCondition": "A flaw was found in the libtiff library. A remote attacker could exploit a signed integer overflow vulnerability in the putcontig8bitYCbCr44tile function by providing a specially crafted TIFF file. This flaw can lead to an out-of-bounds heap write due to incorrect memory pointer calculations, potentially causing a denial of service (application crash) or arbitrary code execution.",
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/4xxx/CVE-2026-4775.json"
     }
   ]
 }

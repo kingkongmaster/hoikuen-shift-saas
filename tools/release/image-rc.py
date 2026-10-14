@@ -171,6 +171,12 @@ def runtime_evidence(command, manifest, source, result):
             'staticHttpUpstream': 'proxy_pass http://api:3000/api/;' in config}
         result['phase'] = 'deepmerge-absence'
         result['api']['deepmergeAbsent'] = command(['docker', 'exec', api, 'node', '-e', "try{require.resolve('deepmerge-ts');process.exit(1)}catch(e){if(e.code!=='MODULE_NOT_FOUND')process.exit(1);console.log('absent')}"], capture=True).strip() == 'absent'
+        # CVE-2026-90711: prohibit subnet-string trust; verify the actual numeric runtime input.
+        main_source = (source / 'apps/api/src/main.ts').read_text()
+        validation_source = (source / 'apps/api/src/config/environment.validation.ts').read_text()
+        numeric_source = "server.set('trust proxy', process.env.NODE_ENV === 'production' ? Number(process.env.TRUST_PROXY)" in main_source and "TRUST_PROXY must be a hop count from 1 to 3" in validation_source
+        proxy_probe = "const n=Number(process.env.TRUST_PROXY);if(!Number.isInteger(n)||n<1||n>3)process.exit(1);const app=require('express')();app.set('trust proxy',n);const f=app.get('trust proxy fn');if(!f('192.0.2.1',0)||f('192.0.2.1',n))process.exit(1);console.log('numeric')"
+        result['api']['numericProxyTrust'] = numeric_source and command(['docker','exec',api,'node','-e',proxy_probe], capture=True).strip() == 'numeric'
         result['phase'] = 'nginx-process'
         result['web']['nginxOnlyProcess'] = set(command(['docker', 'exec', web, 'ps', '-o', 'comm'], capture=True).splitlines()[1:]) <= {'nginx', 'ps'}
         result['amd64'] = all(json.loads(command(['docker','image','inspect',x['imageId']],capture=True))[0]['Architecture']=='amd64' for x in manifest['images'].values())
@@ -182,7 +188,7 @@ def runtime_evidence(command, manifest, source, result):
         result['restartCount'] = 0
         result['internalNetwork'] = True
         result['productionConnected'] = False
-        result['pass'] = result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
+        result['pass'] = result['api']['numericProxyTrust'] and result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
         return result
     finally:
         result['containerDiagnostics'] = []
