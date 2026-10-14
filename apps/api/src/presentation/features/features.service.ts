@@ -1,13 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { SubscriptionPlan } from '@prisma/client';
-import { FEATURE_CODES, PLAN_FEATURES, type FeatureCode } from '../../domain/features/feature-catalog';
+import { FEATURE_CODES, resolveVerifiedFeature, type FeatureResolution, type FeatureCode } from '../../domain/features/feature-catalog';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { UpdateTenantFeatureDto } from './feature.dto';
 
-type Resolution = { enabled: boolean; source: 'CONTRACT' | 'TENANT_OVERRIDE' | 'PLAN' | 'NONE'; code?: string };
 
 @Injectable()
 export class FeaturesService {
@@ -18,17 +16,11 @@ export class FeaturesService {
     return { enabledFeatures: entries.filter((entry) => entry.enabled).map((entry) => entry.featureCode), features: entries };
   }
 
-  async resolve(tenantId: string, featureCode: FeatureCode, at = new Date()): Promise<Resolution> {
+  async resolve(tenantId: string, featureCode: FeatureCode, at = new Date()): Promise<FeatureResolution> {
     const subscription = await this.subscriptions.find(tenantId);
     if (this.subscriptions.readOnly(subscription)) return { enabled: false, source: 'CONTRACT', code: 'FEATURE_NOT_AVAILABLE' };
     const override = await this.prisma.tenantFeature.findUnique({ where: { tenantId_featureCode: { tenantId, featureCode } } });
-    if (override) {
-      const active = (!override.validFrom || override.validFrom <= at) && (!override.validTo || override.validTo > at);
-      if (active) return { enabled: override.enabled, source: 'TENANT_OVERRIDE', ...(override.enabled ? {} : { code: 'FEATURE_NOT_ENTITLED' }) };
-    }
-    return PLAN_FEATURES[subscription.plan as SubscriptionPlan].has(featureCode)
-      ? { enabled: true, source: 'PLAN' }
-      : { enabled: false, source: 'NONE', code: 'FEATURE_NOT_ENTITLED' };
+    return resolveVerifiedFeature(subscription.plan, false, featureCode, override, at);
   }
 
   async assertAvailable(tenantId: string, featureCode: FeatureCode) {

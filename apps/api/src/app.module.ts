@@ -1,3 +1,4 @@
+import { DepartmentsModule } from './presentation/departments/departments.module';
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/environment.validation';
@@ -60,6 +61,7 @@ import { TenantCalendarModule } from './presentation/tenant-calendar/tenant-cale
     StaffWorkContractsModule,
     PaidLeaveModule,
     TenantCalendarModule,
+    DepartmentsModule,
   ],
 })
 export class AppModule implements NestModule {

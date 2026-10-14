@@ -57,7 +57,7 @@ async function main() {
   assert.equal((await call('/staffing-requirements', {}, director.body.accessToken)).status, 200);
   assert.equal((await call('/staffing-requirements', { method: 'POST', body: JSON.stringify(input(definition.id)) }, director.body.accessToken)).status, 403);
   await prisma.membership.update({ where: { tenantId_userId: { tenantId, userId: ownerId } }, data: { role: 'ADMIN' } });
-  const staffLogin = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email: 'staff@demo.enshift.local', password: process.env.SEED_STAFF_PASSWORD || 'ChangeMe123!' }) });
+  const staffLogin = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email: process.env.SEED_STAFF_EMAIL || 'staff@demo.enshift.local', password: process.env.SEED_STAFF_PASSWORD || 'ChangeMe123!' }) });
   assert.equal((await call('/staffing-requirements', {}, staffLogin.body.accessToken)).status, 403);
 
   token = (await call('/auth/login', { method: 'POST', body: JSON.stringify({ email: process.env.SEED_OWNER_EMAIL || 'owner@demo.enshift.local', password: process.env.SEED_OWNER_PASSWORD || 'ChangeMe123!' }) })).body.accessToken;

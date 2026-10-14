@@ -26,7 +26,7 @@ async function main() {
   originalSubscription = await prisma.tenantSubscription.findUniqueOrThrow({ where: { tenantId } });
   await prisma.tenantFeature.deleteMany({ where: { tenantId } });
 
-  await setSubscription({ plan: SubscriptionPlan.TRIAL, status: SubscriptionStatus.ACTIVE, trialEndsAt: null });
+  await setSubscription({ plan: SubscriptionPlan.TRIAL, status: SubscriptionStatus.TRIAL, trialEndsAt: new Date(Date.now() + 86400000) });
   let list = await featureList(token); assert.ok(list.enabledFeatures.includes('BASIC_SHIFT_GENERATION')); assert.equal(list.enabledFeatures.includes('ADVANCED_WORK_PATTERNS'), false);
   await setSubscription({ plan: SubscriptionPlan.STANDARD, status: SubscriptionStatus.ACTIVE });
   list = await featureList(token); assert.deepEqual(list.enabledFeatures, ['BASIC_SHIFT_GENERATION']);

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, SubscriptionStatus } from '@prisma/client';
+import { Prisma, SubscriptionStatus, type TenantSubscription } from '@prisma/client';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateStaffDto } from './create-staff.dto';
@@ -34,8 +34,8 @@ export class StaffService {
     this.validateRules(input);
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const locked = await tx.$queryRaw<Array<{ staffLimit: number; status: SubscriptionStatus; trialEndsAt: Date | null }>>(Prisma.sql`SELECT "staffLimit", "status", "trialEndsAt" FROM "TenantSubscription" WHERE "tenantId" = ${user.tenantId}::uuid FOR UPDATE`);
-        const subscription = locked[0] ?? await this.subscriptions.find(user.tenantId);
+        const locked = await tx.$queryRaw<TenantSubscription[]>(Prisma.sql`SELECT * FROM "TenantSubscription" WHERE "tenantId" = ${user.tenantId}::uuid FOR UPDATE`);
+        const subscription = this.subscriptions.verifySubscription(locked[0] ?? null);
         const expiredTrial = subscription.status === SubscriptionStatus.TRIAL && (!subscription.trialEndsAt || subscription.trialEndsAt <= new Date());
         if (subscription.status === SubscriptionStatus.SUSPENDED) throw new ForbiddenException({ code: 'SUBSCRIPTION_SUSPENDED', message: 'この園の利用は停止されています。' });
         if (expiredTrial || subscription.status === SubscriptionStatus.EXPIRED || subscription.status === SubscriptionStatus.CANCELLED) throw new ForbiddenException({ code: 'SUBSCRIPTION_EXPIRED', message: 'この園の契約は利用期限を過ぎています。' });

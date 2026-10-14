@@ -28,3 +28,17 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, ReadonlySet<FeatureCode>> =
 export function isFeatureCode(value: string): value is FeatureCode {
   return (FEATURE_CODES as readonly string[]).includes(value);
 }
+
+export const FEATURE_LABELS: Record<FeatureCode, string> = {
+  BASIC_SHIFT_GENERATION: 'シフト自動生成', ADVANCED_WORK_PATTERNS: '勤務パターン設定',
+  STAFF_WORK_RULES: '個別勤務条件', ROLE_QUALIFICATION_MANAGEMENT: '役職・資格管理',
+  ADVANCED_STAFFING_REQUIREMENTS: '詳細な必要人数設定', TENANT_CUSTOM_RULES: '園専用ルール',
+};
+export type FeatureResolution = { enabled: boolean; source: 'CONTRACT' | 'TENANT_OVERRIDE' | 'PLAN' | 'NONE'; code?: string };
+export function resolveVerifiedFeature(plan: SubscriptionPlan, readOnly: boolean, feature: FeatureCode, override: { enabled: boolean; validFrom: Date | null; validTo: Date | null } | null, at = new Date()): FeatureResolution {
+  if (readOnly) return { enabled: false, source: 'CONTRACT', code: 'FEATURE_NOT_AVAILABLE' };
+  if (override && (!override.validFrom || override.validFrom <= at) && (!override.validTo || override.validTo > at)) {
+    return { enabled: override.enabled, source: 'TENANT_OVERRIDE', ...(override.enabled ? {} : { code: 'FEATURE_NOT_ENTITLED' }) };
+  }
+  return PLAN_FEATURES[plan].has(feature) ? { enabled: true, source: 'PLAN' } : { enabled: false, source: 'NONE', code: 'FEATURE_NOT_ENTITLED' };
+}

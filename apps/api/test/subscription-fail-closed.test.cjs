@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {SubscriptionsService}=require('../dist/presentation/subscriptions/subscriptions.service');
 const {FeaturesService}=require('../dist/presentation/features/features.service');
 const {FEATURE_CODES}=require('../dist/domain/features/feature-catalog');
-function fixture(row,error){let overrides=0;const db={tenantSubscription:{findUnique:async()=>{if(error)throw error;return row}},tenantFeature:{findUnique:async()=>{overrides++;return {enabled:true}}},staff:{count:async()=>0}};const service=new SubscriptionsService(db,{},{});return {service,features:new FeaturesService(db,service,{}),overrides:()=>overrides};}
+function fixture(row,error){if(row)row={staffLimit:20,...row};let overrides=0;const db={tenantSubscription:{findUnique:async()=>{if(error)throw error;return row}},tenantFeature:{findUnique:async()=>{overrides++;return {enabled:true}}},staff:{count:async()=>0}};const service=new SubscriptionsService(db,{},{});return {service,features:new FeaturesService(db,service,{}),overrides:()=>overrides};}
 const denied=e=>e.getStatus()===403&&e.getResponse().code==='SUBSCRIPTION_UNVERIFIED';
 for(const [name,row] of [['missing',null],['unknown plan',{plan:'UNKNOWN',status:'ACTIVE'}],['unknown status',{plan:'STANDARD',status:'UNKNOWN'}],['trial without expiry',{plan:'TRIAL',status:'TRIAL',trialEndsAt:null}],['invalid trial expiry',{plan:'TRIAL',status:'TRIAL',trialEndsAt:new Date('invalid')}]] ){
  test(name+' blocks every feature and write/capacity check',async()=>{const f=fixture(row);await assert.rejects(f.service.find('anonymous'),denied);await assert.rejects(f.service.assertWritable('anonymous'),denied);await assert.rejects(f.service.assertStaffCapacity('anonymous'),denied);for(const code of FEATURE_CODES)await assert.rejects(f.features.resolve('anonymous',code),denied);assert.equal(f.overrides(),0);});
@@ -12,3 +12,11 @@ test('database failure propagates, without opening overrides',async()=>{const er
 test('known active and grace states retain existing behavior',async()=>{for(const status of ['ACTIVE','PAST_DUE']){const f=fixture({plan:'STANDARD',status});await f.service.assertWritable('anonymous');assert.equal((await f.features.resolve('anonymous','BASIC_SHIFT_GENERATION')).enabled,true);}});
 test('expired, cancelled, suspended contracts cannot be overridden',async()=>{for(const status of ['EXPIRED','CANCELLED','SUSPENDED']){const f=fixture({plan:'PROFESSIONAL',status});await assert.rejects(f.service.assertWritable('anonymous'));assert.equal((await f.features.resolve('anonymous','ADVANCED_WORK_PATTERNS')).enabled,false);assert.equal(f.overrides(),0);}});
 test('future trial allowed, elapsed trial denied; unknown readOnly is closed',async()=>{const f=fixture({plan:'TRIAL',status:'TRIAL',trialEndsAt:new Date(Date.now()+86400000)});await f.service.assertWritable('anonymous');const expired=fixture({plan:'TRIAL',status:'TRIAL',trialEndsAt:new Date(0)});await assert.rejects(expired.service.assertWritable('anonymous'));assert.equal(f.service.readOnly(null),true);assert.equal(f.service.readOnly({status:'UNKNOWN'}),true);});
+for(const [name,row] of [
+ ['negative capacity',{plan:'STANDARD',status:'ACTIVE',staffLimit:-1}],
+ ['fractional capacity',{plan:'STANDARD',status:'ACTIVE',staffLimit:1.5}],
+ ['trial as active',{plan:'TRIAL',status:'ACTIVE'}],
+ ['reversed period',{plan:'STANDARD',status:'ACTIVE',currentPeriodStartedAt:new Date('2030-01-02'),currentPeriodEndsAt:new Date('2030-01-01')}],
+ ['future paid period',{plan:'STANDARD',status:'ACTIVE',currentPeriodStartedAt:new Date(Date.now()+86400000)}],
+])test(name+' fails closed',async()=>{const f=fixture(row);for(const code of FEATURE_CODES)await assert.rejects(f.features.resolve('anonymous',code),denied);assert.equal(f.overrides(),0);});
+test('elapsed paid period closes features even with ACTIVE status',async()=>{const f=fixture({plan:'PROFESSIONAL',status:'ACTIVE',currentPeriodEndsAt:new Date(0)});await assert.rejects(f.service.assertWritable('anonymous'));for(const code of FEATURE_CODES)assert.equal((await f.features.resolve('anonymous',code)).enabled,false);assert.equal(f.overrides(),0);});
