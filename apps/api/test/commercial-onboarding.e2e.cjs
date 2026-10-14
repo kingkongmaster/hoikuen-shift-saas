@@ -1,0 +1,57 @@
+const assert=require('node:assert/strict');
+const {randomUUID}=require('node:crypto');
+const {resolveIsolatedDatabaseUrl}=require('./helpers/isolated-database.cjs');
+process.env.DATABASE_URL=resolveIsolatedDatabaseUrl();
+process.env.JWT_SECRET='local-commercial-isolated-test-signing-key-only';
+process.env.NODE_ENV='test';process.env.COMMERCIAL_ONBOARDING_ENABLED='true';
+require('reflect-metadata');
+const {NestFactory}=require('@nestjs/core');const {ValidationPipe}=require('@nestjs/common');
+const {AppModule}=require('../dist/app.module');
+const {PrismaService}=require('../dist/infrastructure/database/prisma.service');
+const {PasswordService}=require('../dist/application/auth/password.service');
+const run=randomUUID().slice(0,8),password='Local-Only-Start-Aa1!',nextPassword='Local-Only-Changed-Bb2!';
+let app,db;const tenants=[],users=[];
+(async()=>{
+ app=await NestFactory.create(AppModule,{logger:false});app.setGlobalPrefix('api');app.useGlobalPipes(new ValidationPipe({whitelist:true,transform:true}));await app.listen(0,'127.0.0.1');db=app.get(PrismaService);
+ const base=(await app.getUrl())+'/api';
+ async function req(path,method='GET',data,token){const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(data?{body:JSON.stringify(data)}:{})});return {status:r.status,body:await r.json()};}
+ const pwd=app.get(PasswordService); const hash=await pwd.hash(password);
+ const sentinel=await db.tenant.create({data:{name:'Anonymous sentinel',code:'sentinel-'+run}});tenants.push(sentinel.id);
+ for(const [key,platform,role]of[['operator',true,'ADMIN'],['staff',false,'STAFF']]){
+  const u=await db.user.create({data:{loginId:key+'-'+run,displayName:'Anonymous '+key,passwordHash:hash,isPlatformAdmin:platform}});users.push(u.id);await db.membership.create({data:{tenantId:sentinel.id,userId:u.id,role}});
+ }
+ const login=async(loginId,p=password)=>{const r=await req('/auth/login','POST',{loginId,password:p});assert.equal(r.status,200);return r.body;};
+ const operator=await login('operator-'+run),staff=await login('staff-'+run);
+ const input={name:'Anonymous Commercial Nursery',code:'commercial-'+run,adminLoginId:'customer-'+run,adminDisplayName:'園管理者A',initialPassword:password};
+ const counts=async()=>Promise.all([db.tenant.count(),db.user.count(),db.membership.count(),db.tenantSubscription.count(),db.auditLog.count()]);
+ const before=await counts();
+ assert.equal((await req('/tenants/provision','POST',input)).status,401);
+ assert.equal((await req('/tenants/provision','POST',input,staff.accessToken)).status,403);
+ process.env.COMMERCIAL_ONBOARDING_ENABLED='false';assert.equal((await req('/tenants/provision','POST',input,operator.accessToken)).status,403);process.env.COMMERCIAL_ONBOARDING_ENABLED='true';
+ assert.equal((await req('/tenants/provision','POST',{...input,initialPassword:'weak-password'},operator.accessToken)).status,400);
+ assert.equal((await req('/tenants/provision','POST',{...input,name:'   '},operator.accessToken)).status,400);
+ assert.deepEqual(await counts(),before);
+ const sentinelBefore=JSON.stringify(await db.tenant.findUnique({where:{id:sentinel.id},include:{memberships:true}}));
+ const created=await req('/tenants/provision','POST',input,operator.accessToken);assert.equal(created.status,201,JSON.stringify(created.body));
+ const id=created.body.tenant.id;tenants.push(id);users.push(created.body.administrator.id);
+ assert.equal(created.body.tenant.setupStatus,'NOT_STARTED');assert.equal(created.body.subscription.plan,'TRIAL');
+ assert.equal(JSON.stringify(created.body).includes(password),false);assert.equal(JSON.stringify(created.body).includes('passwordHash'),false);
+ assert.equal(await db.membership.count({where:{tenantId:id,userId:users[0]}}),0,'operator not made customer admin');
+ assert.equal(await db.staff.count({where:{tenantId:id}}),0,'no Pilot staff copied');
+ assert.equal(await db.workPattern.count({where:{tenantId:id}}),0,'no Pilot pattern defaults');
+ const stable=await counts();
+ assert.equal((await req('/tenants/provision','POST',input,operator.accessToken)).status,409);
+ assert.equal((await req('/tenants/provision','POST',{...input,code:'other-'+run},operator.accessToken)).status,409);
+ assert.deepEqual(await counts(),stable,'duplicate admin rolls back newly created tenant');
+ const admin=await login(input.adminLoginId);assert.equal(admin.mustChangePassword,true);assert.equal(admin.tenant.id,id);
+ assert.equal((await req('/setup','GET',undefined,admin.accessToken)).status,403);
+ assert.equal((await req('/auth/change-initial-password','POST',{currentPassword:password,newPassword:nextPassword,confirmPassword:nextPassword},admin.accessToken)).status,200);
+ assert.equal((await req('/setup','GET',undefined,admin.accessToken)).status,401,'old token revoked');
+ const changed=await login(input.adminLoginId,nextPassword);
+ assert.equal((await req('/setup','GET',undefined,changed.accessToken)).status,200);
+ assert.equal((await req('/platform/tenants','GET',undefined,changed.accessToken)).status,403);
+ assert.equal((await req('/tenants/provision','POST',{...input,code:'forbidden-'+run},changed.accessToken)).status,403);
+ assert.equal(JSON.stringify(await db.tenant.findUnique({where:{id:sentinel.id},include:{memberships:true}})),sentinelBefore);
+ const audit=await db.auditLog.findFirstOrThrow({where:{tenantId:id,action:'TENANT_PROVISIONED'}});assert.equal(JSON.stringify(audit).includes(password),false);
+ console.log('Commercial onboarding PASS: unauthenticated/staff/customer denied, opt-in disabled, validation, atomic duplicate rollback, independent admin, password rotation/revocation, setup entry, sentinel unchanged, no password disclosure.');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(db){for(const id of tenants.reverse())await db.tenant.delete({where:{id}});for(const id of users)await db.user.delete({where:{id}});}if(app)await app.close();});
