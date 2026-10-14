@@ -1,0 +1,41 @@
+html { scroll-behavior: auto; }
+body { overflow-wrap: anywhere; }
+.training-start { max-width: 880px; margin: 0 auto; padding: 40px 24px; }
+.training-course { text-align: left; padding: 24px; min-height: 220px; }
+.training-coach { position: sticky; top: 0; z-index: 100; background: #f1f8f4; border-bottom: 2px solid #2f6b57; padding: 16px 24px; }
+.training-coach progress { accent-color: #2f6b57; height: 6px; }
+.training-workspace { max-width: 1152px; margin: auto; padding: 24px; }
+.training-target { outline: 3px solid #c97718 !important; outline-offset: 3px; box-shadow: 0 0 0 7px #ffe5b8 !important; scroll-margin-top: 270px; }
+.training-print { width: 100%; height: 500px; border: 1px solid #cbd5e1; background: white; }
+/* Existing modal becomes an inline practice surface, retaining its original controls. */
+#practice-screen > div[role="dialog"] { position: relative; inset: auto; background: transparent; padding: 0; }
+#practice-screen .fixed { top: 260px; max-height: calc(100dvh - 260px); overflow-y: auto; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+@media(max-width:600px) {
+ .training-start { padding: 24px 16px; }
+ .training-coach { padding: 10px 12px; }
+ .training-coach button { min-height: 40px; padding: 8px 12px; }
+ .training-workspace { padding: 16px 12px 48px; }
+ #practice-screen input, #practice-screen select, #practice-screen textarea { max-width: 100%; min-width: 0; }
+ #practice-screen .input.ml-3 { margin-left: 0; }
+}
+@media print { .training-coach { display:none; } .training-workspace { padding:0; } body::before { content:'練習モード — 実際の勤務表ではありません'; display:block; font-weight:bold; } }
+
+.training-print-copy { display:none; }
+@media print { body:has(.training-print-copy) #root { visibility:hidden; } .training-print-copy { display:block; visibility:visible; position:absolute; left:0; top:0; width:100%; } .training-print-copy * { visibility:visible; } }
+
+#practice-screen .onboarding-screen {position:relative;inset:auto;min-height:0;padding:20px 0;}
+#practice-screen .onboarding-card {max-width:100%;}
+#practice-screen .onboarding-screen .btn-quiet {display:none;}
+#practice-screen main.min-h-screen {min-height:0;}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible {outline:3px solid #a14f00;outline-offset:3px;}
+
+#training-heading:focus {outline:none;}
+
+.training-open-login {background:#b65c16 !important;}
+.training-open-login:hover {background:#95470d !important;}
+.training-options {position:relative;}
+.training-options[open] {border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:4px;}
+.training-options button {display:block;}
+/* The production welcome locks body scroll; a guide must keep Back and the lesson accessible. */
+body:has(.onboarding-screen) {overflow:auto;}
