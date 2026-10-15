@@ -6,7 +6,7 @@ const calendar = await readFile(new URL('../src/features/calendar/PersonalCalend
 const exportsPage = await readFile(new URL('../src/features/exports/DataExportManagement.tsx', import.meta.url), 'utf8');
 
 assert.ok(layout.includes('class="monthly"') && layout.includes('first.staffName'), '管理者表は職員×日付の月間一覧を持つ');
-assert.ok(layout.includes("paper: 'B4'") && layout.includes("orientation: 'landscape'"), '管理者表の既定値はB4横');
+assert.ok(layout.includes("defaultAdminPrintOptions: PrintOptions = { paper: 'A4'") && layout.includes("orientation: 'landscape'"), '管理者表の既定値はA4横');
 for (const paper of ["'A4'", "'A3'", "'B4'"]) assert.ok(layout.includes(paper), `共通印刷用紙: ${paper}`);
 assert.ok(layout.includes("['月','火','水','木','金','土','日']"), '本人用PDFは月曜始まりの7列カレンダー');
 assert.ok(layout.includes('data.ownOnly') === false, '印刷レイアウトは受領済み本人データ以外を追加取得しない');

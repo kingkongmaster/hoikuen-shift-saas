@@ -70,6 +70,7 @@ const tids=[],uids=[],run=randomUUID().slice(0,8),password='Anonymous-Onboarding
   const shift=await call(token,'POST','/shifts',{month:'2032-02'},201);
   tenants.push({id,token,loginId,staff,shift,invitationId:input.invitationId});
  }
+ if(process.env.PRODUCT_PHASE4==='true') await require('./product-phase4-monthly.cjs')({call,db,tenants,operator,password,run,uids});
  const [a,b]=tenants;
  const snapshot=async()=>JSON.stringify(await db.tenant.findUnique({where:{id:b.id},include:{staff:true,departments:true,subscription:true,workPatterns:true}}));const before=await snapshot();
  const foreign=await call(a.token,'GET','/setup/readiness?tenantId='+b.id);assert(!JSON.stringify(foreign).includes(b.id));checks++;
@@ -90,17 +91,19 @@ const tids=[],uids=[],run=randomUUID().slice(0,8),password='Anonymous-Onboarding
  for(const update of [{trialEndsAt:null},{trialEndsAt:new Date(0)},{trialStartedAt:new Date(Date.now()+86400000)},{status:'SUSPENDED'}]){
   await db.tenantSubscription.update({where:{tenantId:a.id},data:update});assert.equal((await call(a.token,'GET','/setup/readiness')).ready,false);checks++;
   await call(a.token,'POST','/shifts',{month:'2032-03'},403);
+  if(process.env.PRODUCT_PHASE4==='true')await call(a.token,'POST',`/shifts/${a.shift.id}/generate`,undefined,403);
   await db.tenantSubscription.update({where:{tenantId:a.id},data:{trialStartedAt:sub.trialStartedAt,trialEndsAt:sub.trialEndsAt,status:sub.status}});
  }
  process.env.RATE_LIMIT_ENABLED='true';
  for(let i=0;i<11;i++)await call(null,'POST','/auth/accept-invitation',{loginId:'rate-probe-'+run},i<10?400:429);
  process.env.RATE_LIMIT_ENABLED='false';
- if(process.env.PHASE3_BROWSER==='true'){
+ if(process.env.PHASE3_BROWSER==='true'||process.env.PHASE4_BROWSER==='true'){
   // Serve the built Web app with a loopback-only API proxy. No external services.
   const express=require('express'),path=require('node:path');const web=express();
   web.use('/api',express.raw({type:()=>true}),async(req,res)=>{const r=await fetch(origin+'/api'+req.url,{method:req.method,headers:{'content-type':req.headers['content-type']||'application/json',...(req.headers.authorization?{authorization:req.headers.authorization}:{})},...(!['GET','HEAD'].includes(req.method)?{body:req.body}:{})});res.status(r.status).type(r.headers.get('content-type')||'application/json').send(Buffer.from(await r.arrayBuffer()));});
   web.use(express.static(path.resolve(__dirname,'../../web/dist')));server=web.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
-  await require('./product-phase3-browser.cjs')({base:'http://127.0.0.1:'+server.address().port,operatorLogin:operatorUser.loginId,password,tenants,run,track:async()=>{const rows=await db.tenant.findMany({where:{code:{startsWith:'ui-'+run}}});for(const row of rows){if(!tids.includes(row.id))tids.push(row.id);for(const m of await db.membership.findMany({where:{tenantId:row.id}}))if(!uids.includes(m.userId))uids.push(m.userId);}}});
+  if(process.env.PHASE4_BROWSER==='true')await require('./product-phase4-browser.cjs')({base:'http://127.0.0.1:'+server.address().port,password,tenants});
+  if(process.env.PHASE3_BROWSER==='true')await require('./product-phase3-browser.cjs')({base:'http://127.0.0.1:'+server.address().port,operatorLogin:operatorUser.loginId,password,tenants,run,track:async()=>{const rows=await db.tenant.findMany({where:{code:{startsWith:'ui-'+run}}});for(const row of rows){if(!tids.includes(row.id))tids.push(row.id);for(const m of await db.membership.findMany({where:{tenantId:row.id}}))if(!uids.includes(m.userId))uids.push(m.userId);}}});
  }
  console.log(`PRODUCT Phase3 PASS: ${checks} HTTP/data assertions; two anonymous tenants, invitations, setup, Fail Closed, isolation.`);
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(server)await new Promise(r=>server.close(r));if(db){for(const id of tids.reverse())await db.tenant.delete({where:{id}});for(const id of uids)await db.user.delete({where:{id}});}if(app)await app.close();});

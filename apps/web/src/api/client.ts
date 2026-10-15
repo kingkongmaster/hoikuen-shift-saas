@@ -11,7 +11,7 @@ export type Session = {
 export type MyCalendar = {
   staff: Pick<Staff, 'id' | 'employeeNumber' | 'displayName' | 'email' | 'jobTitle' | 'employmentType' | 'assignedClass' | 'isActive'>;
   schedule: { id: string; status: MonthlyShiftStatus; targetMonth: string; confirmedAt: string | null } | null;
-  assignments: Array<Pick<ShiftAssignment, 'id' | 'staffId' | 'workDate' | 'shiftType' | 'startTime' | 'endTime' | 'breakMinutes' | 'assignedClass'> & { updatedAt: string; workPattern: Pick<WorkPattern, 'code' | 'name' | 'shortName' | 'color'> | null }>;
+  assignments: Array<Pick<ShiftAssignment, 'id' | 'staffId' | 'workDate' | 'shiftType' | 'startTime' | 'endTime' | 'breakMinutes' | 'assignedClass'> & { attendanceModifier?: { modifierType: string; effectiveStartTime: string | null; effectiveEndTime: string | null } | null; updatedAt: string; workPattern: Pick<WorkPattern, 'code' | 'name' | 'shortName' | 'color'> | null }>;
   requests: Array<Pick<ShiftRequest, 'id' | 'requestDate' | 'requestType' | 'status' | 'reason'> & { updatedAt: string }>;
 };
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'REEMPLOYED';

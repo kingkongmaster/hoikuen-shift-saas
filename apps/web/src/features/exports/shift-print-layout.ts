@@ -3,7 +3,7 @@ import type { PrintShiftData } from '../../api/client';
 export type PrintPaper = 'A4' | 'A3' | 'B4';
 export type PrintOrientation = 'portrait' | 'landscape';
 export type PrintOptions = { paper: PrintPaper; orientation: PrintOrientation };
-export const defaultAdminPrintOptions: PrintOptions = { paper: 'B4', orientation: 'landscape' };
+export const defaultAdminPrintOptions: PrintOptions = { paper: 'A4', orientation: 'landscape' };
 export const defaultPersonalPrintOptions: PrintOptions = { paper: 'A4', orientation: 'landscape' };
 
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));

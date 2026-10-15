@@ -99,6 +99,24 @@ export class ShiftsService {
     }
     await this.validateFixedClassSpecialShiftUniqueness(user.tenantId, schedule.id, inputs, staff);
     const staffById = new Map(staff.map((member) => [member.id, member]));
+    // Reuse FINAL validation on the proposed draft, before any write. Existing
+    // unrelated errors may be repaired incrementally; edits cannot introduce new
+    // HARD errors or preserve one on an edited cell.
+    const context = await this.buildGenerationContext(user.tenantId, schedule.targetMonth, schedule.id);
+    const changedKeys = new Set(inputs.map(input => `${input.staffId}:${input.workDate}`));
+    const proposed = inputs.map(input => {
+      const previous = context.assignments.find(row => row.staffId === input.staffId && this.isoDate(row.workDate) === input.workDate);
+      return { id: previous?.id ?? 'proposed', createdAt: new Date(), updatedAt: new Date(),
+        ...this.assignmentData(schedule, input, staffById.get(input.staffId)),
+        workPattern: null, attendanceModifier: previous?.attendanceModifier ?? null };
+    });
+    const diagnosticKey = (item: { code: string; staffId: string | null; date: string }) => `${item.code}:${item.staffId}:${item.date}`;
+    const existingErrors = new Set(validateGenerationContext(context, 'CONFIRM').filter(item => item.severity === 'ERROR').map(diagnosticKey));
+    const assignments = [...context.assignments.filter(row => !changedKeys.has(`${row.staffId}:${this.isoDate(row.workDate)}`)), ...proposed];
+    const weekBoundaryAssignments = [...context.weekBoundaryAssignments.filter(row => !changedKeys.has(`${row.staffId}:${this.isoDate(row.workDate)}`)), ...proposed];
+    const errors = validateGenerationContext({ ...context, assignments, weekBoundaryAssignments }, 'CONFIRM').filter(item => item.severity === 'ERROR' &&
+      (item.category === 'SYSTEM_SAFETY_BLOCK' || !existingErrors.has(diagnosticKey(item)) || changedKeys.has(`${item.staffId}:${item.date}`)));
+    if (errors.length) throw new ConflictException({ message: '必須の勤務条件に違反する変更は保存できません。', diagnostics: errors, warnings: errors.map(item => this.diagnosticWarning(item)) });
     await this.prisma.$transaction(async db=>{
       await db.$queryRaw`SELECT id FROM "MonthlyShift" WHERE id=${schedule.id}::uuid AND "tenantId"=${user.tenantId}::uuid FOR UPDATE`;
       const current=await db.monthlyShift.findFirst({where:{id:schedule.id,tenantId:user.tenantId}});
@@ -403,7 +421,7 @@ export class ShiftsService {
       ? { startTime: staff.regularWorkStartTime, endTime: staff.regularWorkEndTime }
       : null;
     const defaults = individualRegularHours ?? shiftTypeDefaults[input.shiftType as ShiftType];
-    return { tenantId: schedule.tenantId, monthlyShiftId: schedule.id, staffId: input.staffId, workDate: this.date(input.workDate), shiftType: input.shiftType, startTime: input.startTime === undefined ? (defaults?.startTime ?? null) : input.startTime, endTime: input.endTime === undefined ? (defaults?.endTime ?? null) : input.endTime, breakMinutes: input.breakMinutes ?? null, note: input.note?.trim() || null, assignedClass: (workingShiftTypes as readonly ShiftType[]).includes(input.shiftType) ? (input.assignedClass ?? null) : null };
+    return { tenantId: schedule.tenantId, monthlyShiftId: schedule.id, staffId: input.staffId, workDate: this.date(input.workDate), shiftType: input.shiftType, workPatternId: null, startTime: input.startTime === undefined ? (defaults?.startTime ?? null) : input.startTime, endTime: input.endTime === undefined ? (defaults?.endTime ?? null) : input.endTime, breakMinutes: input.breakMinutes ?? null, note: input.note?.trim() || null, assignedClass: (workingShiftTypes as readonly ShiftType[]).includes(input.shiftType) ? (input.assignedClass ?? null) : null };
   }
 
   private async saturdayMinimumWarnings(tenantId: string, schedule: { id: string; targetMonth: Date }): Promise<Warning[]> {

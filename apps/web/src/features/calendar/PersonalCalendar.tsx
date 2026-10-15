@@ -66,8 +66,8 @@ export function PersonalCalendar({ token }: { token: string }) {
           if (!date) return <div key={`empty-${index}`} className="min-h-20" aria-hidden="true" />;
           const assignment = assignments.get(date);
           const dayRequests = requests.get(date) ?? [];
-          const info = assignment ? shiftInfo[assignment.shiftType] : null;
-          return <button key={date} type="button" role="gridcell" onClick={() => setSelectedDate(date)} className={`calendar-day ${selectedDate === date ? 'is-selected' : ''}`} aria-label={dayLabel(date, assignment?.shiftType, dayRequests)}>
+          const info = assignment ? shiftInfo[displayType(assignment)] : null;
+          return <button key={date} type="button" role="gridcell" onClick={() => setSelectedDate(date)} className={`calendar-day ${selectedDate === date ? 'is-selected' : ''}`} aria-label={dayLabel(date, assignment ? displayType(assignment) : undefined, dayRequests)}>
             <span className="calendar-day-number">{Number(date.slice(-2))}</span>
             {info && <span className={`calendar-shift ${info.style}`}><strong>{info.short}</strong><span>{info.label}</span></span>}
             {dayRequests.map((request) => <span key={request.id} className={`calendar-request request-${request.status.toLowerCase()}`}>{requestInfo[request.status].short}</span>)}
@@ -79,9 +79,10 @@ export function PersonalCalendar({ token }: { token: string }) {
     <section className="card" aria-live="polite" aria-labelledby="calendar-detail-title">
       <p className="eyebrow">DETAIL</p><h3 id="calendar-detail-title" className="mt-1 text-xl font-black">{selectedDate ? formatDate(selectedDate) : '日付を選択してください'}</h3>
       {!selectedDate ? <p className="mt-4 text-sm text-[var(--ink-muted)]">カレンダーの日付を押すと、勤務時間・休憩・希望休の状態を確認できます。</p> : <div className="mt-5 space-y-4">
-        {selectedAssignment ? <div className={`rounded-xl border p-4 ${shiftInfo[selectedAssignment.shiftType].style}`}>
-          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-lg font-black">{shiftInfo[selectedAssignment.shiftType].short}｜{shiftInfo[selectedAssignment.shiftType].label}</p><span className="text-label">✓ 確定済み</span></div>
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><Detail label="開始" value={selectedAssignment.startTime ?? '—'} /><Detail label="終了" value={selectedAssignment.endTime ?? '—'} /><Detail label="休憩" value={selectedAssignment.breakMinutes == null ? '—' : `${selectedAssignment.breakMinutes}分`} /><Detail label="勤務種別" value={shiftInfo[selectedAssignment.shiftType].label} /></dl>
+        {selectedAssignment ? <div className={`rounded-xl border p-4 ${shiftInfo[displayType(selectedAssignment)].style}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-lg font-black">{shiftInfo[displayType(selectedAssignment)].short}｜{shiftInfo[displayType(selectedAssignment)].label}</p><span className="text-label">✓ 確定済み</span></div>
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><Detail label="基礎勤務の開始" value={selectedAssignment.startTime ?? '—'} /><Detail label="基礎勤務の終了" value={selectedAssignment.endTime ?? '—'} /><Detail label="休憩" value={selectedAssignment.breakMinutes == null ? '—' : `${selectedAssignment.breakMinutes}分`} /><Detail label="勤務種別" value={shiftInfo[displayType(selectedAssignment)].label} /></dl>
+          {selectedAssignment.attendanceModifier && <p className="mt-3 font-bold">有給時間：{selectedAssignment.attendanceModifier.effectiveStartTime}〜{selectedAssignment.attendanceModifier.effectiveEndTime}</p>}
           {data?.schedule?.confirmedAt && selectedAssignment.updatedAt > data.schedule.confirmedAt && <p className="mt-3 font-bold">！確定後に変更された勤務です</p>}
         </div> : <p className="rounded-xl bg-[var(--canvas)] p-4 font-bold">{data?.schedule?.status === 'DRAFT' ? '△ この月のシフトは未確定です' : 'この日の勤務登録はありません'}</p>}
         {selectedRequests.map((request) => <div key={request.id} className={`calendar-request-detail request-${request.status.toLowerCase()}`}><p className="font-black">{requestInfo[request.status].short}｜{requestInfo[request.status].label}</p><p className="mt-1 text-sm">種類：{requestTypeLabels[request.requestType] ?? request.requestType}</p>{request.reason && <p className="mt-1 text-sm">理由：{request.reason}</p>}</div>)}
@@ -97,3 +98,5 @@ function monthLabel(month: string) { const [year, value] = month.split('-'); ret
 function tokyoToday() { const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()); const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''; return `${get('year')}-${get('month')}-${get('day')}`; }
 function formatDate(date: string) { return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Tokyo' }).format(new Date(`${date}T00:00:00+09:00`)); }
 function dayLabel(date: string, shiftType: ShiftType | undefined, requests: MyCalendar['requests']) { return [formatDate(date), shiftType ? shiftInfo[shiftType].label : '勤務なし', ...requests.map((row) => requestInfo[row.status].label)].join('、'); }
+
+function displayType(assignment: MyCalendar['assignments'][number]): ShiftType { return assignment.attendanceModifier?.modifierType === 'AM_PAID_LEAVE' ? 'AM_HALF' : assignment.attendanceModifier?.modifierType === 'PM_PAID_LEAVE' ? 'PM_HALF' : assignment.shiftType; }

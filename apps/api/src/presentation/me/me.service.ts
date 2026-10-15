@@ -45,6 +45,7 @@ export class MeService {
               breakMinutes: true,
               assignedClass: true,
               updatedAt: true,
+              attendanceModifier: { select: { modifierType: true, effectiveStartTime: true, effectiveEndTime: true } },
               workPattern: { select: { code: true, name: true, shortName: true, color: true } },
             },
             orderBy: { workDate: 'asc' },
