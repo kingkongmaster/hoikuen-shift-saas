@@ -26,14 +26,14 @@ async function main() {
   originalSubscription = await prisma.tenantSubscription.findUniqueOrThrow({ where: { tenantId } });
   await prisma.tenantFeature.deleteMany({ where: { tenantId } });
 
-  await setSubscription({ plan: SubscriptionPlan.TRIAL, status: SubscriptionStatus.TRIAL, trialEndsAt: new Date(Date.now() + 86400000) });
+  await setSubscription({ plan: SubscriptionPlan.TRIAL, status: SubscriptionStatus.TRIAL, trialStartedAt: new Date(Date.now()-86400000), trialEndsAt: new Date(Date.now() + 86400000) });
   let list = await featureList(token); assert.ok(list.enabledFeatures.includes('BASIC_SHIFT_GENERATION')); assert.equal(list.enabledFeatures.includes('ADVANCED_WORK_PATTERNS'), false);
   await setSubscription({ plan: SubscriptionPlan.STANDARD, status: SubscriptionStatus.ACTIVE });
   list = await featureList(token); assert.deepEqual(list.enabledFeatures, ['BASIC_SHIFT_GENERATION']);
   await setSubscription({ plan: SubscriptionPlan.PROFESSIONAL, status: SubscriptionStatus.ACTIVE });
   list = await featureList(token); assert.ok(list.enabledFeatures.includes('ADVANCED_WORK_PATTERNS')); assert.equal(list.enabledFeatures.includes('TENANT_CUSTOM_RULES'), false); assert.equal(list.features.some((item) => item.featureCode === 'UNKNOWN_FEATURE'), false);
   for (const status of [SubscriptionStatus.SUSPENDED, SubscriptionStatus.EXPIRED]) { await setSubscription({ status }); list = await featureList(token); assert.equal(list.enabledFeatures.length, 0); assert.ok(list.features.every((item) => item.code === 'FEATURE_NOT_AVAILABLE')); }
-  await setSubscription({ plan: SubscriptionPlan.TRIAL, status: SubscriptionStatus.TRIAL, trialEndsAt: new Date(Date.now() - 60_000) });
+  await setSubscription({ plan: SubscriptionPlan.TRIAL, status: SubscriptionStatus.TRIAL, trialStartedAt: new Date(Date.now()-86400000), trialEndsAt: new Date(Date.now() - 60_000) });
   list = await featureList(token); assert.equal(list.enabledFeatures.length, 0);
 
   await setSubscription({ plan: SubscriptionPlan.STANDARD, status: SubscriptionStatus.ACTIVE, trialEndsAt: null });
@@ -74,7 +74,7 @@ async function main() {
   result = await call(`/shifts/${scheduleId}/precheck`, { method: 'POST' }, token); assert.notEqual(result.status, 403);
 
   otherTenantId = (await prisma.tenant.create({ data: { name: `Feature別園-${randomUUID().slice(0, 8)}` } })).id;
-  await prisma.tenantSubscription.create({ data: { tenantId: otherTenantId, plan: SubscriptionPlan.STANDARD, status: SubscriptionStatus.ACTIVE } });
+  await prisma.tenantSubscription.create({ data: { tenantId: otherTenantId, plan: SubscriptionPlan.STANDARD, status: SubscriptionStatus.ACTIVE, currentPeriodStartedAt:new Date(Date.now()-86400000),currentPeriodEndsAt:new Date(Date.now()+86400000) } });
   result = await setFeature(token, otherTenantId, { featureCode: 'TENANT_CUSTOM_RULES', enabled: true, source: 'CUSTOM_CONTRACT' }); assert.equal(result.status, 200);
   list = await featureList(token); assert.equal(list.features.find((item) => item.featureCode === 'TENANT_CUSTOM_RULES').source, 'TENANT_OVERRIDE');
   const otherFeature = await prisma.tenantFeature.findUniqueOrThrow({ where: { tenantId_featureCode: { tenantId: otherTenantId, featureCode: 'TENANT_CUSTOM_RULES' } } }); assert.equal(otherFeature.tenantId, otherTenantId);

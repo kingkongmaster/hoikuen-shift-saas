@@ -9,7 +9,7 @@ let app,db;const tids=[],uids=[];const suffix=randomUUID().slice(0,8);
  const password='Anonymous-Test-Only-Aa1!';const hash=await app.get(PasswordService).hash(password);const tokens={};
  for(const kind of ['missing','valid','staff']){
   const t=await db.tenant.create({data:{name:'Anonymous '+kind}});tids.push(t.id);
-  if(kind!=='missing')await db.tenantSubscription.create({data:{tenantId:t.id,plan:'PROFESSIONAL',status:'ACTIVE',staffLimit:10}});
+  if(kind!=='missing')await db.tenantSubscription.create({data:{tenantId:t.id,plan:'PROFESSIONAL',status:'ACTIVE',currentPeriodStartedAt:new Date(Date.now()-86400000),currentPeriodEndsAt:new Date(Date.now()+30*86400000),staffLimit:10}});
   const u=await db.user.create({data:{loginId:kind+'-'+suffix,displayName:'Anonymous',passwordHash:hash}});uids.push(u.id);await db.membership.create({data:{tenantId:t.id,userId:u.id,role:kind==='staff'?'STAFF':'ADMIN'}});
   const auth=await call('/auth/login',null,{loginId:u.loginId,password});assert.equal(auth.status,200);tokens[kind]=auth.body.accessToken;
  }
@@ -28,8 +28,8 @@ let app,db;const tids=[],uids=[];const suffix=randomUUID().slice(0,8);
  assert.equal((await call('/platform/tenants',tokens.valid)).status,403,'tenant ADMIN is not operator');
  assert.equal((await call('/work-patterns',tokens.staff)).status,403);
  assert.equal((await call('/staff',tokens.staff,input)).status,403);
- for(const status of ['SUSPENDED','CANCELLED','EXPIRED']){await db.tenantSubscription.update({where:{tenantId:tids[1]},data:{status}});assert.equal((await call('/features',tokens.valid)).body.enabledFeatures.length,0);assert.equal((await call('/work-patterns',tokens.valid)).status,200);assert.equal((await call('/staff',tokens.valid,input)).status,403);}
+ for(const status of ['SUSPENDED','CANCELLED','EXPIRED']){await db.tenantSubscription.update({where:{tenantId:tids[1]},data:{status}});assert.equal((await call('/features',tokens.valid)).body.enabledFeatures.length,0);assert.equal((await call('/work-patterns',tokens.valid)).status,403);assert.equal((await call('/staff',tokens.valid,input)).status,403);}
  await db.tenantSubscription.update({where:{tenantId:tids[1]},data:{plan:'TRIAL',status:'TRIAL',trialEndsAt:null}});assert.equal((await call('/features',tokens.valid)).status,403);
- await db.tenantSubscription.update({where:{tenantId:tids[1]},data:{trialEndsAt:new Date(Date.now()+86400000)}});assert.deepEqual((await call('/features',tokens.valid)).body.enabledFeatures,['BASIC_SHIFT_GENERATION']);
+ await db.tenantSubscription.update({where:{tenantId:tids[1]},data:{trialStartedAt:new Date(Date.now()-86400000),trialEndsAt:new Date(Date.now()+86400000)}});assert.deepEqual((await call('/features',tokens.valid)).body.enabledFeatures,['BASIC_SHIFT_GENERATION']);
  console.log('Subscription fail-closed HTTP/DB PASS: missing contract blocks override/read gated feature/write, valid contract remains available, states and roles enforced, other tenant unchanged.');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(db){for(const id of tids)await db.tenant.delete({where:{id}});for(const id of uids)await db.user.delete({where:{id}});}if(app)await app.close();});

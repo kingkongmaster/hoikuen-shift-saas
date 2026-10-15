@@ -35,8 +35,9 @@ export const FEATURE_LABELS: Record<FeatureCode, string> = {
   ADVANCED_STAFFING_REQUIREMENTS: '詳細な必要人数設定', TENANT_CUSTOM_RULES: '園専用ルール',
 };
 export type FeatureResolution = { enabled: boolean; source: 'CONTRACT' | 'TENANT_OVERRIDE' | 'PLAN' | 'NONE'; code?: string };
-export function resolveVerifiedFeature(plan: SubscriptionPlan, readOnly: boolean, feature: FeatureCode, override: { enabled: boolean; validFrom: Date | null; validTo: Date | null } | null, at = new Date()): FeatureResolution {
+export function resolveVerifiedFeature(plan: SubscriptionPlan, readOnly: boolean, feature: FeatureCode, override: { source?: string; tenantId?:string; enabled: boolean; validFrom: Date | null; validTo: Date | null } | null, at = new Date()): FeatureResolution {
   if (readOnly) return { enabled: false, source: 'CONTRACT', code: 'FEATURE_NOT_AVAILABLE' };
+  if(override && (typeof override.enabled!=='boolean'||!FEATURE_SOURCES.includes(override.source as FeatureSource)||[override.validFrom,override.validTo].some(d=>d!=null&&(!(d instanceof Date)||!Number.isFinite(d.getTime())))||(override.validFrom&&override.validTo&&override.validFrom>=override.validTo)||(feature==='TENANT_CUSTOM_RULES'&&override.enabled&&!['MANUAL','CUSTOM_CONTRACT'].includes(override.source??''))))return {enabled:false,source:'CONTRACT',code:'FEATURE_UNVERIFIED'};
   if (override && (!override.validFrom || override.validFrom <= at) && (!override.validTo || override.validTo > at)) {
     return { enabled: override.enabled, source: 'TENANT_OVERRIDE', ...(override.enabled ? {} : { code: 'FEATURE_NOT_ENTITLED' }) };
   }

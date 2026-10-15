@@ -20,7 +20,7 @@ export class ReadinessService {
     let entitled=false;try{const sub=await this.subscriptions.find(tenantId);contract={plan:sub.plan,status:sub.status,trialStartedAt:sub.trialStartedAt,trialEndsAt:sub.trialEndsAt};entitled=(await this.features.resolve(tenantId,'BASIC_SHIFT_GENERATION')).enabled;}catch{ /* unverified contract stays closed */ }
     const item=(id:string,label:string,level:string,complete:boolean,started=false)=>({id,label,level,status:complete?'COMPLETE':started?'IN_PROGRESS':'NOT_STARTED'});
     const items=[
-      item('contract','契約・試用期間','HARD',entitled),item('profile','園基本情報','HARD',!!tenant.name.trim()&&!!tenant.contactEmail,!!tenant.contactEmail),
+      item('contract','契約・試用期間','HARD',entitled),item('contractConfiguration','保存済み勤務条件と契約の整合','HARD',entitled&&(await this.incompatibleFeatures(tenantId)).length===0),item('profile','園基本情報','HARD',!!tenant.name.trim()&&!!tenant.contactEmail,!!tenant.contactEmail),
       item('classes','クラスと必要人数の確認','HARD',classes>0&&classesSaved>0,classes>0),item('staff','職員登録','HARD',staff>0),
       item('conditions','雇用・勤務条件、生成条件の確認','HARD',!!setting&&settingSaved>0,!!setting),
       item('patterns','勤務パターン','HARD',patterns>0),item('departments','部署・所属','WARNING',departments>0),
@@ -29,5 +29,19 @@ export class ReadinessService {
     ];
     return {managed,ready:items.every(i=>i.level!=='HARD'||i.status==='COMPLETE'),items,contract,legalCompletionSeparate:true};
   }
-  async assertReady(tenantId:string){const state=await this.get(tenantId);if(state.managed&&!state.ready)throw new ForbiddenException({code:'ONBOARDING_REQUIRED',message:'シフト作成に必要な設定を完了してください。',items:state.items.filter(i=>i.level==='HARD'&&i.status!=='COMPLETE')});}
+  // Retain downgraded data, but never silently omit active working constraints.
+  async incompatibleFeatures(tenantId:string){
+    const [patterns,rules,staffing,conditional]=await Promise.all([
+      this.db.workPattern.count({where:{tenantId,isActive:true,isWorking:true,isSystem:false}}),
+      this.db.staffWorkRule.count({where:{tenantId,isActive:true}}),
+      this.db.shiftStaffingRequirement.count({where:{tenantId,isActive:true}}),
+      this.db.conditionalShiftStaffingRequirement.count({where:{tenantId,isActive:true}}),
+    ]);
+    const required=[['ADVANCED_WORK_PATTERNS',patterns],['STAFF_WORK_RULES',rules],['ADVANCED_STAFFING_REQUIREMENTS',staffing+conditional]] as const;
+    const blocked:string[]=[];
+    for(const [code,count] of required)if(count&&!(await this.features.resolve(tenantId,code)).enabled)blocked.push(code);
+    return blocked;
+  }
+  async assertCompatible(tenantId:string){const features=await this.incompatibleFeatures(tenantId);if(features.length)throw new ForbiddenException({code:'CONTRACT_CONFIGURATION_CONFLICT',message:'保存済みの勤務条件に、現在の契約では利用できない設定があります。条件を無視して処理せず停止しました。運営窓口へご相談ください。',features});}
+  async assertReady(tenantId:string){await this.assertCompatible(tenantId);const state=await this.get(tenantId);if(state.managed&&!state.ready)throw new ForbiddenException({code:'ONBOARDING_REQUIRED',message:'シフト作成に必要な設定を完了してください。',items:state.items.filter(i=>i.level==='HARD'&&i.status!=='COMPLETE')});}
 }

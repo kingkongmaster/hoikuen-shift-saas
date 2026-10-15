@@ -1,3 +1,4 @@
+import { ContractGate } from './features/subscription/ContractGate';
 import { InvitationRegistration } from './features/commercial/InvitationRegistration';
 import { OperatorOnboarding } from './features/commercial/OperatorOnboarding';
 import { useEffect, useState } from 'react';
@@ -40,7 +41,7 @@ export function App() {
     ? <PublicInfoPage route={infoRoute} />
     : !session
       ? <LoginPage onSuccess={(next) => { sessionStorage.setItem('enshift.accessToken', next.accessToken); setSession(next); }} />
-      : <SetupGate session={session} onLogout={() => { sessionStorage.removeItem('enshift.accessToken'); setSession(null); }} />;
+      : <ContractGate session={session} onLogout={() => {sessionStorage.removeItem('enshift.accessToken');setSession(null);}}><SetupGate session={session} onLogout={() => { sessionStorage.removeItem('enshift.accessToken'); setSession(null); }} /></ContractGate>;
   return <ErrorBoundary><div className="flex min-h-screen flex-col"><AppStatusLayer /><div className="flex-1">{content}</div><AppFooter /></div></ErrorBoundary>;
 }
 function isUnknownHash() { return Boolean(window.location.hash.slice(1)) && !routeFromHash() && !['#register','#operator'].includes(window.location.hash); }

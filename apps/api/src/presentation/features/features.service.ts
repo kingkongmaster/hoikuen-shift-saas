@@ -20,6 +20,7 @@ export class FeaturesService {
     const subscription = await this.subscriptions.find(tenantId);
     if (this.subscriptions.readOnly(subscription)) return { enabled: false, source: 'CONTRACT', code: 'FEATURE_NOT_AVAILABLE' };
     const override = await this.prisma.tenantFeature.findUnique({ where: { tenantId_featureCode: { tenantId, featureCode } } });
+    if(override&&override.tenantId!==tenantId)return {enabled:false,source:'CONTRACT',code:'FEATURE_UNVERIFIED'};
     return resolveVerifiedFeature(subscription.plan, false, featureCode, override, at);
   }
 

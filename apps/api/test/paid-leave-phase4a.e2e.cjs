@@ -15,7 +15,7 @@ async function main() {
   const staffUser = await prisma.user.create({ data: { email: `paid-staff-${run}@e2e.invalid`, displayName: 'Paid General Staff', passwordHash: hash(password) } }); created.userIds.push(staffUser.id);
   await prisma.membership.create({ data: { tenantId: tenant.id, userId: user.id, role: 'ADMIN' } });
   await prisma.membership.create({ data: { tenantId: tenant.id, userId: staffUser.id, role: 'STAFF' } });
-  await prisma.tenantSubscription.create({ data: { tenantId: tenant.id, plan: 'STANDARD', status: 'ACTIVE', currentPeriodStartedAt: new Date() } });
+  await prisma.tenantSubscription.create({ data: { tenantId: tenant.id, plan: 'STANDARD', status: 'ACTIVE', currentPeriodStartedAt: new Date(), currentPeriodEndsAt: new Date(Date.now()+30*86400000) } });
   const staff = await prisma.staff.create({ data: { tenantId: tenant.id, employeeNumber: `P-${run}`, displayName: 'Paid Staff' } });
   const otherTenant = await prisma.tenant.create({ data: { name: `Paid other ${run}` } }); created.tenantIds.push(otherTenant.id);
   const otherStaff = await prisma.staff.create({ data: { tenantId: otherTenant.id, employeeNumber: `O-${run}`, displayName: 'Other Staff' } });

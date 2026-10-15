@@ -16,7 +16,7 @@ const tids=[],uids=[],run=randomUUID().slice(0,8),password='Anonymous-Onboarding
  const operatorUser=await db.user.create({data:{loginId:'operator-'+run,displayName:'匿名運営者',isPlatformAdmin:true,passwordHash:await app.get(PasswordService).hash(password)}});uids.push(operatorUser.id);
  await db.membership.create({data:{tenantId:operatorTenant.id,userId:operatorUser.id,role:'ADMIN'}});
  const operator=(await call(null,'POST','/auth/login',{loginId:operatorUser.loginId,password})).accessToken;
- const legacyToken='b'.repeat(64);
+ const legacyToken=require('node:crypto').randomBytes(32).toString('hex');
  const legacy=await db.invitation.create({data:{tenantId:operatorTenant.id,role:'ADMIN',tokenHash:require('node:crypto').createHash('sha256').update(legacyToken).digest('hex'),expiresAt:new Date(Date.now()+3600000),createdByUserId:operatorUser.id}});
  await call(null,'POST','/auth/accept-invitation',{tenantId:operatorTenant.id,invitationId:legacy.id,token:legacyToken,loginId:operatorUser.loginId,password,confirmPassword:password},403);
  const tenants=[];
@@ -89,7 +89,7 @@ const tids=[],uids=[],run=randomUUID().slice(0,8),password='Anonymous-Onboarding
  await db.membership.update({where:{tenantId_userId:{tenantId:savedMembership.tenantId,userId:savedMembership.userId}},data:{role:'ADMIN'}});
  const sub=await db.tenantSubscription.findUnique({where:{tenantId:a.id}});
  for(const update of [{trialEndsAt:null},{trialEndsAt:new Date(0)},{trialStartedAt:new Date(Date.now()+86400000)},{status:'SUSPENDED'}]){
-  await db.tenantSubscription.update({where:{tenantId:a.id},data:update});assert.equal((await call(a.token,'GET','/setup/readiness')).ready,false);checks++;
+  await db.tenantSubscription.update({where:{tenantId:a.id},data:update});await call(a.token,'GET','/setup/readiness',undefined,403);
   await call(a.token,'POST','/shifts',{month:'2032-03'},403);
   if(process.env.PRODUCT_PHASE4==='true')await call(a.token,'POST',`/shifts/${a.shift.id}/generate`,undefined,403);
   await db.tenantSubscription.update({where:{tenantId:a.id},data:{trialStartedAt:sub.trialStartedAt,trialEndsAt:sub.trialEndsAt,status:sub.status}});
@@ -105,5 +105,6 @@ const tids=[],uids=[],run=randomUUID().slice(0,8),password='Anonymous-Onboarding
   if(process.env.PHASE4_BROWSER==='true')await require('./product-phase4-browser.cjs')({base:'http://127.0.0.1:'+server.address().port,password,tenants});
   if(process.env.PHASE3_BROWSER==='true')await require('./product-phase3-browser.cjs')({base:'http://127.0.0.1:'+server.address().port,operatorLogin:operatorUser.loginId,password,tenants,run,track:async()=>{const rows=await db.tenant.findMany({where:{code:{startsWith:'ui-'+run}}});for(const row of rows){if(!tids.includes(row.id))tids.push(row.id);for(const m of await db.membership.findMany({where:{tenantId:row.id}}))if(!uids.includes(m.userId))uids.push(m.userId);}}});
  }
+ if(process.env.PRODUCT_PHASE5==='true')await require('./product-phase5-contracts.cjs')({call,db,tenants,operator,password,origin,operatorLogin:operatorUser.loginId,run,uids});
  console.log(`PRODUCT Phase3 PASS: ${checks} HTTP/data assertions; two anonymous tenants, invitations, setup, Fail Closed, isolation.`);
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(server)await new Promise(r=>server.close(r));if(db){for(const id of tids.reverse())await db.tenant.delete({where:{id}});for(const id of uids)await db.user.delete({where:{id}});}if(app)await app.close();});

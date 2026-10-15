@@ -28,7 +28,7 @@ const tids = [], uids = [];
   const month='2031-06', date=month+'-02';
   for (const label of ['A','B','Operator']) {
     const tenant = await db.tenant.create({data:{name:'Anonymous '+label,contactEmail:'private-'+label+'@example.invalid'}}); tids.push(tenant.id);
-    await db.tenantSubscription.create({data:{tenantId:tenant.id,plan:'PROFESSIONAL',status:'ACTIVE',staffLimit:20}});
+    await db.tenantSubscription.create({data:{tenantId:tenant.id,plan:'PROFESSIONAL',status:'ACTIVE',currentPeriodStartedAt:new Date(Date.now()-86400000),currentPeriodEndsAt:new Date(Date.now()+30*86400000),staffLimit:20}});
     const user=await db.user.create({data:{loginId:label.toLowerCase()+'-'+suffix,displayName:'Anonymous '+label,passwordHash:hash,isPlatformAdmin:label==='Operator'}});uids.push(user.id);
     await db.membership.create({data:{tenantId:tenant.id,userId:user.id,role:'ADMIN'}});
     const token=(await call(null,'POST','/auth/login',{loginId:user.loginId,password},200)).accessToken;
@@ -116,7 +116,7 @@ const tids = [], uids = [];
   await call(staffToken,'GET','/notifications',undefined,403);
   // Actual API entitlement and displayed feature catalogue agree for all plans.
   for(const [plan,advanced] of [['TRIAL',false],['STANDARD',false],['PROFESSIONAL',true]]) {
-    await db.tenantSubscription.update({where:{tenantId:b.tenant.id},data:{plan,status:plan==='TRIAL'?'TRIAL':'ACTIVE',trialEndsAt:plan==='TRIAL'?new Date(Date.now()+86400000):null}});
+    await db.tenantSubscription.update({where:{tenantId:b.tenant.id},data:{plan,status:plan==='TRIAL'?'TRIAL':'ACTIVE',trialStartedAt:new Date(Date.now()-86400000),trialEndsAt:plan==='TRIAL'?new Date(Date.now()+86400000):null}});
     const feature=await call(b.token,'GET','/features',undefined,200);
     const subscription=await call(b.token,'GET','/subscription',undefined,200);
     const labels=require('../dist/domain/features/feature-catalog').FEATURE_LABELS;
@@ -124,7 +124,7 @@ const tids = [], uids = [];
     assert.equal(feature.enabledFeatures.includes('STAFF_WORK_RULES'),advanced);checks++;
     await call(b.token,'POST',`/staff/${b.staff.id}/work-rules`,{ruleType:'MAX_WORK_DAYS_PER_MONTH',numericValue:20,priority:5,isHardConstraint:true,isActive:true},advanced?201:403);
   }
-  await db.tenantSubscription.update({where:{tenantId:b.tenant.id},data:{status:'ACTIVE',currentPeriodEndsAt:new Date(0)}});
+  await db.tenantSubscription.update({where:{tenantId:b.tenant.id},data:{status:'ACTIVE',currentPeriodStartedAt:new Date(-86400000),currentPeriodEndsAt:new Date(0)}});
   const expired=await call(b.token,'GET','/features',undefined,200);assert.deepEqual(expired.enabledFeatures,[]);
   await call(b.token,'POST','/departments',{code:'DENIED',name:'No',displayOrder:0,isActive:true},403);
   console.log(`PRODUCT Phase2 HTTP/DB: PASS (${checks} assertions; cross-tenant reads/writes, operator separation, departments, live membership, plans)`);

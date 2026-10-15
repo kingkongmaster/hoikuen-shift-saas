@@ -184,6 +184,8 @@ export type StaffingConstraintLevel='HARD'|'SOFT'|'INFO';
 export type ShiftStaffingRequirement={id:string;tenantId:string;code:string;name:string;attributeDefinitionId:string;attributeDefinition:StaffAttributeDefinition;classType:AssignedClass|null;dayOfWeek:number|null;startDate:string|null;endDate:string|null;requiredCount:number;constraintLevel:StaffingConstraintLevel;reason:string|null;displayOrder:number;isActive:boolean;createdAt:string;updatedAt:string};
 export type ShiftStaffingRequirementInput=Pick<ShiftStaffingRequirement,'code'|'name'|'attributeDefinitionId'|'classType'|'dayOfWeek'|'startDate'|'endDate'|'requiredCount'|'constraintLevel'|'reason'|'displayOrder'|'isActive'>;
 export type SubscriptionInfo = {
+  effectiveState: string;
+  cancelledAt: string | null;
   id?: string;
   tenantId: string;
   plan: SubscriptionPlan;
@@ -234,6 +236,7 @@ export async function request<T>(path: string, init: RequestInit = {}, token?: s
       if (response.status === 403 && body?.code === 'INITIAL_PASSWORD_CHANGE_REQUIRED') {
         emit('enshift:password-change-required', { token });
       }
+      if(response.status===403 && path!=='/subscription/access' && String(body?.code??'').startsWith('SUBSCRIPTION_'))emit('enshift:contract-changed',{});
       const message = responseMessage(body, response.status, path);
       emit('enshift:api-error', { message }); throw new ApiResponseError(message, response.status, body);
     }

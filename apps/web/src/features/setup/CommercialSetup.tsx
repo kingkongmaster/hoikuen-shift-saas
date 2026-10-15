@@ -1,3 +1,4 @@
+import { SubscriptionInfo } from '../subscription/SubscriptionInfo';
 import { useState, useEffect, type FormEvent } from 'react';
 import { api, request, type Session, type SetupState, type Staff } from '../../api/client';
 import { StaffManagement } from '../staff/StaffManagement';
@@ -7,7 +8,7 @@ import { PaidLeaveManagement } from '../staff/PaidLeaveManagement';
 import { RequestManagement } from '../requests/RequestManagement';
 import { Dashboard } from '../dashboard/Dashboard';
 export type Readiness={managed:boolean;ready:boolean;contract?:{plan:string;status:string;trialStartedAt:string|null;trialEndsAt:string|null}|null;items:Array<{id:string;label:string;level:'HARD'|'WARNING'|'OPTIONAL';status:'NOT_STARTED'|'IN_PROGRESS'|'COMPLETE'}>};
-const tabs=['園基本情報','部署','職員・勤務条件','勤務設定・必要人数・休園日','勤務パターン','希望休','有給'] as const;
+const tabs=['園基本情報','部署','職員・勤務条件','勤務設定・必要人数・休園日','勤務パターン','希望休','有給','契約情報'] as const;
 export function CommercialSetup({session,setup,initial,onLogout}:{session:Session;setup:SetupState;initial:Readiness;onLogout:()=>void}){
  const [state,setState]=useState(initial),[tab,setTab]=useState<string>(tabs[0]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[dashboard,setDashboard]=useState(false);
  async function refresh(){setBusy(true);setError('');try{const r=await api.setupReadiness(session.accessToken);setState(r);return r.ready;}catch(e){setError(e instanceof Error?e.message:'確認できませんでした。');return false;}finally{setBusy(false);}}
@@ -21,6 +22,8 @@ export function CommercialSetup({session,setup,initial,onLogout}:{session:Sessio
  {tab===tabs[4]&&<WorkPatternManagement token={session.accessToken}/>}
  {tab===tabs[5]&&<RequestManagement session={session}/>}
  {tab===tabs[6]&&<PaidLeaveManagement token={session.accessToken}/>}
+ {tab===tabs[7]&&<SubscriptionInfo session={session}/>}
+ {state.items.some(i=>i.id==='contractConfiguration'&&i.status!=='COMPLETE')&&<p role="alert" className="my-3 rounded-lg bg-amber-50 p-3">保存済みの勤務条件に、現在の契約では利用できない設定があります。設定は削除されていません。「契約情報」を確認し、運営窓口へご相談ください。</p>}
  </section></main>;
 }
 type Department={id:string;name:string;code:string;isActive:boolean};

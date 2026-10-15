@@ -35,10 +35,9 @@ export class StaffService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const locked = await tx.$queryRaw<TenantSubscription[]>(Prisma.sql`SELECT * FROM "TenantSubscription" WHERE "tenantId" = ${user.tenantId}::uuid FOR UPDATE`);
-        const subscription = this.subscriptions.verifySubscription(locked[0] ?? null);
-        const expiredTrial = subscription.status === SubscriptionStatus.TRIAL && (!subscription.trialEndsAt || subscription.trialEndsAt <= new Date());
+        const subscription = this.subscriptions.verifySubscription(locked[0] ?? null,user.tenantId);
         if (subscription.status === SubscriptionStatus.SUSPENDED) throw new ForbiddenException({ code: 'SUBSCRIPTION_SUSPENDED', message: 'この園の利用は停止されています。' });
-        if (expiredTrial || subscription.status === SubscriptionStatus.EXPIRED || subscription.status === SubscriptionStatus.CANCELLED) throw new ForbiddenException({ code: 'SUBSCRIPTION_EXPIRED', message: 'この園の契約は利用期限を過ぎています。' });
+        if (this.subscriptions.readOnly(subscription)) throw new ForbiddenException({ code: 'SUBSCRIPTION_EXPIRED', message: 'この園の契約は利用期限を過ぎています。' });
         const staffLimit = subscription.staffLimit;
         const count = await tx.staff.count({ where: { tenantId: user.tenantId, isActive: true } });
         if (count >= staffLimit) throw new ConflictException({ code: 'STAFF_LIMIT_REACHED', message: '職員登録上限に達しています。' });
