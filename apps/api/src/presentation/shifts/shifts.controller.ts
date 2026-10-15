@@ -1,3 +1,4 @@
+import { ReadinessService } from '../setup/readiness.service';
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import type { AuthenticatedUser } from '../../infrastructure/auth/auth.types';
@@ -16,13 +17,13 @@ import { RequiresFeature } from '../features/requires-feature.decorator';
 @Controller('shifts')
 @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, SubscriptionWriteGuard, FeatureGuard)
 export class ShiftsController {
-  constructor(private readonly shifts: ShiftsService) {}
+  constructor(private readonly shifts: ShiftsService,private readonly readiness:ReadinessService) {}
   @Get() list(@Req() request: Request & { user: AuthenticatedUser }, @Query() query: ListShiftsQueryDto) { return this.shifts.list(request.user, query.month, query.staffId); }
   @Get(':id') get(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.get(request.user, id); }
-  @Post() @Roles('ADMIN', 'DIRECTOR') create(@Req() request: Request & { user: AuthenticatedUser }, @Body() input: CreateMonthlyShiftDto) { return this.shifts.create(request.user, input.month); }
+  @Post() @Roles('ADMIN', 'DIRECTOR') async create(@Req() request: Request & { user: AuthenticatedUser }, @Body() input: CreateMonthlyShiftDto) { await this.readiness.assertReady(request.user.tenantId); return this.shifts.create(request.user, input.month); }
   @Put(':id/assignments') @Roles('ADMIN', 'DIRECTOR') save(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string, @Body() input: SaveAssignmentsDto) { return this.shifts.save(request.user, id, input.assignments); }
   @Post(':id/confirm') @HttpCode(200) @Roles('ADMIN', 'DIRECTOR') confirm(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.confirm(request.user, id); }
   @Post(':id/reopen') @HttpCode(200) @Roles('ADMIN', 'DIRECTOR') reopen(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.reopen(request.user, id); }
-  @Post(':id/generate') @Roles('ADMIN') @RequiresFeature('BASIC_SHIFT_GENERATION') generate(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.generate(request.user, id); }
+  @Post(':id/generate') @Roles('ADMIN') @RequiresFeature('BASIC_SHIFT_GENERATION') async generate(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { await this.readiness.assertReady(request.user.tenantId); return this.shifts.generate(request.user, id); }
   @Post(':id/precheck') @Roles('ADMIN') @RequiresFeature('BASIC_SHIFT_GENERATION') precheck(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.precheck(request.user, id); }
 }

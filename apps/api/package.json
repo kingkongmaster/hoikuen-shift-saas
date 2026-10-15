@@ -97,7 +97,8 @@
     "test:tenant-zero-staff": "node test/tenant-zero-staff.e2e.cjs",
     "test:commercial-onboarding": "node test/helpers/isolated-database.cjs && node test/commercial-onboarding.e2e.cjs",
     "test:product-phase1": "node --test test/subscription-fail-closed.test.cjs && node test/helpers/isolated-database.cjs && node test/subscription-fail-closed.e2e.cjs && node test/product-phase1-regression.e2e.cjs && node test/commercial-onboarding.e2e.cjs && node test/common-workforce-foundation.e2e.cjs",
-    "test:product-phase2": "PRODUCT_PHASE2_REGRESSION=true npm run test:product-phase1 && node test/product-route-guards.test.cjs && node test/product-phase2.e2e.cjs && node test/production-hardening.test.cjs && node test/staffing-requirement-generator.test.cjs && node test/staff-work-rule-generator.test.cjs && node test/fixed-assignment-materializer.test.cjs"
+    "test:product-phase2": "PRODUCT_PHASE2_REGRESSION=true npm run test:product-phase1 && node test/product-route-guards.test.cjs && node test/product-phase2.e2e.cjs && node test/production-hardening.test.cjs && node test/staffing-requirement-generator.test.cjs && node test/staff-work-rule-generator.test.cjs && node test/fixed-assignment-materializer.test.cjs",
+    "test:product-phase3": "node test/helpers/isolated-database.cjs && node test/product-phase3.e2e.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",

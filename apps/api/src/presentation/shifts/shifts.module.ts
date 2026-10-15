@@ -1,3 +1,4 @@
+import { SetupModule } from '../setup/setup.module';
 import { ManagerResolutionController } from './manager-resolution.controller';
 import { ManagerResolutionService } from './manager-resolution.service';
 import { Module } from '@nestjs/common';
@@ -11,5 +12,5 @@ import { FeaturesModule } from '../features/features.module';
 import { WorkPatternsModule } from '../work-patterns/work-patterns.module';
 import { MonthlyGenerationContextBuilder } from '../../application/shifts/monthly-generation-context-builder';
 
-@Module({ imports: [SettingsModule, NotificationsModule, AuditModule, SubscriptionsModule, FeaturesModule, WorkPatternsModule], controllers: [ShiftsController, ManagerResolutionController], providers: [ManagerResolutionService, ShiftsService, MonthlyGenerationContextBuilder] })
+@Module({ imports: [SetupModule,SettingsModule, NotificationsModule, AuditModule, SubscriptionsModule, FeaturesModule, WorkPatternsModule], controllers: [ShiftsController, ManagerResolutionController], providers: [ManagerResolutionService, ShiftsService, MonthlyGenerationContextBuilder] })
 export class ShiftsModule {}

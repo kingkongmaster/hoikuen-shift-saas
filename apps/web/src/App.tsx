@@ -1,3 +1,5 @@
+import { InvitationRegistration } from './features/commercial/InvitationRegistration';
+import { OperatorOnboarding } from './features/commercial/OperatorOnboarding';
 import { useEffect, useState } from 'react';
 import { api, type Session } from './api/client';
 import { AppStatusLayer } from './components/AppStatusLayer';
@@ -12,9 +14,10 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [restoringSession, setRestoringSession] = useState(true);
   const [infoRoute, setInfoRoute] = useState<InfoRoute | null>(() => routeFromHash());
+  const [specialRoute,setSpecialRoute]=useState(()=>window.location.hash);
   const [notFound, setNotFound] = useState(() => isUnknownHash());
   useEffect(() => { const token = sessionStorage.getItem('enshift.accessToken'); if (!token) { setRestoringSession(false); return; } api.me(token).then((data) => setSession({ ...data, accessToken: token })).catch(() => sessionStorage.removeItem('enshift.accessToken')).finally(() => setRestoringSession(false)); }, []);
-  useEffect(() => { const update = () => { setInfoRoute(routeFromHash()); setNotFound(isUnknownHash()); }; window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update); }, []);
+  useEffect(() => { const update = () => { setSpecialRoute(window.location.hash); setInfoRoute(routeFromHash()); setNotFound(isUnknownHash()); }; window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update); }, []);
   useEffect(() => {
     const requirePasswordChange = (event: Event) => {
       const token = (event as CustomEvent<{ token?: string }>).detail?.token;
@@ -27,6 +30,10 @@ export function App() {
     ? <main className="grid min-h-screen place-items-center bg-[var(--canvas)]"><p role="status" className="font-semibold">認証状態を確認しています…</p></main>
     : session?.mustChangePassword
     ? <InitialPasswordChangePage session={session} onCompleted={() => setSession(null)} />
+    : specialRoute === '#register'
+    ? <InvitationRegistration/>
+    : session && specialRoute === '#operator'
+    ? <OperatorOnboarding session={session} onLogout={() => {sessionStorage.removeItem('enshift.accessToken');setSession(null);}}/>
     : notFound
     ? <ErrorPage code="404" title="ページが見つかりません" message="指定されたページは存在しないか、移動した可能性があります。" />
     : infoRoute
@@ -36,7 +43,7 @@ export function App() {
       : <SetupGate session={session} onLogout={() => { sessionStorage.removeItem('enshift.accessToken'); setSession(null); }} />;
   return <ErrorBoundary><div className="flex min-h-screen flex-col"><AppStatusLayer /><div className="flex-1">{content}</div><AppFooter /></div></ErrorBoundary>;
 }
-function isUnknownHash() { return Boolean(window.location.hash.slice(1)) && !routeFromHash(); }
+function isUnknownHash() { return Boolean(window.location.hash.slice(1)) && !routeFromHash() && !['#register','#operator'].includes(window.location.hash); }
 
 function routeFromHash(): InfoRoute | null {
   const value = window.location.hash.slice(1);

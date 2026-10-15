@@ -208,6 +208,7 @@ model User {
   targetSwaps        ShiftSwapRequest[] @relation("SwapTarget")
   auditLogs          AuditLog[]
   isPlatformAdmin    Boolean            @default(false)
+  adminInvitations   Invitation[]
 }
 
 model TenantSubscription {
@@ -252,6 +253,8 @@ model TenantFeature {
 }
 
 model Invitation {
+  invitedUserId   String?          @db.Uuid
+  invitedUser     User?            @relation(fields: [invitedUserId], references: [id], onDelete: Cascade)
   id              String           @id @default(uuid()) @db.Uuid
   tenantId        String           @db.Uuid
   staffId         String?          @db.Uuid

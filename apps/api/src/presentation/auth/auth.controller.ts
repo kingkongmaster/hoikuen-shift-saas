@@ -1,3 +1,4 @@
+import { AdminInvitationService, AcceptAdminInvitationDto } from '../tenants/admin-invitation.service';
 import { Body, Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
@@ -11,7 +12,8 @@ import type { RequestWithContext } from '../../infrastructure/http/request-conte
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private readonly auth: AuthService, private readonly invitations: AdminInvitationService) {}
+  @Post('accept-invitation') @HttpCode(200) accept(@Body() input: AcceptAdminInvitationDto) { return this.invitations.accept(input); }
   @Post('login') @HttpCode(200) login(@Body() input: LoginDto) { return this.auth.login(input); }
   @Post('change-initial-password') @HttpCode(200) @AllowPasswordChange() @UseGuards(JwtAuthGuard, TenantAccessGuard)
   changeInitialPassword(@Req() request: Request & RequestWithContext & { user: AuthenticatedUser }, @Body() input: ChangeInitialPasswordDto) { return this.auth.changeInitialPassword(request.user, input, request.requestId); }

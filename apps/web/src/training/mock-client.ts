@@ -45,6 +45,7 @@ function run(name:string, args:any[]) {
   if (role==='STAFF'&&adminOnly.has(name)) throw new Error('管理者専用の操作です。');
   const [,a,b,c] = args;
   switch(name) {
+    case 'setupReadiness':return {managed:false,ready:false,items:[]};
     case 'setup':return reviewFixture();
     case 'monthlySubmission':return {month:a,items:db.submissions,hasUnsubmitted:db.submissions.some((x:any)=>x.state==='NOT_SUBMITTED')};
     case 'confirmMonthlySubmission':{const item=db.submissions.find((x:any)=>x.category===b);if(!item||item.revision!==c.revision||item.inputDigest!==c.inputDigest||item.pending>0||c.state!==(item.count===0?'SUBMITTED_EMPTY':'SUBMITTED_WITH_DATA'))throw new Error('提出内容を再確認してください。');Object.assign(item,{state:c.state,confirmedAt:stamp,revision:item.revision+1});return item;}

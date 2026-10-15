@@ -220,7 +220,7 @@ function responseMessage(data: unknown, status: number, path = '') {
   return fallbackMessage(status);
 }
 
-async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   emit('enshift:api-start');
   try {
     let response: Response;
@@ -247,6 +247,7 @@ export class ApiResponseError extends Error {
 async function download(path:string, token:string, init:RequestInit={}):Promise<{blob:Blob;name:string}> { emit('enshift:api-start'); try { let response:Response; try { response=await fetch(`${apiBaseUrl}${path}`,{...init,headers:{Authorization:`Bearer ${token}`,...init.headers}}); } catch { const message=navigator.onLine?'ファイルを準備できませんでした。時間をおいてもう一度お試しください。':'現在オフラインのため、ファイルを準備できません。通信が回復してからお試しください。';emit('enshift:api-error',{message});throw new Error(message); } const type=response.headers.get('content-type') ?? ''; if(!response.ok || !type.includes('text/csv') && !type.includes('application/json')) { const message=responseMessage(await response.json().catch(()=>null),response.status);emit('enshift:api-error',{message});throw new Error(message); } const disposition=response.headers.get('content-disposition') ?? ''; const name=/filename="?([^";]+)"?/.exec(disposition)?.[1] ?? 'enshift-download'; return {blob:await response.blob(),name}; } finally { emit('enshift:api-end'); } }
 
 export const api = {
+  setupReadiness(token:string){ return request<import('../features/setup/CommercialSetup').Readiness>('/setup/readiness',{},token); },
   login(loginId: string, password: string) { return request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ loginId, password }) }); },
   me(token: string) { return request<Omit<Session, 'accessToken'>>('/me', {}, token); },
   myCalendar(token: string, month: string) { return request<MyCalendar>(`/me/calendar?month=${encodeURIComponent(month)}`, {}, token); },
