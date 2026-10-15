@@ -2,9 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [manifestText, serviceWorker, html, main, styles, states, status, errorBoundary, login, dashboard, notifications, exportsPage, printLayout, footer, installPrompt, subscription] = await Promise.all([
+const [manifestText, html, main, styles, states, status, errorBoundary, login, dashboard, notifications, exportsPage, printLayout, footer, installPrompt, subscription] = await Promise.all([
   read('../public/manifest.json'),
-  read('../public/sw.js'),
   read('../index.html'),
   read('../src/main.tsx'),
   read('../src/styles.css'),
@@ -26,14 +25,15 @@ assert.equal(manifest.start_url, '/');
 assert.equal(manifest.name, 'AeN Shift');
 assert.equal(manifest.short_name, 'AeN Shift');
 assert.ok(manifest.icons.some((icon) => icon.sizes === '192x192'));
-assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512' && icon.purpose.includes('maskable')));
+assert.ok(manifest.icons.some(icon => icon.sizes === '512x512' && icon.purpose === 'any'));
+assert.ok(manifest.icons.some(icon => icon.sizes === 'any' && icon.type === 'image/svg+xml' && icon.purpose === 'maskable'));
 for (const file of ['../public/icons/icon-192.png', '../public/icons/icon-512.png', '../public/icons/apple-touch-icon.png', '../public/icons/splash-1170x2532.png']) {
   assert.ok((await stat(new URL(file, import.meta.url))).size > 1000, `${file} asset`);
 }
-assert.ok(serviceWorker.includes("'/offline.html'") && serviceWorker.includes("url.pathname.startsWith('/api/')"), 'offline fallback and API exclusion');
-assert.ok(serviceWorker.includes('skipWaiting') && serviceWorker.includes('clients.claim'), 'service worker lifecycle');
+// Execute the worker: private/API/authenticated traffic must never enter its cache.
+await import('./pwa-shell.test.mjs');
 assert.ok(html.includes('rel="manifest"') && html.includes('apple-mobile-web-app-capable') && html.includes('apple-touch-startup-image'), 'install/home/splash meta');
-assert.ok(main.includes("navigator.serviceWorker.register('/sw.js')") && main.includes('import.meta.env.PROD'), 'production service worker registration');
+assert.ok(main.includes("navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })") && main.includes('import.meta.env.PROD'), 'production service worker registration');
 for (const token of ['.btn-primary', '.btn-secondary', '.btn-danger', '.card', '.input', '.message-success', '.message-error']) assert.ok(styles.includes(token), token);
 for (const component of ['LoadingState', 'EmptyState', 'MessageBanner', 'ErrorState']) assert.ok(states.includes(`function ${component}`), component);
 assert.ok(status.includes("enshift:api-start") && status.includes('navigator.onLine') && status.includes('オフラインです'), 'global loading/offline/toast');

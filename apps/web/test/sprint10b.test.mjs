@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [feedback, device, updates, pages, dashboard, footer, app, appInfo, serviceWorker] = await Promise.all([
+const [feedback, device, updates, pages, dashboard, footer, app, appInfo] = await Promise.all([
   read('../src/features/support/FeedbackManagement.tsx'),
   read('../src/features/support/device-info.ts'),
   read('../src/features/support/UpdateHistory.tsx'),
@@ -11,7 +11,6 @@ const [feedback, device, updates, pages, dashboard, footer, app, appInfo, servic
   read('../src/features/info/AppFooter.tsx'),
   read('../src/App.tsx'),
   read('../src/app-info.ts'),
-  read('../public/sw.js'),
 ]);
 
 for (const label of ['お問い合わせ', '改善要望', '不具合報告', 'ご意見', 'アプリ評価']) assert.ok(feedback.includes(label), `${label}種別`);
@@ -33,7 +32,8 @@ assert.ok((pages.match(/^\s*\['/gm) ?? []).length >= 10, 'FAQ 10項目以上');
 for (const hash of ['#contact', '#support', '#help', '#updates']) assert.ok(footer.includes(hash), `${hash}フッターリンク`);
 assert.ok(app.includes("'support'") && app.includes("'updates'"), '公開ルート');
 assert.ok(appInfo.includes("APP_BUILD") && !appInfo.includes("?? 'local'") && appInfo.includes('APP_LAST_UPDATED') && appInfo.includes('APP_DEVELOPER'), '製品Build・更新日・開発者');
-assert.ok(serviceWorker.includes('enshift-shell-v12-print-calendar'), 'PWAキャッシュ更新');
+// Verify update/retired-cache behavior rather than a historical cache name.
+await import('./pwa-shell.test.mjs');
 assert.ok(feedback.includes('sm:grid-cols-2') && pages.includes('sm:grid-cols-2') && dashboard.includes('basis-[calc(50%-0.25rem)]'), '390/768/1024/1280レスポンシブ');
 
 console.log('Sprint 10-B Web tests: PASS (お問い合わせ・要望・不具合・意見・評価・更新履歴・端末情報・FAQ・レスポンシブ)');

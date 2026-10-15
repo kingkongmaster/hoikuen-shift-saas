@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [home, dashboard, styles, login, guide, serviceWorker] = await Promise.all([
+const [home, dashboard, styles, login, guide] = await Promise.all([
   read('../src/features/dashboard/HomeDashboard.tsx'),
   read('../src/features/dashboard/Dashboard.tsx'),
   read('../src/styles.css'),
   read('../src/features/auth/LoginPage.tsx'),
   read('../../../docs/enshift-design-guidelines.md'),
-  read('../public/sw.js'),
 ]);
 
 // ホームの情報優先順位
@@ -52,6 +51,7 @@ for (const symbol of ['今', '休', '勤', '知']) assert.ok(dashboard.includes(
 assert.ok(dashboard.includes('>他</span>'), '独自の一文字バッジ: 他');
 assert.ok(!/from ['"](?:lucide|@mui|material-icons|@heroicons)/.test(`${home}\n${dashboard}\n${login}`), '外部アイコンライブラリを不使用');
 assert.ok(!styles.includes('@font-face') && !styles.includes('fonts.googleapis.com'), '外部フォントを不使用');
-assert.ok(serviceWorker.includes('enshift-shell-v12-print-calendar'), 'Sprint10-C以降のPWAキャッシュ');
+// Verify update/retired-cache behavior rather than a historical cache name.
+await import('./pwa-shell.test.mjs');
 
 console.log('Sprint 10-C Web tests: PASS (ホーム優先順位・UI統一・390px・アクセシビリティ・独自ブランド・知的財産配慮)');

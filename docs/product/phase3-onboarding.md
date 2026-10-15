@@ -1,5 +1,7 @@
 # PRODUCT Phase 3 — 新規園オンボーディング
 
+追記：旧Web一括回帰の不整合は[Phase3最終ゲート](phase3-final-gate.md)で解消・全29スクリプトPASS。以下の未PASS／未push記述は初回完了時点の履歴です。
+
 2026-10-15。開始基点 `a60c6554e4176e63606414fcf61fb10cf41498ad`。
 PRODUCT workspace / `codex/commercial-saas-release` のみ。匿名ローカル隔離DBを使用。
 Production接続、Pilot branch編集、実職員・個別園条件の持込、決済・デプロイは行わない。

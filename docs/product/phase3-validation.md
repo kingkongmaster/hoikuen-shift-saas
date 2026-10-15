@@ -1,5 +1,7 @@
 # PRODUCT Phase 3 検証記録
 
+追記：旧Web一括回帰の不整合は[Phase3最終ゲート](phase3-final-gate.md)で解消・全29スクリプトPASS。以下の未PASS／未push記述は初回完了時点の履歴です。
+
 2026-10-15。[設計・残課題](phase3-onboarding.md)。開始HEAD `a60c6554e4176e63606414fcf61fb10cf41498ad`。
 環境は既存ローカルDocker PostgreSQL、loopback `127.0.0.1:55439`、DB名 `aen_commercial_isolated`。
 接続は既存 `resolveIsolatedDatabaseUrl` と `TEST_DATABASE_ISOLATED=true` で制限。

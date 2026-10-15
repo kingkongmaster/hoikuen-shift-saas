@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [onboarding, gate, admin, home, dashboard, states, status, requests, swaps, client, philosophy, readme, styles, worker, errorBoundary] = await Promise.all([
+const [onboarding, gate, admin, home, dashboard, states, status, requests, swaps, client, philosophy, readme, styles, errorBoundary] = await Promise.all([
   read('../src/features/onboarding/FirstLoginExperience.tsx'),
   read('../src/features/setup/SetupGate.tsx'),
   read('../src/features/dashboard/AdminHomeSummary.tsx'),
@@ -16,7 +16,6 @@ const [onboarding, gate, admin, home, dashboard, states, status, requests, swaps
   read('../../../docs/developer-philosophy.md'),
   read('../../../README.md'),
   read('../src/styles.css'),
-  read('../public/sw.js'),
   read('../src/components/ErrorBoundary.tsx'),
 ]);
 
@@ -55,6 +54,7 @@ for (const phrase of ['システムを管理するのではなく、人を支え
 assert.ok(readme.includes('[AeN Shift Developer Philosophy](docs/developer-philosophy.md)'), 'READMEから参照可能');
 assert.ok(styles.includes('.onboarding-screen') && styles.includes('.summary-grid') && styles.includes('grid-cols-2') && styles.includes('lg:grid-cols-5'), '390px優先レスポンシブ');
 assert.ok(styles.includes('body:has(.onboarding-screen) footer { display: none; }'), '初回体験では他の操作を隠す');
-assert.ok(worker.includes('enshift-shell-v12-print-calendar'), '印刷改善を含むService Workerキャッシュ');
+// Verify update/retired-cache behavior rather than a historical cache name.
+await import('./pwa-shell.test.mjs');
 
 console.log('Sprint 11-A Web tests: PASS (初回体験・3画面ガイド・ロール別ホーム・優しい文言・空状態・オフライン・Philosophy・RC1)');
