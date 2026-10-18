@@ -21,7 +21,8 @@ try {
    const feedback=renderToStaticMarkup(React.createElement(FeedbackManagement,{session}));
    assert.equal(exported.includes('バックアップを保存'),channel==='standard');
    assert.equal(exported.includes('type="file"'),channel==='standard');
-   assert.equal(feedback.includes('報告ファイルを保存'),channel==='standard');
+   assert.equal(feedback.includes('報告ファイルを保存'),false);
+   assert.ok(feedback.includes('運営へ送信'), 'feedback is delivered through API in both channels');
    for(const text of ['月間シフトCSV','希望休CSV','職員一覧CSV','監査ログCSV','印刷／PDF','B4','横']) assert.ok(exported.includes(text));
    if(channel==='musubi-beta') assert.ok(!exported.includes('<pre'));
   } finally {await server.close();}

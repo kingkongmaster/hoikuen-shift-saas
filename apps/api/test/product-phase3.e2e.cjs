@@ -106,5 +106,6 @@ const tids=[],uids=[],run=randomUUID().slice(0,8),password='Anonymous-Onboarding
   if(process.env.PHASE3_BROWSER==='true')await require('./product-phase3-browser.cjs')({base:'http://127.0.0.1:'+server.address().port,operatorLogin:operatorUser.loginId,password,tenants,run,track:async()=>{const rows=await db.tenant.findMany({where:{code:{startsWith:'ui-'+run}}});for(const row of rows){if(!tids.includes(row.id))tids.push(row.id);for(const m of await db.membership.findMany({where:{tenantId:row.id}}))if(!uids.includes(m.userId))uids.push(m.userId);}}});
  }
  if(process.env.PRODUCT_PHASE5==='true')await require('./product-phase5-contracts.cjs')({call,db,tenants,operator,password,origin,operatorLogin:operatorUser.loginId,run,uids});
+ if(process.env.PRODUCT_PHASE6==='true')await require('./product-phase6-operations.cjs')({call,db,tenants,operator,password,origin,operatorLogin:operatorUser.loginId,run,uids,tids,app});
  console.log(`PRODUCT Phase3 PASS: ${checks} HTTP/data assertions; two anonymous tenants, invitations, setup, Fail Closed, isolation.`);
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(server)await new Promise(r=>server.close(r));if(db){for(const id of tids.reverse())await db.tenant.delete({where:{id}});for(const id of uids)await db.user.delete({where:{id}});}if(app)await app.close();});

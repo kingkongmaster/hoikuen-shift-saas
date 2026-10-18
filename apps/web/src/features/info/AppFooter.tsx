@@ -2,6 +2,7 @@ import { APP_VERSION } from '../../app-info';
 import { InstallPrompt } from './InstallPrompt';
 
 const links = [
+  { href: '#product', label: '製品・プラン（販売準備中）' },
   { href: '#terms', label: '利用規約' },
   { href: '#privacy', label: 'プライバシーポリシー' },
   { href: '#contact', label: 'お問い合わせ' },

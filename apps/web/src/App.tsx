@@ -1,3 +1,4 @@
+import { ProductSales } from './features/commercial/ProductSales';
 import { ContractGate } from './features/subscription/ContractGate';
 import { InvitationRegistration } from './features/commercial/InvitationRegistration';
 import { OperatorOnboarding } from './features/commercial/OperatorOnboarding';
@@ -31,6 +32,8 @@ export function App() {
     ? <main className="grid min-h-screen place-items-center bg-[var(--canvas)]"><p role="status" className="font-semibold">認証状態を確認しています…</p></main>
     : session?.mustChangePassword
     ? <InitialPasswordChangePage session={session} onCompleted={() => setSession(null)} />
+    : specialRoute === '#product'
+    ? <ProductSales/>
     : specialRoute === '#register'
     ? <InvitationRegistration/>
     : session && specialRoute === '#operator'
@@ -44,7 +47,7 @@ export function App() {
       : <ContractGate session={session} onLogout={() => {sessionStorage.removeItem('enshift.accessToken');setSession(null);}}><SetupGate session={session} onLogout={() => { sessionStorage.removeItem('enshift.accessToken'); setSession(null); }} /></ContractGate>;
   return <ErrorBoundary><div className="flex min-h-screen flex-col"><AppStatusLayer /><div className="flex-1">{content}</div><AppFooter /></div></ErrorBoundary>;
 }
-function isUnknownHash() { return Boolean(window.location.hash.slice(1)) && !routeFromHash() && !['#register','#operator'].includes(window.location.hash); }
+function isUnknownHash() { return Boolean(window.location.hash.slice(1)) && !routeFromHash() && !['#register','#operator','#product'].includes(window.location.hash); }
 
 function routeFromHash(): InfoRoute | null {
   const value = window.location.hash.slice(1);

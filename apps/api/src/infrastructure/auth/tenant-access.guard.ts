@@ -16,7 +16,8 @@ export class TenantAccessGuard implements CanActivate {
     const path=request.path.replace(/^\/api/, '');
     // Operator routes have their own live platform authorization. Contract metadata
     // remains accessible so suspended customers can understand the restriction.
-    if(!path.startsWith('/platform/')&&!['/tenants/provision','/tenants/operator-context'].includes(path)&&!/^\/tenants\/[^/]+\/invitations/.test(path)){
+    const support = (path === '/support/tickets' && ['GET','POST'].includes(request.method)) || (/^\/support\/tickets\/[0-9a-f-]{36}$/i.test(path) && request.method === 'GET') || (/^\/support\/tickets\/[0-9a-f-]{36}\/messages$/i.test(path) && request.method === 'POST');
+    if(!support&&!path.startsWith('/platform/')&&!['/tenants/provision','/tenants/operator-context'].includes(path)&&!/^\/tenants\/[^/]+\/invitations/.test(path)){
       const sub=await this.prisma.tenantSubscription.findUnique({where:{tenantId:user.tenantId}});
       const metadata=path==='/me'||path==='/subscription'||path==='/subscription/access'||path==='/features';
       if(sub?.status==='SUSPENDED'&&!metadata)throw new ForbiddenException({code:'SUBSCRIPTION_SUSPENDED',message:'この園の利用は停止されています。運営窓口へお問い合わせください。'});

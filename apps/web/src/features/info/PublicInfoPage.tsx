@@ -21,7 +21,7 @@ const faq = [
   ['PDFで保存したい', '印刷用画面を開き、ブラウザの印刷先で「PDFとして保存」を選択してください。'],
   ['バックアップを取得したい', '管理者・園長は「データ出力」のJSON Exportを利用できます。認証情報はバックアップへ含まれません。'],
   ['バックアップを確認したい', 'JSON Import後にバックアップ検証と復元プレビューを実行できます。プレビューでは現在のデータは変更されません。'],
-  ['改善要望や不具合を報告したい', 'ログイン後の「お問い合わせ」から報告種類を選び、この端末へ保存してください。必要に応じてJSONを書き出して管理者へ共有できます。'],
+  ['改善要望や不具合を報告したい', 'ログイン後の「お問い合わせ」から運営へ送信してください。受付番号と返信を同じ画面で確認できます。'],
   ['ホーム画面へ追加したい', '画面下部の「アプリをインストール」、またはiPhoneの共有メニューにある「ホーム画面に追加」を利用してください。'],
 ] as const;
 
@@ -33,7 +33,7 @@ export function PublicInfoPage({ route }: { route: InfoRoute }) {
       {route === 'privacy' && <LegalDocument kind="privacy" />}
       {route === 'contact' && <ContactPage />}
       {route === 'support' && <SupportPage />}
-      {route === 'help' && <article><a href="/training/" className="card mb-6 block border-emerald-300"><strong className="text-xl">操作練習ガイド →</strong><p className="mt-2 text-sm">実際の画面を操作して覚えます。練習モードでは実際のデータは変更されません。</p></a><p className="text-sm font-semibold text-emerald-700">Help</p><h2 className="mt-1 text-2xl font-bold">よくあるご質問</h2><p className="mt-3 text-sm text-slate-600">よく利用する操作とモニター運用時の対応をまとめています。</p><div className="mt-6 space-y-3">{(technicalJsonEnabled ? faq : [...faq.filter((item) => !item[1].includes('JSON')), ['バックアップや復旧について', '運用窓口へお問い合わせください。'], ['改善要望や不具合を報告したい', 'ログイン後の「お問い合わせ」で内容を整理し、運用窓口へご相談ください。']]).map(([question, answer]) => <details key={question} className="group rounded-xl border bg-white p-4 shadow-sm"><summary className="min-h-11 cursor-pointer content-center font-semibold">{question}</summary><p className="mt-3 border-t pt-3 text-sm leading-6 text-slate-600">{answer}</p></details>)}</div></article>}
+      {route === 'help' && <article><a href="/training/" className="card mb-6 block border-emerald-300"><strong className="text-xl">操作練習ガイド →</strong><p className="mt-2 text-sm">実際の画面を操作して覚えます。練習モードでは実際のデータは変更されません。</p></a><p className="text-sm font-semibold text-emerald-700">Help</p><h2 className="mt-1 text-2xl font-bold">よくあるご質問</h2><p className="mt-3 text-sm text-slate-600">よく利用する操作とモニター運用時の対応をまとめています。</p><div className="mt-6 space-y-3">{(technicalJsonEnabled ? faq : [...faq.filter((item) => !item[1].includes('JSON')), ['バックアップや復旧について', '運用窓口へお問い合わせください。']]).map(([question, answer]) => <details key={question} className="group rounded-xl border bg-white p-4 shadow-sm"><summary className="min-h-11 cursor-pointer content-center font-semibold">{question}</summary><p className="mt-3 border-t pt-3 text-sm leading-6 text-slate-600">{answer}</p></details>)}</div></article>}
       {route === 'updates' && <UpdateHistory />}
       {route === 'about' && <AboutPage />}
     </section>
@@ -41,10 +41,10 @@ export function PublicInfoPage({ route }: { route: InfoRoute }) {
 }
 
 function ContactPage() {
-  return <article className="card"><p className="text-sm font-semibold text-emerald-700">Support</p><h2 className="mt-1 text-2xl font-bold">お問い合わせ窓口</h2><p className="mt-3 text-sm leading-6 text-slate-600">ログインできる場合は、管理メニューの「お問い合わせ」から不具合・改善要望・ご意見を端末へ保存できます。ログインできない場合は以下の窓口をご利用ください。</p><dl className="mt-7 grid gap-4 sm:grid-cols-2"><Info label="メールアドレス" value={LEGAL_DOCUMENTS.release.contact} /><Info label="受付時間" value="順次対応（回答時間の保証なし）" /></dl><div className="message-banner message-warning mt-6">お問い合わせへパスワード、園児の氏名、健康情報などを記載しないでください。</div></article>;
+  return <article className="card"><p className="text-sm font-semibold text-emerald-700">Support</p><h2 className="mt-1 text-2xl font-bold">お問い合わせ窓口</h2><p className="mt-3 text-sm leading-6 text-slate-600">ログインできる場合は、管理メニューの「お問い合わせ」から不具合・改善要望・ご意見を運営へ送信できます。ログインできない場合は以下の窓口をご利用ください。</p><dl className="mt-7 grid gap-4 sm:grid-cols-2"><Info label="メールアドレス" value={LEGAL_DOCUMENTS.release.contact} /><Info label="受付時間" value="順次対応（回答時間の保証なし）" /></dl><div className="message-banner message-warning mt-6">お問い合わせへパスワード、園児の氏名、健康情報などを記載しないでください。</div></article>;
 }
 function SupportPage() {
-  return <article><p className="text-sm font-semibold text-emerald-700">Monitor support</p><h2 className="mt-1 text-2xl font-bold">モニター園サポート情報</h2><div className="mt-6 grid gap-4 sm:grid-cols-2"><Info label="通常のお問い合わせ" value={LEGAL_DOCUMENTS.release.contact} /><Info label="受付時間" value="順次対応（回答時間の保証なし）" /><Info label="不具合報告" value="管理メニュー「お問い合わせ」" /><Info label="改善要望" value="管理メニュー「お問い合わせ」" /></div><section className="card mt-5"><h3 className="font-bold">報告時にご用意いただく情報</h3><ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600"><li>発生した日時と操作内容</li><li>期待した結果と実際の結果</li><li>画面名、Version、Build番号</li><li>ブラウザと端末情報</li></ul><p className="mt-4 text-sm text-slate-500">ログイン後の報告画面では、画面名・Version・Build・ブラウザ情報を自動付加します。</p></section></article>;
+  return <article><p className="text-sm font-semibold text-emerald-700">Monitor support</p><h2 className="mt-1 text-2xl font-bold">モニター園サポート情報</h2><div className="mt-6 grid gap-4 sm:grid-cols-2"><Info label="通常のお問い合わせ" value={LEGAL_DOCUMENTS.release.contact} /><Info label="受付時間" value="順次対応（回答時間の保証なし）" /><Info label="不具合報告" value="管理メニュー「お問い合わせ」" /><Info label="改善要望" value="管理メニュー「お問い合わせ」" /></div><section className="card mt-5"><h3 className="font-bold">報告時にご用意いただく情報</h3><ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600"><li>発生した日時と操作内容</li><li>期待した結果と実際の結果</li><li>画面名、Version、Build番号</li><li>ブラウザと端末情報</li></ul><p className="mt-4 text-sm text-slate-500">画面名・Version・Build・ブラウザ情報を、個人情報を含めず本文へ記載してください。</p></section></article>;
 }
 function AboutPage() {
   const device = getDeviceInfo();

@@ -1,3 +1,4 @@
+import { ProductOperationsModule } from './presentation/product-operations/product-operations.module';
 import { DepartmentsModule } from './presentation/departments/departments.module';
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -62,10 +63,11 @@ import { TenantCalendarModule } from './presentation/tenant-calendar/tenant-cale
     PaidLeaveModule,
     TenantCalendarModule,
     DepartmentsModule,
+    ProductOperationsModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(AuthRateLimitMiddleware).forRoutes({ path: 'auth/{*splat}', method: RequestMethod.ALL });
+    consumer.apply(AuthRateLimitMiddleware).forRoutes({ path: 'auth/{*splat}', method: RequestMethod.ALL }, { path: 'product-sales/applications', method: RequestMethod.POST });
   }
 }

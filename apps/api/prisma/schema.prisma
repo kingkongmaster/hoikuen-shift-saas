@@ -143,6 +143,8 @@ model Tenant {
   code                            String?                               @unique
   createdAt                       DateTime                              @default(now())
   updatedAt                       DateTime                              @updatedAt
+  supportTickets                  SupportTicket[]
+  applications                    ProductApplication[]
   memberships                     Membership[]
   staff                           Staff[]
   requests                        ShiftRequest[]
@@ -921,4 +923,49 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, action, createdAt])
   @@index([tenantId, memberId, createdAt])
+}
+
+model SupportTicket {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @db.Uuid
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requesterId String           @db.Uuid
+  subject     String           @db.VarChar(120)
+  category    String           @db.VarChar(30)
+  status      String           @default("OPEN") @db.VarChar(20)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  messages    SupportMessage[]
+
+  @@index([tenantId, requesterId, createdAt])
+  @@index([status, createdAt])
+}
+
+model SupportMessage {
+  id           String        @id @default(uuid()) @db.Uuid
+  ticketId     String        @db.Uuid
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId     String        @db.Uuid
+  fromOperator Boolean       @default(false)
+  body         String        @db.VarChar(4000)
+  status       String        @db.VarChar(20)
+  createdAt    DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model ProductApplication {
+  id            String    @id @default(uuid()) @db.Uuid
+  organization  String    @db.VarChar(100)
+  contactName   String    @db.VarChar(100)
+  contactEmail  String    @db.VarChar(254)
+  requestedPlan String    @db.VarChar(20)
+  consent       Json
+  createdAt     DateTime  @default(now())
+  tenantId      String?   @unique @db.Uuid
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  verifiedBy    String?   @db.Uuid
+  verifiedAt    DateTime?
+
+  @@index([createdAt])
 }
