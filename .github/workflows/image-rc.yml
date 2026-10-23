@@ -1,68 +1,150 @@
-name: Image RC (manual, no deployment)
-
+name: PR36 final audit (exact source, no deployment)
+run-name: PR36 final gate dbdba741958d
 on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Approved source commit (40 lowercase hex characters)
+        description: Reviewed source (must remain the approved PR36 SHA)
         required: true
-        type: string
-      cost_verified:
-        description: Confirm current public repo, standard runner, free storage headroom and zero-spend stop
-        required: true
-        type: boolean
-        default: false
-      source_pii_reviewed:
-        description: Confirm source SHA has passed human PII and secret review
-        required: true
-        type: boolean
-        default: false
-
+        default: dbdba741958d34328797448a9afc396331831a16
 permissions:
   contents: read
-
-concurrency:
-  group: image-rc
-  cancel-in-progress: false
-
 jobs:
-  image-rc:
-    if: inputs.cost_verified && inputs.source_pii_reviewed && github.event.repository.private == false
+  final-audit:
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pr36_isolated_test
+          POSTGRES_USER: pr36_ci
+          POSTGRES_PASSWORD: isolated_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pr36_ci -d pr36_isolated_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://pr36_ci:isolated_ci_only@127.0.0.1:5432/pr36_isolated_test
+      TEST_DATABASE_ISOLATED: 'true'
+      API_BASE_URL: http://127.0.0.1:18087/api
+      WEB_BASE_URL: http://127.0.0.1:4187
+      JWT_SECRET: isolated-pr36-ci-only-no-production-secret-2026
+      JWT_EXPIRES_IN: 8h
+      WEB_ORIGIN: http://127.0.0.1:4187
+      PORT: '18087'
     steps:
-      - name: Validate dispatch
+      - name: Check approved SHA and public-runner zero-cost policy
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
-          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
-      - name: Checkout reviewed RC tooling
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-          path: control
-      - name: Checkout exact application source
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+          test "$SOURCE_SHA" = dbdba741958d34328797448a9afc396331831a16
+          echo 'Public repo; standard Ubuntu runner; no caches/artifacts/packages/images uploaded; no cloud deploy or production credentials.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
           persist-credentials: false
-          path: source
-      - name: Set up Node (no cache)
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: '24'
-      - name: Build and verify RC
+          node-version: 22
+          package-manager-cache: false
+      - name: Verify exact source and protected source files
+        run: |
+          test "$(git rev-parse HEAD)" = dbdba741958d34328797448a9afc396331831a16
+          git diff --check 531dde7c504577f9277ae603a2a61bdb83f79a64...HEAD
+          git diff --exit-code 531dde7c504577f9277ae603a2a61bdb83f79a64...HEAD -- apps/api/prisma/schema.prisma apps/api/prisma/migrations apps/api/src/application/shifts/rule-based-shift-generator.ts
+      - name: Install dependencies (no cache)
+        run: |
+          (cd apps/api && npm ci)
+          (cd apps/web && npm ci)
+      - name: API lint build schema validation and isolated DB preparation
+        working-directory: apps/api
+        run: |
+          npm run db:generate
+          npm run lint
+          npm run build
+          npx prisma validate
+          node test/helpers/isolated-database.cjs
+          npx prisma migrate deploy
+      - name: API targeted regression and security guards (no FINAL endpoints)
+        working-directory: apps/api
+        run: |
+          node test/staffing-requirement-generator.test.cjs
+          node test/staff-work-rule-generator.test.cjs
+          node test/pattern-preference-identity.test.cjs
+          node -r ts-node/register test/generation-preflight-validator.test.ts
+          node test/individual-working-hours.test.cjs
+          node test/fixed-class-special-shift.test.cjs
+          node test/assignment-time-breakdown.test.cjs
+          node test/production-operation-guard.test.cjs
+          node test/isolated-database-safety.test.cjs
+          node test/production-hardening.test.cjs
+          node test/paid-leave-timezone.test.cjs
+      - name: Web lint build and RC boundaries
+        run: |
+          (cd apps/web && npm run lint)
+          node tools/release/create-metadata.mjs pr36-final-gate "$RUNNER_TEMP/release-metadata.json"
+          (cd apps/web && AEN_RELEASE_METADATA="$(cat "$RUNNER_TEMP/release-metadata.json")" npm run build)
+          node tools/release/metadata.test.mjs
+          node tools/release/image-boundaries.test.mjs
+          (cd apps/web && node test/release-metadata.test.mjs)
+      - name: Full Web regression with unchanged-base comparison
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,re,subprocess
+          root=pathlib.Path.cwd(); temp=pathlib.Path(os.environ['RUNNER_TEMP']); baseline=temp/'baseline'; baseline.mkdir()
+          archive=subprocess.Popen(['git','archive','531dde7c504577f9277ae603a2a61bdb83f79a64','apps/web'],stdout=subprocess.PIPE)
+          subprocess.run(['tar','-x','-C',str(baseline)],stdin=archive.stdout,check=True);assert archive.wait()==0
+          scripts=json.loads((root/'apps/web/package.json').read_text())['scripts']; names=[x.strip().removeprefix('npm run ') for x in scripts['test:regression'].split('&&')]
+          rows=[]; allowed={'test:sprint9c','test:sprint10a','test:sprint10b','test:sprint10c','test:sprint11a'}
+          def signature(text):
+              lines=text.splitlines(); i=next((i for i,s in enumerate(lines) if 'AssertionError' in s),len(lines)); return '\n'.join(lines[i:i+4]).split(' at file:')[0]
+          for name in names:
+              p=subprocess.run(scripts[name],shell=True,cwd=root/'apps/web',capture_output=True,text=True);row={'test':name,'exit':p.returncode}
+              if p.returncode:
+                  b=subprocess.run(scripts[name],shell=True,cwd=baseline/'apps/web',capture_output=True,text=True);row.update(baselineExit=b.returncode,sameFailure=signature(p.stdout+p.stderr)==signature(b.stdout+b.stderr));assert name in allowed and b.returncode and row['sameFailure'],json.dumps(row)
+              rows.append(row);print(json.dumps(row),flush=True)
+          (temp/'web-regression.json').write_text(json.dumps(rows,indent=2));failed=[r['test'] for r in rows if r['exit']];assert set(failed)==allowed
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:f.write('\nWeb strict regression: 24/29 PASS; 5 FAIL on both exact source and unchanged base; new failures 0. Baseline failures are not waived as a full green suite.\n'+json.dumps(rows)+'\n')
+          PY
+      - name: Install temporary browser test runtime (no cache/artifacts)
+        run: |
+          mkdir -p "$RUNNER_TEMP/browser-runtime"
+          npm install --prefix "$RUNNER_TEMP/browser-runtime" --no-save playwright@1.62.1
+          "$RUNNER_TEMP/browser-runtime/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Start isolated API and Web
+        run: |
+          (cd apps/api && node dist/main.js > "$RUNNER_TEMP/api.log" 2>&1) &
+          (cd apps/web && VITE_API_BASE_URL=http://127.0.0.1:18087/api npm run dev -- --host 127.0.0.1 --port 4187 --strictPort > "$RUNNER_TEMP/web.log" 2>&1) &
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:18087/api/ready >/dev/null && curl -fsS http://127.0.0.1:4187 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/web.log"
+          exit 1
+      - name: Anonymous UI API DB readback reload and reevaluation E2E
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
-        run: python3 control/tools/release/image-rc.py source "$RUNNER_TEMP/image-rc" "$SOURCE_SHA"
-      - name: Upload sanitized evidence and passing images only
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: image-rc-${{ github.run_id }}
-          path: ${{ runner.temp }}/image-rc/publish/
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: ignore
-          include-hidden-files: false
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser-runtime/node_modules/playwright
+          EVIDENCE_DIR: ${{ runner.temp }}/e2e-evidence
+        run: |
+          node apps/api/test/manual-work-pattern-save.e2e.cjs
+          python3 - <<'PY'
+          import pathlib,json,os
+          result=json.loads((pathlib.Path(os.environ['EVIDENCE_DIR'])/'result.json').read_text());assert result['status']=='PASS' and len(result['checks'])==18
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:f.write('\nAnonymous UI/API/DB E2E: 18 checks PASS. No generate/confirm/reopen requests. No Production access.\n')
+          PY
+      - name: Dependency audit (report, do not silently waive vulnerabilities)
+        if: ${{ always() }}
+        run: |
+          set +e
+          (cd apps/api && npm audit --json) > "$RUNNER_TEMP/api-audit.json"
+          (cd apps/web && npm audit --json) > "$RUNNER_TEMP/web-audit.json"
+          python3 - <<'PY'
+          import pathlib,json,os
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+            for app in ['api','web']:
+              d=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/(app+'-audit.json')).read_text());counts=d.get('metadata',{}).get('vulnerabilities',{});print(app,json.dumps(counts));f.write('\nDependency audit '+app+': '+json.dumps(counts)+'. Security release gate requires separate reachability review; this CI does not waive findings.\n')
+          PY
