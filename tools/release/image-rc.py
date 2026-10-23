@@ -269,7 +269,11 @@ def run(source, output, expected_sha):
         command(['node', str(source / 'tools/release/build-images.mjs'), str(metadata_file), str(manifest_file)])
         command(['node', str(source / 'tools/release/verify-images.mjs'), str(manifest_file)])
         manifest = json.loads(manifest_file.read_text())
-        policy = json.loads((source / 'tools/release/image-security-policy.json').read_text())
+        # Audit-only control policy: never inherit expired application exceptions.
+        # Application checkout remains clean and pinned to the approved source SHA.
+        policy = json.loads(Path(__file__).with_name('image-rc-audit-policy.json').read_text())
+        if policy['sourceSha'] != expected_sha:
+            raise ValueError('AUDIT_POLICY_SOURCE_SHA_MISMATCH')
         fingerprint_ok = source_fingerprint(source) == policy['sourceFingerprint']
         if not fingerprint_ok: raise ValueError('REACHABILITY_SOURCE_CHANGED')
         public_contact = public_legal_contact(source)
