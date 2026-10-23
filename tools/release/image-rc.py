@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import secrets
 import urllib.request
@@ -179,6 +180,23 @@ def runtime_evidence(command, manifest, source, result):
         result['api']['numericProxyTrust'] = numeric_source and command(['docker','exec',api,'node','-e',proxy_probe], capture=True).strip() == 'numeric'
         result['phase'] = 'nginx-process'
         result['web']['nginxOnlyProcess'] = set(command(['docker', 'exec', web, 'ps', '-o', 'comm'], capture=True).splitlines()[1:]) <= {'nginx', 'ps'}
+        # Additional read-only native reachability evidence for the new musl/PCRE2 findings.
+        result['nativeRegexEvidence'] = {}
+        for role, container, executable in [('api', api, '/usr/local/bin/node'), ('web', web, '/usr/sbin/nginx')]:
+            paths = [executable]
+            if role == 'api':
+                paths += command(['docker', 'exec', container, 'find', '/app/node_modules', '-type', 'f', '(', '-name', '*.node', '-o', '-name', '*.so', ')'], capture=True).splitlines()
+            native = []
+            with tempfile.TemporaryDirectory() as temp:
+                for index, path in enumerate(paths):
+                    local = str(Path(temp) / str(index))
+                    command(['docker', 'cp', container + ':' + path, local])
+                    symbols = command(['readelf', '--wide', '--dyn-syms', local], capture=True)
+                    native.append({'path': path, 'sha256': sha(Path(local)),
+                        'libcRegexImports': sorted(set(re.findall(r'\bUND\s+((?:regcomp|regexec)(?:@\S+)?)', symbols))),
+                        'pcre2Imports': sorted(set(re.findall(r'\bUND\s+(pcre2_\S+)', symbols)))})
+            result['nativeRegexEvidence'][role] = native
+        result['nginxEvidence']['pcreJitDirective'] = bool(re.search(r'^\s*pcre_jit\s+on\s*;', config, re.M))
         result['amd64'] = all(json.loads(command(['docker','image','inspect',x['imageId']],capture=True))[0]['Architecture']=='amd64' for x in manifest['images'].values())
         for name in (api, web):
             state = json.loads(command(['docker', 'inspect', '--format', '{{json .State}}', name], capture=True))
