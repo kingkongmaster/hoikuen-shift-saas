@@ -19,8 +19,9 @@ export class ShiftsController {
   constructor(private readonly shifts: ShiftsService) {}
   @Get() list(@Req() request: Request & { user: AuthenticatedUser }, @Query() query: ListShiftsQueryDto) { return this.shifts.list(request.user, query.month, query.staffId); }
   @Get(':id') get(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.get(request.user, id); }
+  @Get(':id/evaluation') @Roles('ADMIN', 'DIRECTOR') evaluate(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.evaluate(request.user, id); }
   @Post() @Roles('ADMIN', 'DIRECTOR') create(@Req() request: Request & { user: AuthenticatedUser }, @Body() input: CreateMonthlyShiftDto) { return this.shifts.create(request.user, input.month); }
-  @Put(':id/assignments') @Roles('ADMIN', 'DIRECTOR') save(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string, @Body() input: SaveAssignmentsDto) { return this.shifts.save(request.user, id, input.assignments); }
+  @Put(':id/assignments') @Roles('ADMIN', 'DIRECTOR') save(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string, @Body() input: SaveAssignmentsDto) { return this.shifts.save(request.user, id, input.assignments, input.expectedUpdatedAt); }
   @Post(':id/confirm') @HttpCode(200) @Roles('ADMIN', 'DIRECTOR') confirm(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.confirm(request.user, id); }
   @Post(':id/reopen') @HttpCode(200) @Roles('ADMIN', 'DIRECTOR') reopen(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.reopen(request.user, id); }
   @Post(':id/generate') @Roles('ADMIN') @RequiresFeature('BASIC_SHIFT_GENERATION') generate(@Req() request: Request & { user: AuthenticatedUser }, @Param('id', new ParseUUIDPipe()) id: string) { return this.shifts.generate(request.user, id); }

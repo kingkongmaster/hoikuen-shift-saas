@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 import { AssignedClass, ShiftType } from '@prisma/client';
 import { shiftTypes } from '../../domain/shifts/monthly-shift';
 
@@ -12,6 +12,9 @@ export class AssignmentInputDto {
 
   @IsEnum(shiftTypes)
   shiftType!: ShiftType;
+
+  @IsOptional() @IsUUID()
+  workPatternId?: string | null;
 
   @IsOptional() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'startTimeはHH:mm形式で指定してください。' })
   startTime?: string | null;
@@ -30,6 +33,9 @@ export class AssignmentInputDto {
 }
 
 export class SaveAssignmentsDto {
+  @IsOptional() @IsDateString()
+  expectedUpdatedAt?: string;
+
   @IsArray() @ArrayNotEmpty() @ArrayMaxSize(500)
   @ValidateNested({ each: true }) @Type(() => AssignmentInputDto)
   assignments!: AssignmentInputDto[];

@@ -25,6 +25,7 @@ export function staffingPriority(requirements: GeneratorStaffingRequirement[], a
 export function evaluateStaffingRequirements(requirements: GeneratorStaffingRequirement[], attributes: GeneratorAttributeAssignment[], assignments: GeneratedAssignment[]) {
   const evaluations: StaffingRequirementEvaluation[] = [];
   const dates = [...new Set(assignments.map((item) => item.workDate.toISOString().slice(0, 10)))].sort();
+  assignments = assignments.filter(item => ['EARLY', 'NORMAL', 'LATE', 'OTHER'].includes(item.shiftType) && item.countsTowardStaffing !== false);
   for (const dateKey of dates) {
     const date = new Date(`${dateKey}T00:00:00.000Z`); const day = assignments.filter((item) => item.workDate.toISOString().slice(0, 10) === dateKey);
     for (const requirement of activeRequirements(requirements, date)) {
