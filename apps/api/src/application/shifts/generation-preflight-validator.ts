@@ -1,3 +1,4 @@
+import { workPatternShiftType } from '../../domain/shifts/work-pattern-shift-type';
 import { readProvisionalSoftRules } from './provisional-soft-rules';
 import { hasApprovedFixedTime } from './approved-fixed-time';
 import { ShiftRequestType, ShiftType, StaffingConstraintLevel, StaffWorkRuleType } from '@prisma/client';
@@ -12,7 +13,7 @@ export type GenerationDiagnostic = { severity: GenerationDiagnosticSeverity; cat
 type DiagnosticInput = Omit<GenerationDiagnostic, 'category' | 'impact' | 'overrideAllowed'> & Partial<Pick<GenerationDiagnostic, 'category' | 'impact' | 'overrideAllowed'>>;
 
 const systemSafetyCodes = new Set([
-  'FEATURE_LOOKUP_FAILED', 'INVALID_EXCEPTION_PERIOD', 'INVALID_RULE_EXCEPTION_REFERENCE',
+  'ASSIGNMENT_PATTERN_MISMATCH', 'FEATURE_LOOKUP_FAILED', 'INVALID_EXCEPTION_PERIOD', 'INVALID_RULE_EXCEPTION_REFERENCE',
   'INVALID_EXCEPTION_PROVENANCE',
   'FIXED_GENERATOR_DOUBLE_HANDLING', 'FIXED_CONTRACT_UNRESOLVED', 'INVALID_WORK_RULE_PERIOD',
   'EVENT_UNKNOWN_STAFF', 'EVENT_UNKNOWN_WORK_PATTERN',
@@ -41,6 +42,7 @@ export function validateGenerationContext(context: MonthlyGenerationContext, pha
   const issues: DiagnosticInput[] = [];
   const add = (issue: DiagnosticInput) => issues.push(issue);
   const month = iso(context.range.start);
+  for (const assignment of context.assignments) if (assignment.workPattern && workPatternShiftType(assignment.workPattern) !== assignment.shiftType) add({ severity: 'ERROR', code: 'ASSIGNMENT_PATTERN_MISMATCH', staffId: assignment.staffId, date: iso(assignment.workDate), source: 'ShiftAssignment', reason: '保存済み勤務のパターンと勤務種別が一致しません。勤務を選び直して保存してください。', allowedActions: ['対象の勤務を選び直して保存する'], overrideAllowed: false });
   for (const [code, state] of Object.entries(context.features)) if (state.lookupFailed) add({ severity: 'ERROR', code: 'FEATURE_LOOKUP_FAILED', staffId: null, date: month, source: `TenantFeature:${code}`, reason: `${code}の有効状態を確認できません。正式条件を欠いたまま生成・確定できません。`, allowedActions: ['Feature設定を確認して再試行する'] });
   for (const request of context.pendingRequests) add({ severity: 'INFO', code: 'PENDING_REQUEST_REVIEW', staffId: request.staffId, date: iso(request.requestDate), source: `ShiftRequest:${request.id}`, reason: '申請中の希望があります。未承認のため自動生成条件には使用しません。', allowedActions: ['承認する', '却下する', '申請内容を確認する'] });
 
@@ -101,7 +103,7 @@ export function validateGenerationContext(context: MonthlyGenerationContext, pha
       const conflict = prohibitionConflict(context.workRules, assignment.staffId, assignment.workDate, type, assignment.startTime && assignment.endTime ? { startTime: assignment.startTime, endTime: assignment.endTime } : null, assignment.workPatternId ?? undefined);
       if (conflict?.isHardConstraint && !hardOverrideKey.has(`${assignment.staffId}:${date}`)) add({ severity: 'ERROR', code: 'HARD_WORK_RULE_CONFLICT', staffId: assignment.staffId, date, source: `StaffWorkRule:${conflict.id}`, reason: '確定予定の勤務がHARD勤務禁止条件に違反しています。', allowedActions: ['勤務を変更する', 'その日だけ例外として承認する', '条件を確認して再生成する', '保留して戻る'] });
       const fixed = fixedRule(context.workRules, assignment.staffId, assignment.workDate); const fixedType = fixed ? patternType(fixed) : null;
-      if (!closed && fixed?.isHardConstraint && fixedType && fixedType !== type && !hardOverrideKey.has(`${assignment.staffId}:${date}`)) add({ severity: 'ERROR', code: 'HARD_FIXED_ASSIGNMENT_CONFLICT', staffId: assignment.staffId, date, source: `StaffWorkRule:${fixed.id}`, reason: '確定予定の勤務がHARD固定勤務と一致しません。', allowedActions: ['勤務を固定勤務へ変更する', 'その日だけ例外として承認する', '保留して戻る'] });
+      if (!closed && fixed?.isHardConstraint && fixedType && (fixed.workPattern && !['EARLY', 'NORMAL', 'LATE', 'OFF'].includes(fixed.workPattern.code) ? fixed.workPattern.id !== assignment.workPatternId : fixedType !== type) && !hardOverrideKey.has(`${assignment.staffId}:${date}`)) add({ severity: 'ERROR', code: 'HARD_FIXED_ASSIGNMENT_CONFLICT', staffId: assignment.staffId, date, source: `StaffWorkRule:${fixed.id}`, reason: '確定予定の勤務がHARD固定勤務と一致しません。', allowedActions: ['勤務を固定勤務へ変更する', 'その日だけ例外として承認する', '保留して戻る'] });
       for (const event of context.events.filter((row) => row.affectsGeneration && iso(row.eventDate) === date)) {
         if (event.fixedTimeStaffAllowed && context.fixedStaffIds.has(assignment.staffId)) continue;
         const targetCodes = jsonStrings(event.targetStaffCodes); const targetClasses = jsonStrings(event.targetClasses); const staff = staffById.get(assignment.staffId);
@@ -124,7 +126,7 @@ export function validateGenerationContext(context: MonthlyGenerationContext, pha
       }
     }
     const closedKeys = new Set(context.closedDates.map((row) => iso(row.closedDate)));
-    if (context.features.ADVANCED_STAFFING_REQUIREMENTS.enabled) for (const evaluation of evaluateStaffingRequirements(context.staffingRequirements, context.attributes, context.assignments.map((row) => ({ staffId: row.staffId, workDate: row.workDate, shiftType: row.shiftType, workPatternId: row.workPatternId, startTime: row.startTime, endTime: row.endTime, breakMinutes: row.breakMinutes, note: row.note, assignedClass: row.assignedClass })))) if (!closedKeys.has(evaluation.date) && !(context.shiftSetting?.sundayOperationEnabled === false && new Date(`${evaluation.date}T00:00:00.000Z`).getUTCDay() === 0) && evaluation.constraintLevel === StaffingConstraintLevel.HARD && !evaluation.isSatisfied) add({ severity: 'ERROR', code: 'STAFFING_REQUIREMENT_HARD', staffId: null, date: evaluation.date, source: `ShiftStaffingRequirement:${evaluation.requirementId}`, reason: evaluation.message, allowedActions: ['勤務を変更する', '必要人数条件を確認する', '日付限定例外を登録する'] });
+    if (context.features.ADVANCED_STAFFING_REQUIREMENTS.enabled) for (const evaluation of evaluateStaffingRequirements(context.staffingRequirements, context.attributes, context.assignments.map((row) => ({ staffId: row.staffId, workDate: row.workDate, shiftType: row.shiftType, workPatternId: row.workPatternId, startTime: row.startTime, endTime: row.endTime, breakMinutes: row.breakMinutes, note: row.note, assignedClass: row.assignedClass, countsTowardStaffing: row.workPattern?.isWorking !== false && row.workPattern?.countsTowardStaffing !== false })))) if (!closedKeys.has(evaluation.date) && !(context.shiftSetting?.sundayOperationEnabled === false && new Date(`${evaluation.date}T00:00:00.000Z`).getUTCDay() === 0) && evaluation.constraintLevel === StaffingConstraintLevel.HARD && !evaluation.isSatisfied) add({ severity: 'ERROR', code: 'STAFFING_REQUIREMENT_HARD', staffId: null, date: evaluation.date, source: `ShiftStaffingRequirement:${evaluation.requirementId}`, reason: evaluation.message, allowedActions: ['勤務を変更する', '必要人数条件を確認する', '日付限定例外を登録する'] });
     if (context.features.ADVANCED_STAFFING_REQUIREMENTS.enabled) for (const requirement of context.conditionalStaffingRequirements.filter((row) => row.constraintLevel === StaffingConstraintLevel.HARD)) for (const date of [...new Set(context.assignments.map((row) => iso(row.workDate)))]) {
       const workDate = new Date(`${date}T00:00:00.000Z`); if (closedKeys.has(date) || (context.shiftSetting?.sundayOperationEnabled === false && workDate.getUTCDay() === 0) || (requirement.startDate && requirement.startDate > workDate) || (requirement.endDate && requirement.endDate < workDate) || (requirement.dayOfWeek != null && requirement.dayOfWeek !== workDate.getUTCDay())) continue;
       const day = context.assignments.filter((row) => iso(row.workDate) === date); const triggerCount = day.filter((row) => row.workPatternId === requirement.triggerWorkPatternId && hasActiveAttribute(context, row.staffId, requirement.triggerAttributeDefinitionId, workDate)).length;
