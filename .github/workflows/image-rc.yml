@@ -96,7 +96,7 @@ jobs:
           python3 - <<'PY'
           import json,os,pathlib,re,subprocess
           root=pathlib.Path.cwd(); temp=pathlib.Path(os.environ['RUNNER_TEMP']); baseline=temp/'baseline'; baseline.mkdir()
-          archive=subprocess.Popen(['git','archive','531dde7c504577f9277ae603a2a61bdb83f79a64','apps/web'],stdout=subprocess.PIPE)
+          archive=subprocess.Popen(['git','archive','531dde7c504577f9277ae603a2a61bdb83f79a64','apps/web','docs','README.md'],stdout=subprocess.PIPE)
           subprocess.run(['tar','-x','-C',str(baseline)],stdin=archive.stdout,check=True);assert archive.wait()==0
           scripts=json.loads((root/'apps/web/package.json').read_text())['scripts']; names=[x.strip().removeprefix('npm run ') for x in scripts['test:regression'].split('&&')]
           rows=[]; allowed={'test:sprint9c','test:sprint10a','test:sprint10b','test:sprint10c','test:sprint11a'}
