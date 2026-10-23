@@ -31,7 +31,7 @@ for (const label of ['全員表示', '出勤者を強調', '休みを薄く表�
 for (const label of ['通常', '早出', '遅出', '希望休', '有給', '夏季', '半休']) assert.ok(source.includes(label), `勤務区分の正式名称: ${label}`);
 assert.ok(source.includes("useState<ShiftDisplayMode>('emphasize')"), '出勤者強調を初期表示にする');
 assert.ok(source.includes('出勤 ${count.working}人') && source.includes('早出 ${count.early}人') && source.includes('休み ${count.off}人'), '日別人数内訳');
-assert.ok(source.includes("'担当クラス'") && source.includes('saved.startTime'), '担当クラスと勤務時間を読み上げる');
+assert.ok(source.includes("'担当クラス'") && source.includes('previewStart') && source.includes('previewEnd'), '担当クラスと勤務時間を読み上げる');
 assert.ok(source.includes("'運営'") && source.includes('応援先') && source.includes('staff.isDirector'), '園長の運営・応援表示');
 assert.ok(source.includes('overflow-x-auto') && source.includes('tabIndex={0}'), '表だけ横スクロールしキーボード操作可能');
 assert.match(styles, /\.shift-cell-normal \{[^}]*var\(--brand-soft\)/, '通常勤務はブランドカラーを維持');
