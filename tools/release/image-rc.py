@@ -197,6 +197,9 @@ def runtime_evidence(command, manifest, source, result):
                         'pcre2Imports': sorted(set(re.findall(r'\bUND\s+(pcre2_\S+)', symbols)))})
             result['nativeRegexEvidence'][role] = native
         result['nginxEvidence']['pcreJitDirective'] = bool(re.search(r'^\s*pcre_jit\s+on\s*;', config, re.M))
+        native_rows = [row for rows in result['nativeRegexEvidence'].values() for row in rows]
+        nginx_imports = set(result['nativeRegexEvidence']['web'][0]['pcre2Imports'])
+        result['nativeRegexGuard'] = not any(row['libcRegexImports'] for row in native_rows) and not result['nginxEvidence']['pcreJitDirective'] and not nginx_imports.intersection({'pcre2_dfa_match_8', 'pcre2_pattern_convert_8', 'pcre2_jit_match_8'})
         result['amd64'] = all(json.loads(command(['docker','image','inspect',x['imageId']],capture=True))[0]['Architecture']=='amd64' for x in manifest['images'].values())
         for name in (api, web):
             state = json.loads(command(['docker', 'inspect', '--format', '{{json .State}}', name], capture=True))
@@ -206,7 +209,7 @@ def runtime_evidence(command, manifest, source, result):
         result['restartCount'] = 0
         result['internalNetwork'] = True
         result['productionConnected'] = False
-        result['pass'] = result['api']['numericProxyTrust'] and result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
+        result['pass'] = result['nativeRegexGuard'] and result['api']['numericProxyTrust'] and result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
         return result
     finally:
         result['containerDiagnostics'] = []
@@ -216,8 +219,14 @@ def runtime_evidence(command, manifest, source, result):
                 data = json.loads(state.stdout)
                 logs = subprocess.run(['docker', 'logs', name], capture_output=True)
                 text = (logs.stdout + logs.stderr).decode(errors='replace')
+                fatal_lines = [line for line in text.splitlines() if 'FATAL' in line]
+                expected_startup = [line for line in fatal_lines if 'the database system is starting up' in line]
+                unexpected_fatal = len(fatal_lines) - len(expected_startup)
+                if unexpected_fatal:
+                    result['pass'] = False
                 result['containerDiagnostics'].append({'role': name.split('-')[1], 'running': data.get('Running'),
                     'exitCode': data.get('ExitCode'), 'oomKilled': data.get('OOMKilled'),
+                    'expectedStartupFatalCount': len(expected_startup), 'unexpectedFatalCount': unexpected_fatal,
                     'errorSignals': {label: label in text for label in ('Invalid production environment', 'Cannot find module', 'ECONNREFUSED', 'Error', 'FATAL')}})
         for name in reversed(created):
             subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
