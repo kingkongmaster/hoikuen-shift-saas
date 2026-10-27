@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
   const securityHeaders = new SecurityHeadersMiddleware();
   app.use(requestContext.use.bind(requestContext));
   app.use(securityHeaders.use.bind(securityHeaders));
-  app.use(json({ limit: '10mb' }));
+  app.use(json({ limit: '10mb', inflate: false }));
   app.setGlobalPrefix('api');
   const origins = configuredOrigins(process.env.WEB_ORIGIN);
   app.enableCors({
@@ -28,7 +28,7 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new SafeExceptionFilter());
   app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
-  await app.listen(Number(process.env.PORT ?? process.env.API_PORT ?? 3000), '0.0.0.0');
+  await app.listen(Number(process.env.PORT ?? process.env.API_PORT ?? 3000), process.env.NODE_ENV === 'test' ? '127.0.0.1' : '0.0.0.0');
 }
 
 void bootstrap();
