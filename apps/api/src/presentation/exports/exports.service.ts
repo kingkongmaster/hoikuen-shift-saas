@@ -1,3 +1,4 @@
+import { readOperatingCalendar, effectiveClosedDates } from '../../domain/calendar/operating-calendar';
 import { monthlySubmissionStatus } from '../shifts/monthly-submission';
 import { readReviewRows } from '../shifts/manager-resolution.service';
 import { draftScope } from '../../application/manager-resolution/resolution';
@@ -24,7 +25,7 @@ export class ExportsService {
     if (!schedule) throw new NotFoundException('対象月の月間シフトが見つかりません。');
     const [assignments, closed] = await Promise.all([
       this.prisma.shiftAssignment.findMany({ where: { monthlyShiftId: schedule.id, tenantId: user.tenantId }, include: { staff: true, workPattern: { select: { name: true } } }, orderBy: [{ workDate: 'asc' }, { staff: { employeeNumber: 'asc' } }] }),
-      this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } } }),
+      readOperatingCalendar(this.prisma,user.tenantId,month).then(effectiveClosedDates),
     ]);
     const closedMap = new Map(closed.map((item) => [this.isoDate(item.closedDate), item.name]));
     const rows = assignments.map((item) => [item.staff.employeeNumber, item.staff.displayName, employmentLabels[item.staff.employmentType], classLabels[item.staff.assignedClass], this.isoDate(item.workDate), this.weekday(item.workDate), item.workPattern?.name ?? item.shiftType, item.assignedClass ? classLabels[item.assignedClass] : '', item.startTime ?? '', item.endTime ?? '', item.breakMinutes ?? '', closedMap.get(this.isoDate(item.workDate)) ?? '', item.note ?? '', schedule.status]);
@@ -63,13 +64,14 @@ export class ExportsService {
     if (ownOnly && schedule.status !== MonthlyShiftStatus.CONFIRMED) throw new NotFoundException('確定済みシフトが見つかりません。');
     const ownStaff = ownOnly ? await this.prisma.staff.findUnique({ where: { tenantId_userId: { tenantId: user.tenantId, userId: user.sub } }, select: { id: true } }) : null;
     if (ownOnly && !ownStaff) throw new NotFoundException('職員情報が見つかりません。');
-    const [tenant, assignments, closed] = await Promise.all([
+    const [tenant, assignments, calendar] = await Promise.all([
       this.prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { name: true } }),
-      this.prisma.shiftAssignment.findMany({ where: { monthlyShiftId: schedule.id, ...(ownStaff ? { staffId: ownStaff.id } : {}) }, include: { staff: { select: { employeeNumber: true, displayName: true } }, workPattern: { select: { name: true } } }, orderBy: [{ staff: { employeeNumber: 'asc' } }, { workDate: 'asc' }] }),
-      this.prisma.tenantClosedDate.findMany({ where: { tenantId: user.tenantId, closedDate: { gte: range.start, lt: range.end } } }),
+      this.prisma.shiftAssignment.findMany({ where: { tenantId:user.tenantId, monthlyShiftId: schedule.id, ...(ownStaff ? { staffId: ownStaff.id } : {}) }, include: { staff: { select: { employeeNumber: true, displayName: true } }, workPattern: { select: { name: true } } }, orderBy: [{ staff: { employeeNumber: 'asc' } }, { workDate: 'asc' }] }),
+      readOperatingCalendar(this.prisma,user.tenantId,month),
     ]);
+    const closed=effectiveClosedDates(calendar);
     await this.audit.create(user.tenantId, user.sub, 'SHIFT_PRINT_VIEWED', 'MonthlyShift', schedule.id, { month, ownOnly });
-    return { hasUnsubmitted: schedule.status !== 'CONFIRMED' && (await monthlySubmissionStatus(this.prisma,user.tenantId,month)).hasUnsubmitted, tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.workPattern?.name ?? shiftTypeLabels[item.shiftType] ?? 'その他勤務', assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
+    return { calendarDays:calendar.days, holidayCoverage:calendar.holidayCoverage, hasUnsubmitted: schedule.status !== 'CONFIRMED' && (await monthlySubmissionStatus(this.prisma,user.tenantId,month)).hasUnsubmitted, tenantName: tenant.name, month, status: schedule.status, printedAt: new Date().toISOString(), ownOnly, closedDates: closed.map((item) => ({ date: this.isoDate(item.closedDate), name: item.name })), assignments: assignments.map((item) => ({ employeeNumber: item.staff.employeeNumber, staffName: item.staff.displayName, date: this.isoDate(item.workDate), weekday: this.weekday(item.workDate), shiftType: item.workPattern?.name ?? shiftTypeLabels[item.shiftType] ?? 'その他勤務', assignedClass: item.assignedClass ? classLabels[item.assignedClass] : '', startTime: item.startTime, endTime: item.endTime, breakMinutes: item.breakMinutes, note: item.note })) };
   }
 
   private csv(headers: string[], rows: unknown[][]) { return BOM + [headers, ...rows].map((row) => row.map((value) => this.cell(value)).join(',')).join('\r\n') + '\r\n'; }

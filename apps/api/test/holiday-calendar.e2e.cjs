@@ -1,0 +1,63 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),{randomUUID,scryptSync}=require('node:crypto');
+const {resolveIsolatedDatabaseUrl,resolveLocalApiBaseUrl}=require('./helpers/isolated-database.cjs');resolveIsolatedDatabaseUrl();
+const base=resolveLocalApiBaseUrl(),{PrismaClient}=require('@prisma/client'),db=new PrismaClient(),checks=[];
+const out=process.env.EVIDENCE_DIR;let A,B;
+const pass=(name)=>{checks.push({name,status:'PASS'});console.log('PASS',name)};
+async function api(token,route,method='GET',body){const r=await fetch(base+route,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,body:await r.json()};}
+async function tenant(tag){
+ const t=await db.tenant.create({data:{name:'匿名カレンダー園'+tag,setupStatus:'COMPLETED'}}),salt=randomUUID(),password='Anonymous-Calendar-Only!';
+ const user=await db.user.create({data:{email:randomUUID()+'@example.invalid',displayName:'匿名管理者'+tag,passwordHash:salt+':'+scryptSync(password,salt,64).toString('hex')}});await db.membership.create({data:{tenantId:t.id,userId:user.id,role:'ADMIN'}});
+ await db.tenantSubscription.create({data:{tenantId:t.id,plan:'PROFESSIONAL',status:'ACTIVE',currentPeriodStartedAt:new Date('2026-01-01'),currentPeriodEndsAt:new Date('2028-12-31')}});
+ const staff=[];for(let i=0;i<4;i++)staff.push(await db.staff.create({data:{tenantId:t.id,employeeNumber:'TEST-'+i,displayName:'匿名保育士'+tag+i,assignedClass:'FREE',regularWorkStartTime:'08:00',regularWorkEndTime:'17:00'}}));
+ await db.tenantShiftSetting.create({data:{tenantId:t.id,weekdayEarlyRequired:1,weekdayLateRequired:0,saturdayEarlyRequired:0,saturdayLateRequired:0,saturdayMinimumStaff:1,saturdayOperationEnabled:true,sundayOperationEnabled:false,maxConsecutiveWorkDays:31,maxConsecutiveEarlyDays:31,maxConsecutiveLateDays:31}});
+ for(let i=0;i<6;i++)await db.classStaffingRequirement.create({data:{tenantId:t.id,classType:'AGE_'+i,weekdayRequired:0,saturdayRequired:0}});
+ const login=await api('','/auth/login','POST',{email:user.email,password});assert.equal(login.status,200);const token=login.body.accessToken;
+ const setup=(await api(token,'/setup')).body;assert.equal((await api(token,'/setup/consents','PATCH',{acceptTerms:true,acceptPrivacy:true,termsVersion:setup.currentTermsVersion,privacyVersion:setup.currentPrivacyVersion,termsHash:setup.legalRelease.termsHash,privacyHash:setup.legalRelease.privacyHash})).status,200);
+ const patterns=(await api(token,'/work-patterns')).body;const schedule=(await api(token,'/shifts','POST',{month:'2026-11'})).body;assert.ok(schedule.id);
+ return {t,user,staff,token,schedule,normal:patterns.find(p=>p.code==='NORMAL'),off:patterns.find(p=>p.code==='OFF')};
+}
+const rows=x=>db.shiftAssignment.findMany({where:{tenantId:x.t.id},orderBy:{id:'asc'}});
+async function submitted(x){const state=(await api(x.token,'/manager-reviews/2026-11/submission')).body;for(const item of state.items??state.categories??[]){const r=await api(x.token,'/manager-reviews/2026-11/submission/'+item.category,'POST',{revision:item.revision,inputDigest:item.inputDigest,state:item.count?'SUBMITTED_WITH_DATA':'SUBMITTED_EMPTY'});assert.equal(r.status,201,JSON.stringify(r));}}
+(async()=>{
+ A=await tenant('A');B=await tenant('B');const otherBefore=await rows(B);
+ const calendar=async(month)=>{const r=await api(A.token,'/closed-dates/calendar?month='+month);assert.equal(r.status,200);return r.body};
+ let c=await calendar('2026-11');const day=(cal,date)=>cal.days.find(r=>r.date===date);
+ assert.equal(day(c,'2026-11-01').isOpen,false);assert.equal(day(c,'2026-11-07').isOpen,true);assert.equal(day(c,'2026-11-03').holidayName,'文化の日');assert.equal(day(c,'2026-11-23').isOpen,false);pass('日曜・祝日休園／土曜開園');
+ assert.equal(day(await calendar('2026-05'),'2026-05-06').isOpen,false);assert.equal(day(await calendar('2026-09'),'2026-09-22').isOpen,false);assert.equal(day(await calendar('2027-03'),'2027-03-22').isOpen,false);assert.equal((await calendar('2028-01')).holidayCoverage,false);pass('振替休日・国民の休日・年跨ぎ・将来未確定');
+ const add=await api(A.token,'/closed-dates','POST',{closedDate:'2026-11-03',name:'文化の日'});assert.equal(add.status,201);assert.equal((await api(A.token,'/closed-dates','POST',{closedDate:'2026-11-03',name:'重複'})).status,409);assert.equal((await calendar('2026-11')).days.filter(d=>d.date==='2026-11-03').length,1);assert.equal(await db.tenantClosedDate.count({where:{tenantId:A.t.id}}),1);pass('手動休園DB保存・読戻し・標準休日と重複なし');
+ assert.equal((await api(A.token,'/closed-dates','POST',{closedDate:'2026-02-30',name:'不正'})).status,400);pass('存在しない日付拒否');
+ for(const date of ['2026-11-01','2026-11-03'])assert.equal((await api(A.token,'/closed-dates/calendar-overrides','POST',{date,state:'OPEN',reason:'匿名行事の特別開園'})).status,201);
+ assert.equal(day(await calendar('2026-11'),'2026-11-03').isOpen,true);assert.equal((await api(A.token,'/closed-dates/calendar-overrides','POST',{date:'2026-11-03',state:'CLOSED',reason:'競合'})).status,409);pass('日曜・祝日の特別開園と競合拒否');
+ await db.tenantFeature.create({data:{tenantId:A.t.id,featureCode:'TENANT_CUSTOM_RULES',enabled:true,source:'MANUAL',createdByUserId:A.user.id}});
+ for(const code of ['FIXED_ASSIGNMENT','GENERATOR_EXCLUDED']){const attr=await db.staffAttributeDefinition.create({data:{tenantId:A.t.id,code,name:'匿名固定属性',category:'ASSIGNMENT'}});await db.staffAttributeAssignment.create({data:{tenantId:A.t.id,staffId:A.staff[3].id,attributeDefinitionId:attr.id}});}
+ await db.staffWorkContract.create({data:{tenantId:A.t.id,staffId:A.staff[3].id,effectiveFrom:new Date('2026-11-01'),effectiveTo:new Date('2026-11-30'),annualizedTargetMinutes:100000,prescribedDailyMinutes:480}});
+ for(const [staffId,date,requestType] of [[A.staff[0].id,'2026-11-04','PAID_LEAVE'],[A.staff[1].id,'2026-11-05','DAY_OFF'],[A.staff[3].id,'2026-11-06','HALF_DAY_AM']])await db.shiftRequest.create({data:{tenantId:A.t.id,staffId,requestDate:new Date(date),requestType,status:'APPROVED'}});
+ for(const staffId of [A.staff[0].id,A.staff[3].id])await db.paidLeaveGrant.create({data:{tenantId:A.t.id,staffId,grantDate:new Date('2026-01-01'),validFrom:new Date('2026-01-01'),expiresAt:new Date('2027-12-31'),grantedHalfDays:20,source:'NORMAL_GRANT',createdByUserId:A.user.id}});
+ await db.staffWorkRule.create({data:{tenantId:A.t.id,staffId:A.staff[2].id,ruleType:'PREFERRED_WORK_PATTERN',workPatternId:A.normal.id,startDate:new Date('2026-11-01'),endDate:new Date('2026-11-30'),isHardConstraint:false}});
+ const event=await api(A.token,'/tenant-calendar/events','POST',{eventDate:'2026-11-10',name:'匿名園行事',eventType:'ONSITE',sourceType:'ADMIN_CONFIRMED'});assert.equal(event.status,201);
+ const role=await db.staffAttributeDefinition.create({data:{tenantId:A.t.id,code:'ANON_CHILDCARE',name:'匿名必要人数属性',category:'ROLE'}});for(const staff of A.staff)await db.staffAttributeAssignment.create({data:{tenantId:A.t.id,staffId:staff.id,attributeDefinitionId:role.id}});
+ await db.shiftStaffingRequirement.create({data:{tenantId:A.t.id,code:'ANON_OPEN_SUNDAY',name:'特別開園の必要人数',attributeDefinitionId:role.id,startDate:new Date('2026-11-01'),endDate:new Date('2026-11-01'),requiredCount:1,constraintLevel:'HARD'}});
+ const pre=await api(A.token,'/shifts/'+A.schedule.id+'/precheck','POST');assert.equal(pre.status,201);assert.equal(pre.body.canGenerate,true,JSON.stringify(pre.body.diagnostics));
+ const gen=await api(A.token,'/shifts/'+A.schedule.id+'/generate','POST');assert.equal(gen.status,201,JSON.stringify(gen.body));
+ const generated=await rows(A);assert.equal(generated.length,120);assert.ok(generated.some(r=>r.workDate.toISOString().startsWith('2026-11-01')&&r.shiftType!=='OFF'));assert.ok(generated.filter(r=>r.workDate.toISOString().startsWith('2026-11-23')).every(r=>r.shiftType==='OFF'));pass('実API DRAFT生成・特別開園を反映／祝日勤務なし');
+ assert.equal(generated.find(r=>r.staffId===A.staff[0].id&&r.workDate.toISOString().startsWith('2026-11-04')).shiftType,'PAID_LEAVE');
+ assert.equal(generated.find(r=>r.staffId===A.staff[1].id&&r.workDate.toISOString().startsWith('2026-11-05')).shiftType,'OFF');
+ const half=generated.find(r=>r.staffId===A.staff[3].id&&r.workDate.toISOString().startsWith('2026-11-06'));assert.ok(await db.shiftAttendanceModifier.findUnique({where:{shiftAssignmentId:half.id}}));
+ assert.equal(generated.find(r=>r.staffId===A.staff[3].id&&r.workDate.toISOString().startsWith('2026-11-23')).shiftType,'OFF');pass('希望休・有給・固定勤務・半休・勤務希望・園行事との統合');
+ const lateClosed=await api(A.token,'/closed-dates','POST',{closedDate:'2026-11-02',name:'匿名園独自休園'});assert.equal(lateClosed.status,201);assert.deepEqual(await rows(A),generated);
+ let ev=await api(A.token,'/shifts/'+A.schedule.id+'/evaluation');assert.equal(ev.status,200);assert.ok(ev.body.staffingRequirementEvaluations.some(r=>r.date==='2026-11-01'&&r.actualCount>=1));assert.equal(ev.body.inputChange.changed,true);assert.ok(ev.body.diagnostics.some(d=>d.code==='CLOSED_DATE_WORK_CONFLICT'&&d.date==='2026-11-02'));assert.deepEqual(await rows(A),generated);pass('生成後休園追加・影響日と勤務検知・既存DRAFT保護');
+ const reviewed=await api(A.token,'/shifts/'+A.schedule.id+'/evaluation','POST');assert.equal(reviewed.status,201);assert.equal(reviewed.body.inputChange.changed,false);assert.deepEqual(await rows(A),generated);pass('明示再評価は割当を変更しない');
+ await submitted(A);let final=await api(A.token,'/shifts/'+A.schedule.id+'/confirm','POST');assert.equal(final.status,409);assert.equal((await db.monthlyShift.findUnique({where:{id:A.schedule.id}})).status,'DRAFT');pass('休園勤務のFINAL拒否');
+ const edits=generated.filter(r=>r.workDate.toISOString().startsWith('2026-11-02')).map(r=>({staffId:r.staffId,workDate:'2026-11-02',shiftType:'OFF',workPatternId:A.off.id,assignedClass:'FREE'}));assert.equal((await api(A.token,'/shifts/'+A.schedule.id+'/assignments','PUT',{assignments:edits})).status,200);
+ await submitted(A);assert.equal((await api(A.token,'/shifts/'+A.schedule.id+'/confirm','POST')).status,409);pass('修正後の未再評価FINAL拒否');
+ assert.equal((await api(A.token,'/shifts/'+A.schedule.id+'/evaluation','POST')).status,201);
+ // A condition change with no calendar conflict still invalidates the evaluation.
+ await db.tenantShiftSetting.update({where:{tenantId:A.t.id},data:{maxConsecutiveWorkDays:30}});assert.equal((await api(A.token,'/shifts/'+A.schedule.id+'/evaluation')).body.inputChange.changed,true);assert.equal((await api(A.token,'/shifts/'+A.schedule.id+'/confirm','POST')).status,409);pass('勤務条件変更の検知・古い再評価のFINAL拒否');
+ await api(A.token,'/shifts/'+A.schedule.id+'/evaluation','POST');
+ const print=await api(A.token,'/exports/print/shifts?month=2026-11');assert.equal(print.status,200,JSON.stringify(print));assert.ok(print.body.closedDates.some(d=>d.date==='2026-11-23'));assert.ok(!print.body.closedDates.some(d=>d.date==='2026-11-03'));pass('印刷APIは実効休日を反映');
+ assert.ok([403,404].includes((await api(B.token,'/shifts/'+A.schedule.id+'/evaluation')).status));assert.equal((await api(B.token,'/closed-dates/calendar-overrides/'+(await calendar('2026-11')).overrides[0].id,'DELETE')).status,404);assert.deepEqual(await rows(B),otherBefore);pass('Tenant境界・他園割当不変');
+ if(out){fs.writeFileSync(out+'/fixture.json',JSON.stringify({A,B,print:print.body},null,2));fs.writeFileSync(out+'/holiday-api-result.json',JSON.stringify({status:'PASS',checks},null,2));}
+ const C=await tenant('C');assert.equal((await api(C.token,'/shifts/'+C.schedule.id+'/generate','POST')).status,201);await submitted(C);await api(C.token,'/shifts/'+C.schedule.id+'/evaluation','POST');const good=await api(C.token,'/shifts/'+C.schedule.id+'/confirm','POST');assert.equal(good.status,200,JSON.stringify(good));assert.equal((await db.monthlyShift.findUnique({where:{id:C.schedule.id}})).status,'CONFIRMED');pass('問題解消・提出・最新再評価後の匿名FINAL成功');
+ const D=await tenant('D');await db.tenantShiftSetting.update({where:{tenantId:D.t.id},data:{saturdayOperationEnabled:false}});await api(D.token,'/closed-dates/calendar-overrides','POST',{date:'2026-11-07',state:'OPEN',reason:'匿名土曜特別開園'});await submitted(D);await api(D.token,'/shifts/'+D.schedule.id+'/evaluation','POST');const shortage=await api(D.token,'/shifts/'+D.schedule.id+'/confirm','POST');assert.equal(shortage.status,409);assert.ok(shortage.body.warnings.some(w=>w.code==='SATURDAY_MINIMUM_SHORTAGE'&&w.workDate==='2026-11-07'));pass('土曜通常休園でも特別開園日は必要人数防御を維持');
+ if(out)fs.writeFileSync(out+'/holiday-api-result.json',JSON.stringify({status:'PASS',checks},null,2));console.log('Holiday API E2E PASS');
+})().catch(e=>{console.error(e);if(out)fs.writeFileSync(out+'/holiday-api-result.json',JSON.stringify({status:'FAIL',checks,error:e.stack},null,2));process.exitCode=1}).finally(()=>db.$disconnect());
