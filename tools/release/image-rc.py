@@ -161,7 +161,7 @@ def runtime_evidence(command, manifest, source, result):
         result['api'] = json.loads(command(['docker', 'exec', api, 'node', '-e', probe], capture=True))
         # Node probe in the API container reaches only this internal Web container.
         paths = ['/', '/manifest.json', '/sw.js', '/icons/aen-shift-icon-192.png', '/icons/aen-shift-icon-512.png', '/release-metadata.json']
-        web_probe = "(async()=>{for(const p of " + json.dumps(paths) + "){const r=await fetch('http://" + web + ":8080'+p);if(r.status!==200)throw Error('WEB_HTTP');if(p==='/release-metadata.json'&&JSON.stringify(await r.json())!==JSON.stringify(" + json.dumps(manifest['metadata']) + "))throw Error('WEB_METADATA')}console.log(JSON.stringify({http:200,pwa:200,metadataMatch:true}))})().catch(()=>process.exit(1))"
+        web_probe = "(async()=>{for(const p of " + json.dumps(paths) + "){let r;for(let i=0;i<30;i++){try{r=await fetch('http://" + web + ":8080'+p);if(r.status===200)break}catch{}await new Promise(resolve=>setTimeout(resolve,1000))}if(!r||r.status!==200)throw Error('WEB_HTTP');if(p==='/release-metadata.json'&&JSON.stringify(await r.json())!==JSON.stringify(" + json.dumps(manifest['metadata']) + "))throw Error('WEB_METADATA')}console.log(JSON.stringify({http:200,pwa:200,metadataMatch:true}))})().catch(e=>{console.error(e.message);process.exit(1)})"
         result['phase'] = 'web-http-pwa-metadata'
         result['web'] = json.loads(command(['docker', 'exec', api, 'node', '-e', web_probe], capture=True))
         result['phase'] = 'nginx-config'
@@ -276,6 +276,13 @@ def run(source, output, expected_sha):
         metadata = {'product': 'AeN Shift', 'releaseId': 'musubi-r1-pilot-' + expected_sha[:12],
                     'buildId': stamp.strftime('%Y%m%dT%H%M%SZ') + '-' + expected_sha[:12] + '-' + os.environ.get('GITHUB_RUN_ID', 'local'),
                     'gitSha': expected_sha[:12], 'builtAt': stamp.isoformat().replace('+00:00', 'Z')}
+        if os.environ.get('RC_REUSE_MANIFEST'):
+            if os.environ.get('RC_PRIVATE_VPS_MODE') != 'true':
+                raise ValueError('PRIVATE_RESUME_ONLY')
+            existing = json.loads(Path(os.environ['RC_REUSE_MANIFEST']).read_text())
+            if existing['source']['baseSha'] != expected_sha or existing['source']['dirty']:
+                raise ValueError('RESUME_SOURCE_MISMATCH')
+            metadata = existing['metadata']
         metadata_file = output / 'metadata.json'
         metadata_file.write_text(json.dumps(metadata))
         scanner_archive = output / 'trivy.tar.gz'

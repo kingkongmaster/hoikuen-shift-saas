@@ -41,6 +41,13 @@ def labels(m):
 def build(source, metadata_path, manifest_path):
     m = json.loads(Path(metadata_path).read_text())
     assert m['product'] == 'AeN Shift' and m['gitSha'] == SOURCE_SHA[:12]
+    if os.environ.get('RC_REUSE_MANIFEST'):
+        previous = Path(os.environ['RC_REUSE_MANIFEST'])
+        assert str(previous).startswith('/opt/aen-shift/releases/pr37-private-')
+        manifest = json.loads(previous.read_text())
+        assert manifest['metadata'] == m and manifest['source'] == {'baseSha': SOURCE_SHA, 'dirty': False}
+        Path(manifest_path).write_text(json.dumps(manifest, indent=2))
+        return
     manifest = {'metadata': m, 'platform': 'linux/amd64', 'source': {'baseSha': SOURCE_SHA, 'dirty': False}, 'images': {}}
     for app in ('api', 'web'):
         tag = 'aen-pr37-private-' + app + ':' + m['buildId'].lower()
