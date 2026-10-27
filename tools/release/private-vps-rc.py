@@ -19,6 +19,25 @@ BUILDER = 'aen-pr37-private-builder'
 original_run = subprocess.run
 
 
+def normalize_checkout(source):
+    # Public tracked build inputs need ordinary checkout modes. Confidentiality
+    # comes from the root-only release parent, never unreadable runtime assets.
+    assert source.parent.stat().st_mode & 0o777 == 0o700
+    entries = subprocess.check_output(['git', 'ls-files', '--stage', '-z'], cwd=source).split(b'\0')
+    for entry in filter(None, entries):
+        header, name = entry.split(b'\t', 1)
+        mode = header.split()[0]
+        assert mode in (b'100644', b'100755'), 'UNREVIEWED_CHECKOUT_FILE_TYPE'
+        path = source / os.fsdecode(name)
+        assert path.resolve().is_relative_to(source.resolve()) and not path.is_symlink()
+        path.chmod(0o755 if mode == b'100755' else 0o644)
+        parent = path.parent
+        while parent.is_relative_to(source):
+            parent.chmod(0o755)
+            if parent == source: break
+            parent = parent.parent
+
+
 def invoke(args, **kwargs):
     return original_run(args, **kwargs)
 
@@ -128,6 +147,7 @@ if __name__ == '__main__':
     source, out = map(Path, sys.argv[1:3]); assert sys.argv[3] == SOURCE_SHA
     assert str(out).startswith('/opt/aen-shift/releases/pr37-private-')
     os.umask(0o077)
+    normalize_checkout(source)
     rc = runpy.run_path(str(Path(__file__).with_name('image-rc.py')))
     subprocess.run = intercepted
     try:
@@ -139,5 +159,6 @@ if __name__ == '__main__':
     report['executionEnvironment'] = 'private-vps-new-candidate-not-GitHub-Actions-image'
     report['archiveRetention'] = 'private-originals-retained'
     report['hostPackagesInstalled'] = 0
+    report['checkoutPermissions'] = 'tracked public inputs 0644/0755 below root-only 0700 release parent'
     report_path.write_text(json.dumps(report, indent=2))
     sys.exit(result)

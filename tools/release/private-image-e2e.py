@@ -42,7 +42,7 @@ def cleanup():
 
 
 def start(stage, postgres_image):
-    report = json.loads((stage / 'rc/publish/rc-report.json').read_text())
+    report = json.loads((stage / 'candidate-report.json').read_text())
     assert report['sourceSha'] == '6d92ae4c4fe5c660627371e62fd7d530dfe1e229'
     assert report['securityGate'] and report['status'] == 'IMAGE_SECURITY_METADATA_RUNTIME_VERIFIED'
     for name in NAMES + [NETWORK]:
