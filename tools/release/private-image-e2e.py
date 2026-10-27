@@ -61,7 +61,8 @@ def start(stage, postgres_image):
             '-e', 'PGDATA=/var/lib/postgresql/data/pgdata', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
             '-e', 'POSTGRES_DB=pr37_isolated_test', '-e', 'TZ=Asia/Tokyo'], postgres_image)
         for _ in range(30):
-            if subprocess.run(['docker', 'exec', pg, 'pg_isready', '-U', 'postgres'], capture_output=True).returncode == 0:
+            if subprocess.run(['docker', 'exec', pg, 'psql', '-h', '127.0.0.1', '-U', 'postgres',
+                               '-d', 'pr37_isolated_test', '-Atqc', 'SELECT 1'], capture_output=True).returncode == 0:
                 break
             time.sleep(1)
         else:
