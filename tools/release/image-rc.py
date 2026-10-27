@@ -135,11 +135,13 @@ def runtime_evidence(command, manifest, source, result):
         created.append(name)
     try:
         result['phase'] = 'pull-isolated-postgres'
-        command(['docker', 'pull', '--platform', 'linux/amd64', 'postgres:16-alpine'])
-        result['isolatedPostgresImageId'] = json.loads(command(['docker', 'image', 'inspect', 'postgres:16-alpine'], capture=True))[0]['Id']
+        postgres_image = os.environ.get('RC_POSTGRES_IMAGE', 'postgres:16-alpine')
+        if not postgres_image.startswith('sha256:'):
+            command(['docker', 'pull', '--platform', 'linux/amd64', postgres_image])
+        result['isolatedPostgresImageId'] = json.loads(command(['docker', 'image', 'inspect', postgres_image], capture=True))[0]['Id']
         command(['docker', 'network', 'create', '--internal', network])
         result['phase'] = 'start-isolated-postgres'
-        run_container(db, ['--network-alias', 'db', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rc', 'postgres:16-alpine'])
+        run_container(db, ['--network-alias', 'db', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rc', postgres_image])
         for attempt in range(30):
             ready = subprocess.run(['docker', 'exec', db, 'pg_isready', '-U', 'postgres'], capture_output=True)
             if ready.returncode == 0: break
