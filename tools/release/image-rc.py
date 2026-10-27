@@ -196,6 +196,7 @@ def runtime_evidence(command, manifest, source, result):
                         'libcRegexImports': sorted(set(re.findall(r'\bUND\s+((?:regcomp|regexec)(?:@\S+)?)', symbols))),
                         'pcre2Imports': sorted(set(re.findall(r'\bUND\s+(pcre2_\S+)', symbols)))})
             result['nativeRegexEvidence'][role] = native
+        result['nginxEvidence']['brotliDecoderUnreachable'] = not re.search(r'libbrotli', ldd) and not re.search(r'^\s*(?:load_module|brotli)\b', config, re.M)
         result['nginxEvidence']['pcreJitDirective'] = bool(re.search(r'^\s*pcre_jit\s+on\s*;', config, re.M))
         native_rows = [row for rows in result['nativeRegexEvidence'].values() for row in rows]
         nginx_imports = set(result['nativeRegexEvidence']['web'][0]['pcre2Imports'])
@@ -209,7 +210,7 @@ def runtime_evidence(command, manifest, source, result):
         result['restartCount'] = 0
         result['internalNetwork'] = True
         result['productionConnected'] = False
-        result['pass'] = result['nativeRegexGuard'] and result['api']['numericProxyTrust'] and result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
+        result['pass'] = result['nginxEvidence']['brotliDecoderUnreachable'] and result['nativeRegexGuard'] and result['api']['numericProxyTrust'] and result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
         return result
     finally:
         result['containerDiagnostics'] = []
