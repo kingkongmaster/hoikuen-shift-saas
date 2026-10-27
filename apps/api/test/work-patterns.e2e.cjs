@@ -34,7 +34,7 @@ async function main() {
   defaults = await prisma.workPattern.findMany({ where: { tenantId, isDefault: true, isActive: true } }); assert.deepEqual(defaults.map((row) => row.code), ['NORMAL']);
   const originalEarly = { code: early.code, name: early.name, shortName: early.shortName, displayOrder: early.displayOrder, startTime: early.startTime, endTime: early.endTime, breakMinutes: early.breakMinutes, color: early.color, isWorking: early.isWorking, isDefault: early.isDefault, isActive: early.isActive };
   result = await call(`/work-patterns/${early.id}`, { method: 'PUT', body: JSON.stringify({ ...originalEarly, startTime: '06:45', endTime: '15:45' }) }, token); assert.equal(result.status, 200);
-  const month = `205${Math.floor(Math.random() * 9)}-${String(Math.floor(Math.random() * 11) + 1).padStart(2, '0')}`; result = await call('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, token); assert.equal(result.status, 201); scheduleId = result.body.id;
+  const month = `2027-${String(Math.floor(Math.random() * 11) + 1).padStart(2, '0')}`; result = await call('/shifts', { method: 'POST', body: JSON.stringify({ month }) }, token); assert.equal(result.status, 201); scheduleId = result.body.id;
   result = await call(`/shifts/${scheduleId}/generate`, { method: 'POST' }, token); assert.equal(result.status, 201);
   const generatedEarly = await prisma.shiftAssignment.findFirst({ where: { monthlyShiftId: scheduleId, shiftType: 'EARLY' } }); assert.ok(generatedEarly); assert.equal(generatedEarly.startTime, '06:45'); assert.equal(generatedEarly.workPatternId, early.id, 'Generator結果はsystem WorkPatternを参照する');
   await call(`/work-patterns/${early.id}`, { method: 'PUT', body: JSON.stringify(originalEarly) }, token);

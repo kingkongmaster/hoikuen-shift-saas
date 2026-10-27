@@ -19,12 +19,13 @@ function range(month: string) {
 /** Reads only. A count of zero is never proof that the administrator submitted a month. */
 export async function monthlySubmissionStatus(db: Db, tenantId: string, month: string) {
   const { start, end } = range(month);
-  const [requests, events, closed, reviews, records] = await Promise.all([
+  const [requests, events, closed, reviews, records, calendarOverrides] = await Promise.all([
     db.shiftRequest.findMany({ where: { tenantId, requestDate: { gte: start, lt: end } }, orderBy: { id: 'asc' } }),
     db.tenantEvent.findMany({ where: { tenantId, eventDate: { gte: start, lt: end } }, orderBy: { id: 'asc' } }),
     db.tenantClosedDate.findMany({ where: { tenantId, closedDate: { gte: start, lt: end } }, orderBy: { id: 'asc' } }),
     db.tenantRuleException.findMany({ where: { tenantId, isActive: true, exceptionType: { startsWith: 'MANAGER_REVIEW:' }, exceptionDate: { gte: start, lt: end } }, orderBy: { id: 'asc' } }),
     db.tenantRuleException.findMany({ where: { tenantId, isActive: true, exceptionType: { startsWith: prefix }, exceptionDate: start } }),
+    db.tenantRuleException.findMany({where:{tenantId,isActive:true,exceptionType:'CALENDAR_DAY',exceptionDate:{gte:start,lt:end}},orderBy:{id:'asc'}}),
   ]);
   const effectiveRequests = new Map(requests.filter(r => r.status === 'APPROVED').map(r => [r.staffId + ':' + r.requestDate.toISOString().slice(0,10), r.requestType as string]));
   for (const row of reviews) {
@@ -40,7 +41,7 @@ export async function monthlySubmissionStatus(db: Db, tenantId: string, month: s
   }
   const items = submissionCategories.map(category => {
     const rows = category === 'REQUESTS' ? requests.filter(r => r.requestType === 'DAY_OFF')
-      : category === 'LEAVE' ? requests.filter(r => r.requestType !== 'DAY_OFF') : category === 'EVENTS' ? events : closed;
+      : category === 'LEAVE' ? requests.filter(r => r.requestType !== 'DAY_OFF') : category === 'EVENTS' ? events : [...closed,...calendarOverrides];
     const pending = category === 'REQUESTS' || category === 'LEAVE'
       ? requests.filter(r => (category === 'REQUESTS' ? r.requestType === 'DAY_OFF' : r.requestType !== 'DAY_OFF') && r.status === 'PENDING').length : 0;
     const activeRows = rows.filter(r => !('status' in r) || r.status === 'APPROVED');

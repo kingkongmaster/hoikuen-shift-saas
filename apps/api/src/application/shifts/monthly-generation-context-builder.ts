@@ -1,3 +1,4 @@
+import { operatingCalendar, effectiveClosedDates, calendarExceptionType } from '../../domain/calendar/operating-calendar';
 import { Injectable } from '@nestjs/common';
 import { MembershipRole, MonthlyShiftStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -47,7 +48,7 @@ export class MonthlyGenerationContextBuilder {
       database.paidLeaveUsage.findMany({ where: { tenantId, usageDate: { gte: range.start, lt: range.end } }, include: { allocations: true } }),
       database.tenantClosedDate.findMany({ where: { tenantId, closedDate: { gte: range.start, lt: range.end } }, orderBy: { closedDate: 'asc' } }),
       database.tenantEvent.findMany({ where: { tenantId, eventDate: { gte: range.start, lt: range.end }, isActive: true }, orderBy: { eventDate: 'asc' } }),
-      features.TENANT_CUSTOM_RULES.enabled ? database.tenantRuleException.findMany({ where: { tenantId, isActive: true, exceptionDate: { gte: range.start, lt: range.end } }, orderBy: { exceptionDate: 'asc' } }) : Promise.resolve([]),
+      database.tenantRuleException.findMany({ where: { tenantId, ...(features.TENANT_CUSTOM_RULES.enabled ? {} : { exceptionType: calendarExceptionType }), isActive: true, exceptionDate: { gte: range.start, lt: range.end } }, orderBy: { exceptionDate: 'asc' } }),
       database.staffAttributeAssignment.findMany({ where: { tenantId, isActive: true, staff: { isActive: true }, attributeDefinition: { isActive: true }, OR: [{ startDate: null, endDate: null }, { startDate: { lt: range.end }, endDate: { gte: range.start } }] }, select: { staffId: true, attributeDefinitionId: true, startDate: true, endDate: true, attributeDefinition: { select: { code: true } } } }),
       // Preserve the pre-context-builder manager exclusion policy (RC1 ADMIN-001 is not a working candidate).
       database.membership.findMany({ where: { tenantId, role: { in: [MembershipRole.ADMIN, MembershipRole.DIRECTOR] }, isActive: true }, select: { userId: true } }),
@@ -57,10 +58,12 @@ export class MonthlyGenerationContextBuilder {
       database.shiftAssignment.findMany({ where: { tenantId, workDate: { gte: boundaryStart, lt: boundaryEnd } }, include: { attendanceModifier: true, workPattern: { select: patternSelect } }, orderBy: [{ staffId: 'asc' }, { workDate: 'asc' }] }),
     ]);
 
+    const calendar=operatingCalendar(range.start.toISOString().slice(0,7),closedDates,ruleExceptions.filter(row=>row.exceptionType===calendarExceptionType),shiftSetting);
     return {
+      calendar, manualClosedDates:closedDates,
       tenantId, targetMonth, range, tenant, shiftSetting, staff, workPatterns, contracts, workRules,
       staffingRequirements, conditionalStaffingRequirements, requests, paidLeaveGrants, paidLeaveUsages,
-      closedDates, events: events.map((event) => ({ ...event, affectsGeneration: jsonStrings(event.targetClasses).length > 0 || jsonStrings(event.targetStaffCodes).length > 0 || jsonStrings(event.allowedWorkPatternCodes).length > 0 })),
+      closedDates: effectiveClosedDates(calendar), events: events.map((event) => ({ ...event, affectsGeneration: jsonStrings(event.targetClasses).length > 0 || jsonStrings(event.targetStaffCodes).length > 0 || jsonStrings(event.allowedWorkPatternCodes).length > 0 })),
       ruleExceptions, attributes, directorMemberships, priorAssignments, confirmedAssignments, assignments, weekBoundaryAssignments, features,
       approvedRequests: requests.filter((request) => request.status === 'APPROVED'),
       pendingRequests: requests.filter((request) => request.status === 'PENDING'),
