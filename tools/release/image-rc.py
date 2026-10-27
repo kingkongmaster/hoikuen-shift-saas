@@ -19,7 +19,7 @@ import time
 import secrets
 import urllib.request
 
-MAX_ARTIFACT_BYTES = 400 * 1024 * 1024
+MAX_ARTIFACT_BYTES = 1024 * 1024
 TRIVY_URL = 'https://github.com/aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_Linux-64bit.tar.gz'
 TRIVY_SHA256 = 'c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f'
 FORBIDDEN_PATH = re.compile(r'(^|/)(?:\.env(?:\..*)?|[^/]*\.(?:docx?|xlsx?|pdf|dump|backup|sqlite3?|pem|p12|pfx|key))$|formal-pii|recovery-archive', re.I)
@@ -328,13 +328,13 @@ def run(source, output, expected_sha):
                                      'archiveSha256': sha(compressed)}
         report['metadata'] = metadata
         report['securityGate'] = all(v['security']['pass'] and v['boundary']['pass'] for v in report['images'].values()) and report['sourceSecurity']['pass']
-        report['artifactSizeGate'] = artifact_size_ok(archives) and sum(x.stat().st_size for x in archives) < MAX_ARTIFACT_BYTES - 1024 * 1024
+        report['artifactSizeGate'] = True  # No image archives are uploaded.
         if not report['securityGate']:
             raise ValueError('SECURITY_OR_CONTENT_REVIEW_REQUIRED')
         if not report['artifactSizeGate']:
             raise ValueError('ARTIFACT_COST_SIZE_HOLD')
-        for archive in archives:
-            shutil.move(str(archive), publish / archive.name)
+        # Images remain in the ephemeral runner; public archive upload is forbidden.
+        report['publicImageArchives'] = 0
         report['status'] = 'IMAGE_SECURITY_METADATA_RUNTIME_VERIFIED'
     except Exception as error:
         report['reason'] = str(error) if isinstance(error, ValueError) else type(error).__name__
