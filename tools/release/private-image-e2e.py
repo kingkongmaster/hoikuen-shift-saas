@@ -41,6 +41,27 @@ def cleanup():
         call(['docker', 'network', 'rm', NETWORK])
 
 
+def security(stage):
+    api = NAMES[1]; state = inspect(api)
+    report = json.loads((stage / 'candidate-report.json').read_text())
+    assert state['Config']['Labels'].get('jp.aen-shift.scope') == SCOPE
+    assert state['Image'] == report['images']['api']['imageId']
+    assert list(state['NetworkSettings']['Networks']) == [NETWORK]
+    call(['docker', 'exec', '--user', '0', api, 'mkdir', '-p', '/app/test/helpers'])
+    for name in ['security-input.e2e.cjs', 'helpers/isolated-database.cjs']:
+        call(['docker', 'cp', str(stage / 'source/apps/api/test' / name), api + ':/app/test/' + name])
+    # Oversize and compression tests execute at loopback inside the exact image,
+    # so SSH congestion cannot change the HTTP/parser result being assessed.
+    raw = call(['docker', 'exec', '-e', 'TEST_DATABASE_ISOLATED=true',
+                '-e', 'API_BASE_URL=http://127.0.0.1:3000/api', '-e', 'SECURITY_RESULT=/tmp/pr37-security-result.json',
+                api, 'node', '/app/test/security-input.e2e.cjs'])
+    result = json.loads(raw)
+    assert result['status'] == 'PASS'
+    result['imageId'] = state['Image']; result['execution'] = 'exact candidate container loopback; anonymous DB'
+    (stage / 'security-result.json').write_text(json.dumps(result, indent=2))
+    print(json.dumps(result))
+
+
 def start(stage, postgres_image):
     report = json.loads((stage / 'candidate-report.json').read_text())
     assert report['sourceSha'] == '6d92ae4c4fe5c660627371e62fd7d530dfe1e229'
@@ -101,4 +122,5 @@ if __name__ == '__main__':
     assert socket.gethostname() == 'vm-9b587606-82'
     os.umask(0o077)
     if sys.argv[1] == 'cleanup': cleanup()
+    elif sys.argv[1] == 'security': security(Path(sys.argv[2]))
     else: start(Path(sys.argv[1]), sys.argv[2])
