@@ -1019,10 +1019,10 @@
       "PkgName": "brotli-libs",
       "InstalledVersion": "1.1.0-r2",
       "FixedVersion": "1.1.1-r0",
-      "Severity": "HIGH",
+      "Severity": "CRITICAL",
       "assessedSeverity": "CRITICAL",
       "category": "OS_PACKAGE_NOT_REACHABLE",
-      "reason": "Vendor describes a Brotli decoder out-of-bounds write requiring crafted compressed streams. Current exact-image nginx ldd excludes libbrotli, nginx-only serving process is verified, and effective config must have no load_module or brotli directive. API compressed JSON is rejected before decoding; this classification covers only the installed Web OS package and is guarded on every run. Raw scanner High and vendor Critical are retained.",
+      "reason": "Vendor describes a Brotli decoder out-of-bounds write requiring crafted compressed streams. Current exact-image nginx ldd excludes libbrotli, nginx-only serving process is verified, and effective config must have no load_module or brotli directive. API compressed JSON is rejected before decoding; this classification covers only the installed Web OS package and is guarded on every run. Fresh 2026-10-29 scanner Critical and vendor Critical are both retained. Fresh exact-candidate runtime guards pass; source and all retained archive bytes are unchanged.",
       "exploitCondition": "Attacker-controlled compressed stream must reach an affected Brotli decoder. Static HTTP nginx has no decoder linkage or dynamic module activation.",
       "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/111xxx/CVE-2026-111497.json",
       "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
