@@ -1,7 +1,7 @@
 {
   "sourceSha": "6d92ae4c4fe5c660627371e62fd7d530dfe1e229",
-  "reviewedAt": "2026-10-27",
-  "expiresAt": "2026-10-28",
+  "reviewedAt": "2026-10-29",
+  "expiresAt": "2026-10-30",
   "sourceFingerprint": "b5fdbbbb394c3ca30ffb239594f9bb05b282a8bebcb4eaf923639a78fecdca07",
   "scope": "Exact fixed SHA API/Web runtime only. All 73 scan rows freshly reviewed against 51 primary references and current native/runtime guards. External edge, migration operations, image retention/transfer remain separate gates.",
   "rows": [
@@ -1028,5 +1028,20 @@
       "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     }
   ],
-  "evidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
+  "evidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888",
+  "privateRetainedEvidence": {
+    "assessedDate": "2026-10-29",
+    "primaryReferencesRechecked": 51,
+    "sourceSha": "6d92ae4c4fe5c660627371e62fd7d530dfe1e229",
+    "images": {
+      "api": {
+        "imageId": "sha256:47a3a86c64f4b7155a29fbae3e235960a42dfd1bfefd845cd171beddd86bb6f8",
+        "archiveSha256": "1511cc66bee055ec30d83b42a8206117a6f13e462e2cc7d7860f58cc900c0a68"
+      },
+      "web": {
+        "imageId": "sha256:72ad9fdc970c1f323090fc86068f22bd03e7e5e3441b3be9dcd50b7538357dc2",
+        "archiveSha256": "7771f81fa940359f40d5bffa3e020262e8847ee32cbc6857f65fea6538630989"
+      }
+    }
+  }
 }

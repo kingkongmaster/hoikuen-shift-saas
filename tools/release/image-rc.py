@@ -111,7 +111,13 @@ def public_legal_contact(source):
 
 def classify(scan, scope, policy, guards):
     rows = {(r['scope'], r['VulnerabilityID'], r['PkgName'], r['InstalledVersion']): r for r in policy['rows']}
-    valid = guards and datetime.date.today().isoformat() <= policy['expiresAt']
+    today = datetime.date.today()
+    if os.environ.get('RC_ASSESSMENT_DATE'):
+        if os.environ.get('RC_PRIVATE_VPS_MODE') != 'true':
+            raise ValueError('PRIVATE_ASSESSMENT_DATE_ONLY')
+        today = max(today, datetime.date.fromisoformat(os.environ['RC_ASSESSMENT_DATE']))
+    valid = guards and policy.get('reviewedAt', '0001-01-01') <= today.isoformat() <= policy['expiresAt']
+    scan['assessmentDate'] = today.isoformat()
     for finding in scan['findings']:
         key = (scope, finding['VulnerabilityID'], finding['PkgName'], finding['InstalledVersion'])
         rule = rows.get(key) if valid else None
@@ -322,16 +328,26 @@ def run(source, output, expected_sha):
         archives = []
         for app, image in manifest['images'].items():
             report['stage'] = 'image-scan-' + app
-            archive = output / (app + '.tar')
-            command(['docker', 'save', '-o', str(archive), image['imageId']])
+            retained = os.environ.get('RC_RETAINED_ARCHIVES')
+            if retained:
+                if os.environ.get('RC_PRIVATE_VPS_MODE') != 'true':
+                    raise ValueError('PRIVATE_RETAINED_ARCHIVES_ONLY')
+                archive = Path(retained) / (app + '.tar.gz')
+                original = json.loads((Path(retained).parent / 'candidate-report.json').read_text())['images'][app]
+                if original['imageId'] != image['imageId'] or sha(archive) != original['archiveSha256']:
+                    raise ValueError('RETAINED_ORIGINAL_MISMATCH')
+            else:
+                archive = output / (app + '.tar')
+                command(['docker', 'save', '-o', str(archive), image['imageId']])
             boundary = layer_boundary(archive, public_contact)
             scan_file = output / (app + '.scan.private.json')
             command([str(scanner), 'image', '--cache-dir', str(cache), '--scanners', 'vuln,secret', '--format', 'json', '--output', str(scan_file), image['imageId']])
             security = classify(vulnerabilities(json.loads(scan_file.read_text())), app, policy, guards and boundary['absentExecutables']['untgz'])
             detail = json.loads(command(['docker', 'image', 'inspect', image['imageId']], capture=True))[0]
-            compressed = output / (app + '.tar.gz')
-            with archive.open('rb') as src, gzip.open(compressed, 'wb', compresslevel=6) as dst:
-                shutil.copyfileobj(src, dst)
+            compressed = archive if retained else output / (app + '.tar.gz')
+            if not retained:
+                with archive.open('rb') as src, gzip.open(compressed, 'wb', compresslevel=6) as dst:
+                    shutil.copyfileobj(src, dst)
             archives.append(compressed)
             report['images'][app] = {**image, 'layers': detail['RootFS']['Layers'], 'boundary': boundary,
                                      'security': security, 'archiveBytes': compressed.stat().st_size,
