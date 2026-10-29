@@ -149,7 +149,9 @@ def runtime_evidence(command, manifest, source, result):
         result['phase'] = 'start-isolated-postgres'
         run_container(db, ['--network-alias', 'db', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rc', postgres_image])
         for attempt in range(30):
-            ready = subprocess.run(['docker', 'exec', db, 'pg_isready', '-U', 'postgres'], capture_output=True)
+            # The entrypoint's temporary Unix-socket server is not the final
+            # network listener. Wait for the intended database over TCP.
+            ready = subprocess.run(['docker', 'exec', db, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'rc'], capture_output=True)
             if ready.returncode == 0: break
             time.sleep(1)
         else: raise ValueError('ISOLATED_POSTGRES_NOT_READY')
@@ -229,6 +231,10 @@ def runtime_evidence(command, manifest, source, result):
                 logs = subprocess.run(['docker', 'logs', name], capture_output=True)
                 text = (logs.stdout + logs.stderr).decode(errors='replace')
                 fatal_lines = [line for line in text.splitlines() if 'FATAL' in line]
+                if name == db and fatal_lines and os.environ.get('RC_PRIVATE_VPS_MODE') == 'true':
+                    # Only the disposable, synthetic DB log; never publish it.
+                    with Path(os.environ['RC_PRIVATE_LOG']).open('a') as private_log:
+                        private_log.write('\n'.join(fatal_lines) + '\n')
                 expected_startup = [line for line in fatal_lines if 'the database system is starting up' in line]
                 unexpected_fatal = len(fatal_lines) - len(expected_startup)
                 if unexpected_fatal:
@@ -238,7 +244,7 @@ def runtime_evidence(command, manifest, source, result):
                     'expectedStartupFatalCount': len(expected_startup), 'unexpectedFatalCount': unexpected_fatal,
                     'errorSignals': {label: label in text for label in ('Invalid production environment', 'Cannot find module', 'ECONNREFUSED', 'Error', 'FATAL')}})
         for name in reversed(created):
-            subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
+            subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True)
         subprocess.run(['docker', 'network', 'rm', network], capture_output=True)
 
 
