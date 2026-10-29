@@ -117,6 +117,7 @@ class RcSafety(unittest.TestCase):
             if 'run' in step:
                 self.assertNotIn('${{', step['run'])
         upload = job['steps'][-1]
+        self.assertEqual(upload['with']['path'], '${{ runner.temp }}/image-rc/publish/rc-report.json')
         self.assertEqual(upload['with']['retention-days'], '1')
         self.assertEqual(upload['with']['include-hidden-files'], 'false')
 

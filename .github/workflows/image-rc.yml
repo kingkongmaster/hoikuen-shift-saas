@@ -56,12 +56,12 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: python3 control/tools/release/image-rc.py source "$RUNNER_TEMP/image-rc" "$SOURCE_SHA"
-      - name: Upload sanitized evidence and passing images only
+      - name: Upload sanitized report only (no image archives)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: image-rc-${{ github.run_id }}
-          path: ${{ runner.temp }}/image-rc/publish/
+          path: ${{ runner.temp }}/image-rc/publish/rc-report.json
           retention-days: 1
           compression-level: 0
           if-no-files-found: ignore

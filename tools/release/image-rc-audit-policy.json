@@ -1,10 +1,9 @@
 {
-  "sourceSha": "dbdba741958d34328797448a9afc396331831a16",
-  "reviewedAt": "2026-10-23",
-  "expiresAt": "2026-10-24",
-  "sourceFingerprint": "63daab5f2844b160abb0a853e5cf6e056414ee0891278aea1d37d552025e9c8f",
-  "scope": "Candidate API/Web exact SHA only. External TLS edge, operations/migration images and current Production configuration excluded. No previous exception automatically inherited. All rules require current native/runtime guards.",
-  "evidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/39920623260",
+  "sourceSha": "6d92ae4c4fe5c660627371e62fd7d530dfe1e229",
+  "reviewedAt": "2026-10-29",
+  "expiresAt": "2026-10-30",
+  "sourceFingerprint": "b5fdbbbb394c3ca30ffb239594f9bb05b282a8bebcb4eaf923639a78fecdca07",
+  "scope": "Exact fixed SHA API/Web runtime only. All 73 scan rows freshly reviewed against 51 primary references and current native/runtime guards. External edge, migration operations, image retention/transfer remain separate gates.",
   "rows": [
     {
       "VulnerabilityID": "CVE-2026-40345",
@@ -17,59 +16,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Current exact-SHA isolated API require.resolve probe confirms package absent. Migration/Prisma build tooling is outside API/Web runtime. No application import or attacker recursive object graph reaches this dependency.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/40xxx/CVE-2026-40345.json"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-77037",
-      "PkgName": "multer",
-      "InstalledVersion": "2.2.0",
-      "FixedVersion": "2.3.0",
-      "Severity": "HIGH",
-      "scope": "source",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "HIGH",
-      "reason": "Current API source has no multer middleware/upload interceptor registration. Fresh isolated multipart login probe rejects the request. API JSON parser does not invoke multer field/disk parsing. No new upload route exists in this SHA.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/77xxx/CVE-2026-77037.json"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-77078",
-      "PkgName": "multer",
-      "InstalledVersion": "2.2.0",
-      "FixedVersion": "2.3.0",
-      "Severity": "HIGH",
-      "scope": "source",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "HIGH",
-      "reason": "Current API source has no multer middleware/upload interceptor registration. Fresh isolated multipart login probe rejects the request. API JSON parser does not invoke multer field/disk parsing. No new upload route exists in this SHA.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/77xxx/CVE-2026-77078.json"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-82333",
-      "PkgName": "multer",
-      "InstalledVersion": "2.2.0",
-      "FixedVersion": "2.3.0",
-      "Severity": "HIGH",
-      "scope": "source",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "HIGH",
-      "reason": "Current API source has no multer middleware/upload interceptor registration. Fresh isolated multipart login probe rejects the request. API JSON parser does not invoke multer field/disk parsing. No new upload route exists in this SHA.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/82xxx/CVE-2026-82333.json"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-90711",
-      "PkgName": "proxy-addr",
-      "InstalledVersion": "2.0.7",
-      "FixedVersion": "2.0.8",
-      "Severity": "CRITICAL",
-      "scope": "source",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "CRITICAL",
-      "reason": "Exact source enforces numeric trust proxy hop count 1-3, and fresh isolated runtime verifies Number(TRUST_PROXY) and hop behavior. Vulnerable subnet-string compilation is not used. Production runtime verification remains a separate HOLD; this classification covers candidate API image only.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/90xxx/CVE-2026-90711.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/40xxx/CVE-2026-40345.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-93749",
@@ -82,7 +30,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Current source uses this in CSS/build tooling only. Final Web is static nginx, without Node/Vite/source-map consumer. Fresh all-layer scans report sourceMaps=0 for both images.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/93xxx/CVE-2026-93749.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/93xxx/CVE-2026-93749.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-112942",
@@ -95,7 +44,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Vendor advisory concerns Windows launch-editor dev middleware. Current build runs Linux; final Web is nginx static assets with no Vite dev server or Windows shell. No runtime Vite package detected.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/112xxx/CVE-2026-112942.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/112xxx/CVE-2026-112942.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-14456",
@@ -108,7 +58,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/14xxx/CVE-2026-14456.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/14xxx/CVE-2026-14456.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-14456",
@@ -121,7 +72,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/14xxx/CVE-2026-14456.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/14xxx/CVE-2026-14456.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-107891",
@@ -134,7 +86,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Current maintainer advisory requires attacker-controlled patterns passed to libc regcomp. Fresh readelf evidence for Node, the generated Prisma native engine and nginx has no regcomp/regexec imports. nginx uses PCRE2; application source has no native-regex or child-process invocation. Startup shell patterns are trusted code. This assessment excludes interactive operator commands.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://seclists.org/oss-sec/2026/q4/289"
+      "reference": "https://seclists.org/oss-sec/2026/q4/289",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-107891",
@@ -147,59 +100,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Current maintainer advisory requires attacker-controlled patterns passed to libc regcomp. Fresh readelf evidence for Node, the generated Prisma native engine and nginx has no regcomp/regexec imports. nginx uses PCRE2; application source has no native-regex or child-process invocation. Startup shell patterns are trusted code. This assessment excludes interactive operator commands.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://seclists.org/oss-sec/2026/q4/289"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-77037",
-      "PkgName": "multer",
-      "InstalledVersion": "2.2.0",
-      "FixedVersion": "2.3.0",
-      "Severity": "HIGH",
-      "scope": "api",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "HIGH",
-      "reason": "Current API source has no multer middleware/upload interceptor registration. Fresh isolated multipart login probe rejects the request. API JSON parser does not invoke multer field/disk parsing. No new upload route exists in this SHA.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/77xxx/CVE-2026-77037.json"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-77078",
-      "PkgName": "multer",
-      "InstalledVersion": "2.2.0",
-      "FixedVersion": "2.3.0",
-      "Severity": "HIGH",
-      "scope": "api",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "HIGH",
-      "reason": "Current API source has no multer middleware/upload interceptor registration. Fresh isolated multipart login probe rejects the request. API JSON parser does not invoke multer field/disk parsing. No new upload route exists in this SHA.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/77xxx/CVE-2026-77078.json"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-82333",
-      "PkgName": "multer",
-      "InstalledVersion": "2.2.0",
-      "FixedVersion": "2.3.0",
-      "Severity": "HIGH",
-      "scope": "api",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "HIGH",
-      "reason": "Current API source has no multer middleware/upload interceptor registration. Fresh isolated multipart login probe rejects the request. API JSON parser does not invoke multer field/disk parsing. No new upload route exists in this SHA.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/82xxx/CVE-2026-82333.json"
-    },
-    {
-      "VulnerabilityID": "CVE-2026-90711",
-      "PkgName": "proxy-addr",
-      "InstalledVersion": "2.0.7",
-      "FixedVersion": "2.0.8",
-      "Severity": "CRITICAL",
-      "scope": "api",
-      "category": "RUNTIME_REACHABLE_MITIGATED",
-      "assessedSeverity": "CRITICAL",
-      "reason": "Exact source enforces numeric trust proxy hop count 1-3, and fresh isolated runtime verifies Number(TRUST_PROXY) and hop behavior. Vulnerable subnet-string compilation is not used. Production runtime verification remains a separate HOLD; this classification covers candidate API image only.",
-      "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/90xxx/CVE-2026-90711.json"
+      "reference": "https://seclists.org/oss-sec/2026/q4/289",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-33630",
@@ -212,7 +114,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/33xxx/CVE-2026-33630.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/33xxx/CVE-2026-33630.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-5773",
@@ -225,7 +128,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/5xxx/CVE-2026-5773.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/5xxx/CVE-2026-5773.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-6276",
@@ -238,7 +142,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/6xxx/CVE-2026-6276.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/6xxx/CVE-2026-6276.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-8286",
@@ -251,7 +156,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8286.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8286.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-8927",
@@ -264,7 +170,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8927.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8927.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-92392",
@@ -277,7 +184,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/92xxx/CVE-2026-92392.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/92xxx/CVE-2026-92392.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-1965_1",
@@ -290,7 +198,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-1965_2",
@@ -303,7 +212,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-31789",
@@ -316,7 +226,8 @@
       "assessedSeverity": "CRITICAL",
       "reason": "Vendor prerequisite is a 32-bit platform and enormous certificate extension conversion. Fresh image inspection verifies amd64/64-bit; the 32-bit overflow prerequisite is absent. Raw Critical severity is retained.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/31xxx/CVE-2026-31789.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/31xxx/CVE-2026-31789.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-15467",
@@ -329,7 +240,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/15xxx/CVE-2025-15467.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/15xxx/CVE-2025-15467.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-69421",
@@ -342,7 +254,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/69xxx/CVE-2025-69421.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/69xxx/CVE-2025-69421.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28387",
@@ -355,7 +268,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28387.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28387.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28388",
@@ -368,7 +282,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28388.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28388.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28389",
@@ -381,7 +296,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28389.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28389.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28390",
@@ -394,7 +310,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28390.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28390.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-45447",
@@ -407,7 +324,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/45xxx/CVE-2026-45447.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/45xxx/CVE-2026-45447.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-84782",
@@ -420,7 +338,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/84xxx/CVE-2026-84782.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/84xxx/CVE-2026-84782.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-5773",
@@ -433,7 +352,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/5xxx/CVE-2026-5773.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/5xxx/CVE-2026-5773.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-6276",
@@ -446,7 +366,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/6xxx/CVE-2026-6276.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/6xxx/CVE-2026-6276.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-8286",
@@ -459,7 +380,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8286.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8286.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-8927",
@@ -472,7 +394,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8927.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/8xxx/CVE-2026-8927.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-92392",
@@ -485,7 +408,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/92xxx/CVE-2026-92392.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/92xxx/CVE-2026-92392.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-1965_1",
@@ -498,7 +422,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-1965_2",
@@ -511,7 +436,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/1xxx/CVE-2026-1965.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-59375",
@@ -524,7 +450,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/59xxx/CVE-2025-59375.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/59xxx/CVE-2025-59375.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-25210",
@@ -537,7 +464,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/25xxx/CVE-2026-25210.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/25xxx/CVE-2026-25210.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-45186",
@@ -550,7 +478,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/45xxx/CVE-2026-45186.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/45xxx/CVE-2026-45186.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-66046",
@@ -563,7 +492,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/66xxx/CVE-2026-66046.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/66xxx/CVE-2026-66046.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-76641",
@@ -576,7 +506,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/76xxx/CVE-2026-76641.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/76xxx/CVE-2026-76641.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-76956",
@@ -589,7 +520,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/76xxx/CVE-2026-76956.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/76xxx/CVE-2026-76956.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-76957",
@@ -602,7 +534,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/76xxx/CVE-2026-76957.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/76xxx/CVE-2026-76957.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-77214",
@@ -615,7 +548,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/77xxx/CVE-2026-77214.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/77xxx/CVE-2026-77214.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-93990",
@@ -628,7 +562,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/93xxx/CVE-2026-93990.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/93xxx/CVE-2026-93990.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-64720",
@@ -641,7 +576,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/64xxx/CVE-2025-64720.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/64xxx/CVE-2025-64720.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-65018",
@@ -654,7 +590,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/65xxx/CVE-2025-65018.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/65xxx/CVE-2025-65018.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-66293",
@@ -667,7 +604,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/66xxx/CVE-2025-66293.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/66xxx/CVE-2025-66293.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-22695",
@@ -680,7 +618,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/22xxx/CVE-2026-22695.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/22xxx/CVE-2026-22695.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-22801",
@@ -693,7 +632,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/22xxx/CVE-2026-22801.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/22xxx/CVE-2026-22801.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-25646",
@@ -706,7 +646,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/25xxx/CVE-2026-25646.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/25xxx/CVE-2026-25646.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-31789",
@@ -719,7 +660,8 @@
       "assessedSeverity": "CRITICAL",
       "reason": "Vendor prerequisite is a 32-bit platform and enormous certificate extension conversion. Fresh image inspection verifies amd64/64-bit; the 32-bit overflow prerequisite is absent. Raw Critical severity is retained.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/31xxx/CVE-2026-31789.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/31xxx/CVE-2026-31789.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-15467",
@@ -732,7 +674,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/15xxx/CVE-2025-15467.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/15xxx/CVE-2025-15467.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-69421",
@@ -745,7 +688,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/69xxx/CVE-2025-69421.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/69xxx/CVE-2025-69421.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28387",
@@ -758,7 +702,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28387.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28387.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28388",
@@ -771,7 +716,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28388.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28388.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28389",
@@ -784,7 +730,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28389.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28389.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-28390",
@@ -797,7 +744,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28390.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/28xxx/CVE-2026-28390.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-45447",
@@ -810,7 +758,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/45xxx/CVE-2026-45447.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/45xxx/CVE-2026-45447.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-84782",
@@ -823,7 +772,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh amd64 isolated candidate runtime serves HTTP only, with fixed HTTP API upstream and no TLS/DTLS/QUIC/CMS/PKCS7/CRL configuration. Current vendor exploit prerequisites are absent. This does not classify the external TLS edge or arbitrary future upstream configuration.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/84xxx/CVE-2026-84782.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/84xxx/CVE-2026-84782.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-32414",
@@ -836,7 +786,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/32xxx/CVE-2025-32414.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/32xxx/CVE-2025-32414.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-32415",
@@ -849,7 +800,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/32xxx/CVE-2025-32415.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/32xxx/CVE-2025-32415.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-49794",
@@ -862,7 +814,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/49xxx/CVE-2025-49794.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/49xxx/CVE-2025-49794.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-49795",
@@ -875,7 +828,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/49xxx/CVE-2025-49795.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/49xxx/CVE-2025-49795.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2025-49796",
@@ -888,7 +842,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/49xxx/CVE-2025-49796.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/49xxx/CVE-2025-49796.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-6732",
@@ -901,7 +856,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/6xxx/CVE-2026-6732.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/6xxx/CVE-2026-6732.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-40200",
@@ -914,7 +870,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Vendor describes qsort overflow requiring beyond-seven-million-element arrays on 32-bit and an impractical 64th Leonardo size on 64-bit. Fresh candidate architecture check verifies amd64; no attacker-supplied native sort API is exposed.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/40xxx/CVE-2026-40200.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/40xxx/CVE-2026-40200.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-107891",
@@ -927,7 +884,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Current maintainer advisory requires attacker-controlled patterns passed to libc regcomp. Fresh readelf evidence for Node, the generated Prisma native engine and nginx has no regcomp/regexec imports. nginx uses PCRE2; application source has no native-regex or child-process invocation. Startup shell patterns are trusted code. This assessment excludes interactive operator commands.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://seclists.org/oss-sec/2026/q4/289"
+      "reference": "https://seclists.org/oss-sec/2026/q4/289",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-40200",
@@ -940,7 +898,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Vendor describes qsort overflow requiring beyond-seven-million-element arrays on 32-bit and an impractical 64th Leonardo size on 64-bit. Fresh candidate architecture check verifies amd64; no attacker-supplied native sort API is exposed.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/40xxx/CVE-2026-40200.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/40xxx/CVE-2026-40200.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-107891",
@@ -953,7 +912,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Current maintainer advisory requires attacker-controlled patterns passed to libc regcomp. Fresh readelf evidence for Node, the generated Prisma native engine and nginx has no regcomp/regexec imports. nginx uses PCRE2; application source has no native-regex or child-process invocation. Startup shell patterns are trusted code. This assessment excludes interactive operator commands.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://seclists.org/oss-sec/2026/q4/289"
+      "reference": "https://seclists.org/oss-sec/2026/q4/289",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-27135",
@@ -966,7 +926,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/27xxx/CVE-2026-27135.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/27xxx/CVE-2026-27135.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-103111",
@@ -979,7 +940,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh effective nginx config has pcre_jit disabled. Fresh native imports exclude DFA match, pattern_convert and direct jit_match APIs. Upstream nginx 1.27.5 ngx_regex.c uses pcre2_match with NULL match context and administrator-controlled config patterns, not request-controlled patterns. 32-bit-only issue is additionally excluded by amd64. Current API has no PCRE2 imports.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/103xxx/CVE-2026-103111.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/103xxx/CVE-2026-103111.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-86145",
@@ -992,7 +954,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh effective nginx config has pcre_jit disabled. Fresh native imports exclude DFA match, pattern_convert and direct jit_match APIs. Upstream nginx 1.27.5 ngx_regex.c uses pcre2_match with NULL match context and administrator-controlled config patterns, not request-controlled patterns. 32-bit-only issue is additionally excluded by amd64. Current API has no PCRE2 imports.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/86xxx/CVE-2026-86145.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/86xxx/CVE-2026-86145.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-89157",
@@ -1005,7 +968,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh effective nginx config has pcre_jit disabled. Fresh native imports exclude DFA match, pattern_convert and direct jit_match APIs. Upstream nginx 1.27.5 ngx_regex.c uses pcre2_match with NULL match context and administrator-controlled config patterns, not request-controlled patterns. 32-bit-only issue is additionally excluded by amd64. Current API has no PCRE2 imports.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/89xxx/CVE-2026-89157.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/89xxx/CVE-2026-89157.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-89161",
@@ -1018,7 +982,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh effective nginx config has pcre_jit disabled. Fresh native imports exclude DFA match, pattern_convert and direct jit_match APIs. Upstream nginx 1.27.5 ngx_regex.c uses pcre2_match with NULL match context and administrator-controlled config patterns, not request-controlled patterns. 32-bit-only issue is additionally excluded by amd64. Current API has no PCRE2 imports.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/89xxx/CVE-2026-89161.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/89xxx/CVE-2026-89161.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-4775",
@@ -1031,7 +996,8 @@
       "assessedSeverity": "HIGH",
       "reason": "Fresh nginx linked-library inventory excludes this library; nginx-only process check passes. Effective configuration has no XML/XSLT/image conversion, HTTP2/QUIC or arbitrary HTTPS upstream. Source has no shell/child-process request path. Installed curl executable is not invoked by the HTTP serving path. Package presence is preserved in raw findings.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/4xxx/CVE-2026-4775.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/4xxx/CVE-2026-4775.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     },
     {
       "VulnerabilityID": "CVE-2026-22184",
@@ -1044,7 +1010,38 @@
       "assessedSeverity": "HIGH",
       "reason": "Vendor issue is confined to contrib/untgz demonstration utility, not libz core. Fresh all-layer evidence confirms untgz executable absent in both images.",
       "exploitCondition": "See current primary advisory and exact-SHA native/runtime evidence; raw severity remains unchanged.",
-      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/22xxx/CVE-2026-22184.json"
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/22xxx/CVE-2026-22184.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
+    },
+    {
+      "scope": "web",
+      "VulnerabilityID": "CVE-2026-111497",
+      "PkgName": "brotli-libs",
+      "InstalledVersion": "1.1.0-r2",
+      "FixedVersion": "1.1.1-r0",
+      "Severity": "CRITICAL",
+      "assessedSeverity": "CRITICAL",
+      "category": "OS_PACKAGE_NOT_REACHABLE",
+      "reason": "Vendor describes a Brotli decoder out-of-bounds write requiring crafted compressed streams. Current exact-image nginx ldd excludes libbrotli, nginx-only serving process is verified, and effective config must have no load_module or brotli directive. API compressed JSON is rejected before decoding; this classification covers only the installed Web OS package and is guarded on every run. Fresh 2026-10-29 scanner Critical and vendor Critical are both retained. Fresh exact-candidate runtime guards pass; source and all retained archive bytes are unchanged.",
+      "exploitCondition": "Attacker-controlled compressed stream must reach an affected Brotli decoder. Static HTTP nginx has no decoder linkage or dynamic module activation.",
+      "reference": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/111xxx/CVE-2026-111497.json",
+      "reviewedEvidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888"
     }
-  ]
+  ],
+  "evidenceRun": "https://github.com/kingkongmaster/hoikuen-shift-saas/actions/runs/40522059888",
+  "privateRetainedEvidence": {
+    "assessedDate": "2026-10-29",
+    "primaryReferencesRechecked": 51,
+    "sourceSha": "6d92ae4c4fe5c660627371e62fd7d530dfe1e229",
+    "images": {
+      "api": {
+        "imageId": "sha256:47a3a86c64f4b7155a29fbae3e235960a42dfd1bfefd845cd171beddd86bb6f8",
+        "archiveSha256": "1511cc66bee055ec30d83b42a8206117a6f13e462e2cc7d7860f58cc900c0a68"
+      },
+      "web": {
+        "imageId": "sha256:72ad9fdc970c1f323090fc86068f22bd03e7e5e3441b3be9dcd50b7538357dc2",
+        "archiveSha256": "7771f81fa940359f40d5bffa3e020262e8847ee32cbc6857f65fea6538630989"
+      }
+    }
+  }
 }

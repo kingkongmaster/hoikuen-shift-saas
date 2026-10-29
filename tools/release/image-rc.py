@@ -19,7 +19,7 @@ import time
 import secrets
 import urllib.request
 
-MAX_ARTIFACT_BYTES = 400 * 1024 * 1024
+MAX_ARTIFACT_BYTES = 1024 * 1024
 TRIVY_URL = 'https://github.com/aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_Linux-64bit.tar.gz'
 TRIVY_SHA256 = 'c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f'
 FORBIDDEN_PATH = re.compile(r'(^|/)(?:\.env(?:\..*)?|[^/]*\.(?:docx?|xlsx?|pdf|dump|backup|sqlite3?|pem|p12|pfx|key))$|formal-pii|recovery-archive', re.I)
@@ -111,7 +111,13 @@ def public_legal_contact(source):
 
 def classify(scan, scope, policy, guards):
     rows = {(r['scope'], r['VulnerabilityID'], r['PkgName'], r['InstalledVersion']): r for r in policy['rows']}
-    valid = guards and datetime.date.today().isoformat() <= policy['expiresAt']
+    today = datetime.date.today()
+    if os.environ.get('RC_ASSESSMENT_DATE'):
+        if os.environ.get('RC_PRIVATE_VPS_MODE') != 'true':
+            raise ValueError('PRIVATE_ASSESSMENT_DATE_ONLY')
+        today = max(today, datetime.date.fromisoformat(os.environ['RC_ASSESSMENT_DATE']))
+    valid = guards and policy.get('reviewedAt', '0001-01-01') <= today.isoformat() <= policy['expiresAt']
+    scan['assessmentDate'] = today.isoformat()
     for finding in scan['findings']:
         key = (scope, finding['VulnerabilityID'], finding['PkgName'], finding['InstalledVersion'])
         rule = rows.get(key) if valid else None
@@ -135,13 +141,17 @@ def runtime_evidence(command, manifest, source, result):
         created.append(name)
     try:
         result['phase'] = 'pull-isolated-postgres'
-        command(['docker', 'pull', '--platform', 'linux/amd64', 'postgres:16-alpine'])
-        result['isolatedPostgresImageId'] = json.loads(command(['docker', 'image', 'inspect', 'postgres:16-alpine'], capture=True))[0]['Id']
+        postgres_image = os.environ.get('RC_POSTGRES_IMAGE', 'postgres:16-alpine')
+        if not postgres_image.startswith('sha256:'):
+            command(['docker', 'pull', '--platform', 'linux/amd64', postgres_image])
+        result['isolatedPostgresImageId'] = json.loads(command(['docker', 'image', 'inspect', postgres_image], capture=True))[0]['Id']
         command(['docker', 'network', 'create', '--internal', network])
         result['phase'] = 'start-isolated-postgres'
-        run_container(db, ['--network-alias', 'db', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rc', 'postgres:16-alpine'])
+        run_container(db, ['--network-alias', 'db', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rc', postgres_image])
         for attempt in range(30):
-            ready = subprocess.run(['docker', 'exec', db, 'pg_isready', '-U', 'postgres'], capture_output=True)
+            # The entrypoint's temporary Unix-socket server is not the final
+            # network listener. Wait for the intended database over TCP.
+            ready = subprocess.run(['docker', 'exec', db, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'rc'], capture_output=True)
             if ready.returncode == 0: break
             time.sleep(1)
         else: raise ValueError('ISOLATED_POSTGRES_NOT_READY')
@@ -159,7 +169,7 @@ def runtime_evidence(command, manifest, source, result):
         result['api'] = json.loads(command(['docker', 'exec', api, 'node', '-e', probe], capture=True))
         # Node probe in the API container reaches only this internal Web container.
         paths = ['/', '/manifest.json', '/sw.js', '/icons/aen-shift-icon-192.png', '/icons/aen-shift-icon-512.png', '/release-metadata.json']
-        web_probe = "(async()=>{for(const p of " + json.dumps(paths) + "){const r=await fetch('http://" + web + ":8080'+p);if(r.status!==200)throw Error('WEB_HTTP');if(p==='/release-metadata.json'&&JSON.stringify(await r.json())!==JSON.stringify(" + json.dumps(manifest['metadata']) + "))throw Error('WEB_METADATA')}console.log(JSON.stringify({http:200,pwa:200,metadataMatch:true}))})().catch(()=>process.exit(1))"
+        web_probe = "(async()=>{for(const p of " + json.dumps(paths) + "){let r;for(let i=0;i<30;i++){try{r=await fetch('http://" + web + ":8080'+p);if(r.status===200)break}catch{}await new Promise(resolve=>setTimeout(resolve,1000))}if(!r||r.status!==200)throw Error('WEB_HTTP');if(p==='/release-metadata.json'&&JSON.stringify(await r.json())!==JSON.stringify(" + json.dumps(manifest['metadata']) + "))throw Error('WEB_METADATA')}console.log(JSON.stringify({http:200,pwa:200,metadataMatch:true}))})().catch(e=>{console.error(e.message);process.exit(1)})"
         result['phase'] = 'web-http-pwa-metadata'
         result['web'] = json.loads(command(['docker', 'exec', api, 'node', '-e', web_probe], capture=True))
         result['phase'] = 'nginx-config'
@@ -196,6 +206,7 @@ def runtime_evidence(command, manifest, source, result):
                         'libcRegexImports': sorted(set(re.findall(r'\bUND\s+((?:regcomp|regexec)(?:@\S+)?)', symbols))),
                         'pcre2Imports': sorted(set(re.findall(r'\bUND\s+(pcre2_\S+)', symbols)))})
             result['nativeRegexEvidence'][role] = native
+        result['nginxEvidence']['brotliDecoderUnreachable'] = not re.search(r'libbrotli', ldd) and not re.search(r'^\s*(?:load_module|brotli)\b', config, re.M)
         result['nginxEvidence']['pcreJitDirective'] = bool(re.search(r'^\s*pcre_jit\s+on\s*;', config, re.M))
         native_rows = [row for rows in result['nativeRegexEvidence'].values() for row in rows]
         nginx_imports = set(result['nativeRegexEvidence']['web'][0]['pcre2Imports'])
@@ -209,7 +220,7 @@ def runtime_evidence(command, manifest, source, result):
         result['restartCount'] = 0
         result['internalNetwork'] = True
         result['productionConnected'] = False
-        result['pass'] = result['nativeRegexGuard'] and result['api']['numericProxyTrust'] and result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
+        result['pass'] = result['nginxEvidence']['brotliDecoderUnreachable'] and result['nativeRegexGuard'] and result['api']['numericProxyTrust'] and result['api']['deepmergeAbsent'] and result['web']['nginxOnlyProcess'] and result['amd64'] and result['nginxEvidence']['excludedFeatureDirectives'] and result['nginxEvidence']['staticHttpUpstream'] and not re.search(r'libcares|libnghttp2', ldd)
         return result
     finally:
         result['containerDiagnostics'] = []
@@ -220,6 +231,10 @@ def runtime_evidence(command, manifest, source, result):
                 logs = subprocess.run(['docker', 'logs', name], capture_output=True)
                 text = (logs.stdout + logs.stderr).decode(errors='replace')
                 fatal_lines = [line for line in text.splitlines() if 'FATAL' in line]
+                if name == db and fatal_lines and os.environ.get('RC_PRIVATE_VPS_MODE') == 'true':
+                    # Only the disposable, synthetic DB log; never publish it.
+                    with Path(os.environ['RC_PRIVATE_LOG']).open('a') as private_log:
+                        private_log.write('\n'.join(fatal_lines) + '\n')
                 expected_startup = [line for line in fatal_lines if 'the database system is starting up' in line]
                 unexpected_fatal = len(fatal_lines) - len(expected_startup)
                 if unexpected_fatal:
@@ -229,7 +244,7 @@ def runtime_evidence(command, manifest, source, result):
                     'expectedStartupFatalCount': len(expected_startup), 'unexpectedFatalCount': unexpected_fatal,
                     'errorSignals': {label: label in text for label in ('Invalid production environment', 'Cannot find module', 'ECONNREFUSED', 'Error', 'FATAL')}})
         for name in reversed(created):
-            subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
+            subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True)
         subprocess.run(['docker', 'network', 'rm', network], capture_output=True)
 
 
@@ -273,6 +288,13 @@ def run(source, output, expected_sha):
         metadata = {'product': 'AeN Shift', 'releaseId': 'musubi-r1-pilot-' + expected_sha[:12],
                     'buildId': stamp.strftime('%Y%m%dT%H%M%SZ') + '-' + expected_sha[:12] + '-' + os.environ.get('GITHUB_RUN_ID', 'local'),
                     'gitSha': expected_sha[:12], 'builtAt': stamp.isoformat().replace('+00:00', 'Z')}
+        if os.environ.get('RC_REUSE_MANIFEST'):
+            if os.environ.get('RC_PRIVATE_VPS_MODE') != 'true':
+                raise ValueError('PRIVATE_RESUME_ONLY')
+            existing = json.loads(Path(os.environ['RC_REUSE_MANIFEST']).read_text())
+            if existing['source']['baseSha'] != expected_sha or existing['source']['dirty']:
+                raise ValueError('RESUME_SOURCE_MISMATCH')
+            metadata = existing['metadata']
         metadata_file = output / 'metadata.json'
         metadata_file.write_text(json.dumps(metadata))
         scanner_archive = output / 'trivy.tar.gz'
@@ -312,29 +334,39 @@ def run(source, output, expected_sha):
         archives = []
         for app, image in manifest['images'].items():
             report['stage'] = 'image-scan-' + app
-            archive = output / (app + '.tar')
-            command(['docker', 'save', '-o', str(archive), image['imageId']])
+            retained = os.environ.get('RC_RETAINED_ARCHIVES')
+            if retained:
+                if os.environ.get('RC_PRIVATE_VPS_MODE') != 'true':
+                    raise ValueError('PRIVATE_RETAINED_ARCHIVES_ONLY')
+                archive = Path(retained) / (app + '.tar.gz')
+                original = json.loads((Path(retained).parent / 'candidate-report.json').read_text())['images'][app]
+                if original['imageId'] != image['imageId'] or sha(archive) != original['archiveSha256']:
+                    raise ValueError('RETAINED_ORIGINAL_MISMATCH')
+            else:
+                archive = output / (app + '.tar')
+                command(['docker', 'save', '-o', str(archive), image['imageId']])
             boundary = layer_boundary(archive, public_contact)
             scan_file = output / (app + '.scan.private.json')
             command([str(scanner), 'image', '--cache-dir', str(cache), '--scanners', 'vuln,secret', '--format', 'json', '--output', str(scan_file), image['imageId']])
             security = classify(vulnerabilities(json.loads(scan_file.read_text())), app, policy, guards and boundary['absentExecutables']['untgz'])
             detail = json.loads(command(['docker', 'image', 'inspect', image['imageId']], capture=True))[0]
-            compressed = output / (app + '.tar.gz')
-            with archive.open('rb') as src, gzip.open(compressed, 'wb', compresslevel=6) as dst:
-                shutil.copyfileobj(src, dst)
+            compressed = archive if retained else output / (app + '.tar.gz')
+            if not retained:
+                with archive.open('rb') as src, gzip.open(compressed, 'wb', compresslevel=6) as dst:
+                    shutil.copyfileobj(src, dst)
             archives.append(compressed)
             report['images'][app] = {**image, 'layers': detail['RootFS']['Layers'], 'boundary': boundary,
                                      'security': security, 'archiveBytes': compressed.stat().st_size,
                                      'archiveSha256': sha(compressed)}
         report['metadata'] = metadata
         report['securityGate'] = all(v['security']['pass'] and v['boundary']['pass'] for v in report['images'].values()) and report['sourceSecurity']['pass']
-        report['artifactSizeGate'] = artifact_size_ok(archives) and sum(x.stat().st_size for x in archives) < MAX_ARTIFACT_BYTES - 1024 * 1024
+        report['artifactSizeGate'] = True  # No image archives are uploaded.
         if not report['securityGate']:
             raise ValueError('SECURITY_OR_CONTENT_REVIEW_REQUIRED')
         if not report['artifactSizeGate']:
             raise ValueError('ARTIFACT_COST_SIZE_HOLD')
-        for archive in archives:
-            shutil.move(str(archive), publish / archive.name)
+        # Images remain in the ephemeral runner; public archive upload is forbidden.
+        report['publicImageArchives'] = 0
         report['status'] = 'IMAGE_SECURITY_METADATA_RUNTIME_VERIFIED'
     except Exception as error:
         report['reason'] = str(error) if isinstance(error, ValueError) else type(error).__name__
